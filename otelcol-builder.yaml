@@ -13,17 +13,21 @@
 # limitations under the License.
 
 dist:
+  module: github.com/ymotongpoo/opentelemetry-collector-extra/builder
   name: otelcol-custom
-  description: Local OpenTelemetry Collector binary
+  description: Custom OpenTelemetry Collector binary
   output_path: .
 
 receivers:
   - gomod: go.opentelemetry.io/collector/receiver/otlpreceiver v0.88.0
   - gomod: github.com/open-telemetry/opentelemetry-collector-contrib/receiver/prometheusreceiver v0.88.0
+  - gomod: github.com/ymotongpoo/opentelemetry-collector-extra/receiver/discordreceiver v0.0.0
 
 processors:
   - gomod: go.opentelemetry.io/collector/processor/batchprocessor v0.88.0
 
 exporters:
-  - gomod: github.com/open-telemetry/opentelemetry-collector-contrib/exporter/alibabacloudlogserviceexporter v0.88.0
   - gomod: go.opentelemetry.io/collector/exporter/debugexporter v0.88.0
+
+replaces:
+  - github.com/ymotongpoo/opentelemetry-collector-extra/receiver/discordreceiver => ./receiver/discordreceiver

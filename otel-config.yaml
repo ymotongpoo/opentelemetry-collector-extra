@@ -12,22 +12,24 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-steps:
-  - name: "golang:1.21"
-    script: |
-      GO111MODULE=on go install go.opentelemetry.io/collector/cmd/builder@latest
-      cp /go/bin/builder /workspace/
-    id: DOWNLOAD_OCB
-    waitFor: ["-"]
+receivers:
+  otlp:
+    protocols:
+      grpc:
+      http:
+  discord:
+    token: USE_YOUR_TOKEN_HERE
 
-  - name: "golang:1.21"
-    script: |
-      pwd
-      /workspace/builder --config=/workspace/otelcol-builder.yaml
-    id: BUILD_COLLECTOR
-    waitFor: ["DOWNLOAD_OCB"]
+processors:
+  batch:
 
-artifacts:
-  objects:
-    location: "gs://yoshifumi-artifacts/"
-    paths: ["otelcol-custom"]
+exporters:
+  debug:
+    verbosity: debug
+
+service:
+  pipelines:
+    metrics:
+      receivers: [discord, otlp]
+      processors: [batch]
+      exporters: [debug]

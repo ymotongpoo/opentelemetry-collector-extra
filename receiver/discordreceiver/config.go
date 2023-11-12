@@ -17,8 +17,8 @@ package discordreceiver
 import (
 	"errors"
 
+	"github.com/ymotongpoo/opentelemetry-collector-extra/receiver/discordreceiver/internal/metadata"
 	"go.opentelemetry.io/collector/component"
-	"go.opentelemetry.io/collector/confmap"
 )
 
 // Config defines configuration for Discord receiver.
@@ -31,24 +31,27 @@ type Config struct {
 	// If it is false, the receiver collects statistics per channel.
 	// If it is true, the receiver ignores the Channels setting.
 	// Default is false.
-	ServerWide bool `mapstructure:"server_wide"`
+	ServerWide bool `mapstructure:"server_wide,omitempty"`
 
 	// Channels is an optional setting to collect statistics from specific channels.
 	// If it is empty, the receiver collects statistics from all channels.
 	// The ServerWide setting is true, receiver ignores this setting.
-	Channels []string `mapstructure:"channels"`
+	Channels []string `mapstructure:"channels,omitempty"`
+
+	// MetricsBuilderConfig is the configuration for the metrics builder.
+	MetricsBuilderConfig metadata.MetricsBuilderConfig
 }
 
 func createDefaultConfig() component.Config {
 	return &Config{
-		Token:      "",
-		ServerWide: false,
-		Channels:   []string{},
+		Token:                "",
+		ServerWide:           false,
+		Channels:             []string{},
+		MetricsBuilderConfig: metadata.DefaultMetricsBuilderConfig(),
 	}
 }
 
 var _ component.Config = (*Config)(nil)
-var _ confmap.Unmarshaler = (*Config)(nil)
 
 // Validate checks if the receiver configuration is valid.
 func (c Config) Validate() error {
@@ -58,19 +61,5 @@ func (c Config) Validate() error {
 	if c.ServerWide && len(c.Channels) > 0 {
 		return errors.New("server_wide and channels cannot be set at the same time")
 	}
-	return nil
-}
-
-// Unmarshal parses the receiver configuration.
-func (c *Config) Unmarshal(conf *confmap.Conf) error {
-	err := conf.Unmarshal(c, confmap.WithErrorUnused(true))
-	if err != nil {
-		return err
-	}
-
-	if !conf.IsSet("token") {
-		return errors.New("token is required")
-	}
-
 	return nil
 }

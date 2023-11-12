@@ -16,25 +16,38 @@ package discordreceiver
 
 import (
 	"context"
+	"errors"
 
 	"go.opentelemetry.io/collector/component"
 	"go.opentelemetry.io/collector/consumer"
 	"go.opentelemetry.io/collector/receiver"
+
+	"github.com/ymotongpoo/opentelemetry-collector-extra/receiver/discordreceiver/internal/metadata"
 )
 
 type discordReceiver struct {
 	consumer consumer.Metrics
-	cancel   context.CancelFunc
-	cfg      *Config
-	channels []string
 	settings receiver.CreateSettings
+	cancel   context.CancelFunc
+	mb       *metadata.MetricsBuilder
+	config   *Config
+	dh       *discordHandler
 }
 
-func (r *discordReceiver) Start(ctx context.Context, host component.Host) error {
+func (r *discordReceiver) Start(ctx context.Context, _ component.Host) error {
 	ctx, r.cancel = context.WithCancel(ctx)
 
-	// TODO: connect to Discord
-
+	var err error
+	r.dh, err = newDiscordHandler(r.consumer, r.config, r.settings)
+	if err != nil {
+		return err
+	}
+	if r.dh == nil {
+		return errors.New("failed to create discord handler")
+	}
+	if err := r.dh.run(ctx); err != nil {
+		return err
+	}
 	return nil
 }
 
@@ -43,12 +56,4 @@ func (r *discordReceiver) Shutdown(ctx context.Context) error {
 		r.cancel()
 	}
 	return nil
-}
-
-func newDiscordReceiver(cfg *Config, set *receiver.CreateSettings) (receiver.CreateSettings, error) {
-	r := &discordReceiver{
-		cfg:      cfg,
-		settings: set,
-	}
-	return r, nil
 }

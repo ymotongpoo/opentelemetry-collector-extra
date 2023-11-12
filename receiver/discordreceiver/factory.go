@@ -20,20 +20,16 @@ import (
 	"go.opentelemetry.io/collector/component"
 	"go.opentelemetry.io/collector/consumer"
 	"go.opentelemetry.io/collector/receiver"
-)
 
-const (
-	typeStr = "discord"
-
-	metricsStability = component.StabilityLevelDevelopment
+	metadata "github.com/ymotongpoo/opentelemetry-collector-extra/receiver/discordreceiver/internal/metadata"
 )
 
 // NewFactory returns a new factory for the Discord receiver.
 func NewFactory() receiver.Factory {
 	return receiver.NewFactory(
-		typeStr,
+		metadata.Type,
 		createDefaultConfig,
-		receiver.WithMetrics(createMetricsReceiver, metricsStability),
+		receiver.WithMetrics(createMetricsReceiver, metadata.MetricsStability),
 	)
 }
 
@@ -47,15 +43,15 @@ func createMetricsReceiver(
 		return nil, component.ErrNilNextConsumer
 	}
 
-	err := cfg.(*Config).Validate()
-	if err == nil {
+	c := cfg.(*Config)
+	err := c.Validate()
+	if err != nil {
 		return nil, err
 	}
-
 	r := &discordReceiver{
-		settings: settings,
-		cfg:      cfg.(*Config),
 		consumer: consumer,
+		settings: settings,
+		config:   c,
 	}
 	return r, nil
 }
