@@ -20,6 +20,12 @@ The number of messages sent to the channel
 | ---- | ----------- | ---------- | ----------------------- | --------- |
 | {messages} | Sum | Int | Cumulative | true |
 
+#### Attributes
+
+| Name | Description | Values |
+| ---- | ----------- | ------ |
+| discord.channel.id | The ID of the channel | Any Str |
+
 ### discord.messages.length
 
 The length of message sent to the channel
@@ -28,8 +34,8 @@ The length of message sent to the channel
 | ---- | ----------- | ---------- | ----------------------- | --------- |
 | {characters} | Sum | Int | Cumulative | true |
 
-## Resource Attributes
+#### Attributes
 
-| Name | Description | Values | Enabled |
-| ---- | ----------- | ------ | ------- |
-| discord.channel.id | The ID of the channel | Any Str | false |
+| Name | Description | Values |
+| ---- | ----------- | ------ |
+| discord.channel.id | The ID of the channel | Any Str |

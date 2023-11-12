@@ -66,9 +66,14 @@ func (dh *discordHandler) messageCreateFunc(ctx context.Context) func(s *discord
 	handler := func(s *discordgo.Session, m *discordgo.MessageCreate) {
 		metrics, err := dh.unm.UnmarshalMessageCreateMetrics(m)
 		if err != nil {
+			dh.unm.logger.Error(err.Error())
 			return
 		}
-		dh.consumer.ConsumeMetrics(ctx, metrics)
+		err = dh.consumer.ConsumeMetrics(ctx, metrics)
+		if err != nil {
+			dh.unm.logger.Error(err.Error())
+			return
+		}
 	}
 	return handler
 }

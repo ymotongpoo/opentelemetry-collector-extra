@@ -40,47 +40,13 @@ func DefaultMetricsConfig() MetricsConfig {
 	}
 }
 
-// ResourceAttributeConfig provides common config for a particular resource attribute.
-type ResourceAttributeConfig struct {
-	Enabled bool `mapstructure:"enabled"`
-
-	enabledSetByUser bool
-}
-
-func (rac *ResourceAttributeConfig) Unmarshal(parser *confmap.Conf) error {
-	if parser == nil {
-		return nil
-	}
-	err := parser.Unmarshal(rac, confmap.WithErrorUnused())
-	if err != nil {
-		return err
-	}
-	rac.enabledSetByUser = parser.IsSet("enabled")
-	return nil
-}
-
-// ResourceAttributesConfig provides config for discord resource attributes.
-type ResourceAttributesConfig struct {
-	DiscordChannelID ResourceAttributeConfig `mapstructure:"discord.channel.id"`
-}
-
-func DefaultResourceAttributesConfig() ResourceAttributesConfig {
-	return ResourceAttributesConfig{
-		DiscordChannelID: ResourceAttributeConfig{
-			Enabled: false,
-		},
-	}
-}
-
 // MetricsBuilderConfig is a configuration for discord metrics builder.
 type MetricsBuilderConfig struct {
-	Metrics            MetricsConfig            `mapstructure:"metrics"`
-	ResourceAttributes ResourceAttributesConfig `mapstructure:"resource_attributes"`
+	Metrics MetricsConfig `mapstructure:"metrics"`
 }
 
 func DefaultMetricsBuilderConfig() MetricsBuilderConfig {
 	return MetricsBuilderConfig{
-		Metrics:            DefaultMetricsConfig(),
-		ResourceAttributes: DefaultResourceAttributesConfig(),
+		Metrics: DefaultMetricsConfig(),
 	}
 }

@@ -57,15 +57,13 @@ func TestMetricsBuilder(t *testing.T) {
 
 			defaultMetricsCount++
 			allMetricsCount++
-			mb.RecordDiscordMessagesCountDataPoint(ts, 1)
+			mb.RecordDiscordMessagesCountDataPoint(ts, 1, "discord.channel.id-val")
 
 			defaultMetricsCount++
 			allMetricsCount++
-			mb.RecordDiscordMessagesLengthDataPoint(ts, 1)
+			mb.RecordDiscordMessagesLengthDataPoint(ts, 1, "discord.channel.id-val")
 
-			rb := mb.NewResourceBuilder()
-			rb.SetDiscordChannelID("discord.channel.id-val")
-			res := rb.Emit()
+			res := pcommon.NewResource()
 			metrics := mb.Emit(WithResource(res))
 
 			if test.configSet == testSetNone {
@@ -101,6 +99,9 @@ func TestMetricsBuilder(t *testing.T) {
 					assert.Equal(t, ts, dp.Timestamp())
 					assert.Equal(t, pmetric.NumberDataPointValueTypeInt, dp.ValueType())
 					assert.Equal(t, int64(1), dp.IntValue())
+					attrVal, ok := dp.Attributes().Get("discord.channel.id")
+					assert.True(t, ok)
+					assert.EqualValues(t, "discord.channel.id-val", attrVal.Str())
 				case "discord.messages.length":
 					assert.False(t, validatedMetrics["discord.messages.length"], "Found a duplicate in the metrics slice: discord.messages.length")
 					validatedMetrics["discord.messages.length"] = true
@@ -115,6 +116,9 @@ func TestMetricsBuilder(t *testing.T) {
 					assert.Equal(t, ts, dp.Timestamp())
 					assert.Equal(t, pmetric.NumberDataPointValueTypeInt, dp.ValueType())
 					assert.Equal(t, int64(1), dp.IntValue())
+					attrVal, ok := dp.Attributes().Get("discord.channel.id")
+					assert.True(t, ok)
+					assert.EqualValues(t, "discord.channel.id-val", attrVal.Str())
 				}
 			}
 		})

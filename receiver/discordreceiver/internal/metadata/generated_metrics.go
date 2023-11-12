@@ -25,9 +25,10 @@ func (m *metricDiscordMessagesCount) init() {
 	m.data.SetEmptySum()
 	m.data.Sum().SetIsMonotonic(true)
 	m.data.Sum().SetAggregationTemporality(pmetric.AggregationTemporalityCumulative)
+	m.data.Sum().DataPoints().EnsureCapacity(m.capacity)
 }
 
-func (m *metricDiscordMessagesCount) recordDataPoint(start pcommon.Timestamp, ts pcommon.Timestamp, val int64) {
+func (m *metricDiscordMessagesCount) recordDataPoint(start pcommon.Timestamp, ts pcommon.Timestamp, val int64, discordChannelIDAttributeValue string) {
 	if !m.config.Enabled {
 		return
 	}
@@ -35,6 +36,7 @@ func (m *metricDiscordMessagesCount) recordDataPoint(start pcommon.Timestamp, ts
 	dp.SetStartTimestamp(start)
 	dp.SetTimestamp(ts)
 	dp.SetIntValue(val)
+	dp.Attributes().PutStr("discord.channel.id", discordChannelIDAttributeValue)
 }
 
 // updateCapacity saves max length of data point slices that will be used for the slice capacity.
@@ -76,9 +78,10 @@ func (m *metricDiscordMessagesLength) init() {
 	m.data.SetEmptySum()
 	m.data.Sum().SetIsMonotonic(true)
 	m.data.Sum().SetAggregationTemporality(pmetric.AggregationTemporalityCumulative)
+	m.data.Sum().DataPoints().EnsureCapacity(m.capacity)
 }
 
-func (m *metricDiscordMessagesLength) recordDataPoint(start pcommon.Timestamp, ts pcommon.Timestamp, val int64) {
+func (m *metricDiscordMessagesLength) recordDataPoint(start pcommon.Timestamp, ts pcommon.Timestamp, val int64, discordChannelIDAttributeValue string) {
 	if !m.config.Enabled {
 		return
 	}
@@ -86,6 +89,7 @@ func (m *metricDiscordMessagesLength) recordDataPoint(start pcommon.Timestamp, t
 	dp.SetStartTimestamp(start)
 	dp.SetTimestamp(ts)
 	dp.SetIntValue(val)
+	dp.Attributes().PutStr("discord.channel.id", discordChannelIDAttributeValue)
 }
 
 // updateCapacity saves max length of data point slices that will be used for the slice capacity.
@@ -148,11 +152,6 @@ func NewMetricsBuilder(mbc MetricsBuilderConfig, settings receiver.CreateSetting
 		op(mb)
 	}
 	return mb
-}
-
-// NewResourceBuilder returns a new resource builder that should be used to build a resource associated with for the emitted metrics.
-func (mb *MetricsBuilder) NewResourceBuilder() *ResourceBuilder {
-	return NewResourceBuilder(mb.config.ResourceAttributes)
 }
 
 // updateCapacity updates max length of metrics and resource attributes that will be used for the slice capacity.
@@ -227,13 +226,13 @@ func (mb *MetricsBuilder) Emit(rmo ...ResourceMetricsOption) pmetric.Metrics {
 }
 
 // RecordDiscordMessagesCountDataPoint adds a data point to discord.messages.count metric.
-func (mb *MetricsBuilder) RecordDiscordMessagesCountDataPoint(ts pcommon.Timestamp, val int64) {
-	mb.metricDiscordMessagesCount.recordDataPoint(mb.startTime, ts, val)
+func (mb *MetricsBuilder) RecordDiscordMessagesCountDataPoint(ts pcommon.Timestamp, val int64, discordChannelIDAttributeValue string) {
+	mb.metricDiscordMessagesCount.recordDataPoint(mb.startTime, ts, val, discordChannelIDAttributeValue)
 }
 
 // RecordDiscordMessagesLengthDataPoint adds a data point to discord.messages.length metric.
-func (mb *MetricsBuilder) RecordDiscordMessagesLengthDataPoint(ts pcommon.Timestamp, val int64) {
-	mb.metricDiscordMessagesLength.recordDataPoint(mb.startTime, ts, val)
+func (mb *MetricsBuilder) RecordDiscordMessagesLengthDataPoint(ts pcommon.Timestamp, val int64, discordChannelIDAttributeValue string) {
+	mb.metricDiscordMessagesLength.recordDataPoint(mb.startTime, ts, val, discordChannelIDAttributeValue)
 }
 
 // Reset resets metrics builder to its initial state. It should be used when external metrics source is restarted,

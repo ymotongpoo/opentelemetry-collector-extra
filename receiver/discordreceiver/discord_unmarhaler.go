@@ -40,12 +40,7 @@ func newDiscordUnmarshaler(mbc metadata.MetricsBuilderConfig, params receiver.Cr
 
 func (du *discordUnmarshaler) UnmarshalMessageCreateMetrics(m *discordgo.MessageCreate) (pmetric.Metrics, error) {
 	now := pcommon.NewTimestampFromTime(time.Now())
-	du.mb.RecordDiscordMessagesCountDataPoint(now, 1)
-	du.mb.RecordDiscordMessagesLengthDataPoint(now, int64(len(m.Content)))
-
-	rb := du.mb.NewResourceBuilder()
-	rb.SetDiscordChannelID(m.ChannelID)
-	du.mb.Emit(metadata.WithResource(rb.Emit()))
-
+	du.mb.RecordDiscordMessagesCountDataPoint(now, 1, m.ChannelID)
+	du.mb.RecordDiscordMessagesLengthDataPoint(now, int64(len(m.Content)), m.ChannelID)
 	return du.mb.Emit(), nil
 }

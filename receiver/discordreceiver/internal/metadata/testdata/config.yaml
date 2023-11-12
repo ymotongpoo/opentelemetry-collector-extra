@@ -5,15 +5,9 @@ all_set:
       enabled: true
     discord.messages.length:
       enabled: true
-  resource_attributes:
-    discord.channel.id:
-      enabled: true
 none_set:
   metrics:
     discord.messages.count:
       enabled: false
     discord.messages.length:
-      enabled: false
-  resource_attributes:
-    discord.channel.id:
       enabled: false
