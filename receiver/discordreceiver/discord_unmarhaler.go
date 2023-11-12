@@ -20,21 +20,18 @@ import (
 	"go.opentelemetry.io/collector/pdata/pcommon"
 	"go.opentelemetry.io/collector/pdata/pmetric"
 	"go.opentelemetry.io/collector/receiver"
-	"go.uber.org/zap"
 
 	"github.com/bwmarrin/discordgo"
 	"github.com/ymotongpoo/opentelemetry-collector-extra/receiver/discordreceiver/internal/metadata"
 )
 
 type discordUnmarshaler struct {
-	mb     *metadata.MetricsBuilder
-	logger *zap.Logger
+	mb *metadata.MetricsBuilder
 }
 
 func newDiscordUnmarshaler(mbc metadata.MetricsBuilderConfig, params receiver.CreateSettings) *discordUnmarshaler {
 	return &discordUnmarshaler{
-		mb:     metadata.NewMetricsBuilder(mbc, params),
-		logger: params.Logger,
+		mb: metadata.NewMetricsBuilder(mbc, params),
 	}
 }
 
