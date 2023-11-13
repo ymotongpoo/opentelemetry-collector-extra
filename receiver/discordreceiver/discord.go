@@ -16,11 +16,15 @@ package discordreceiver
 
 import (
 	"context"
+	"time"
 
 	"go.opentelemetry.io/collector/consumer"
+	"go.opentelemetry.io/collector/pdata/pcommon"
 	"go.opentelemetry.io/collector/receiver"
+	"go.opentelemetry.io/collector/receiver/receiverhelper"
 
 	"github.com/bwmarrin/discordgo"
+	"github.com/ymotongpoo/opentelemetry-collector-extra/receiver/discordreceiver/internal/metadata"
 )
 
 type discordHandler struct {
@@ -28,10 +32,12 @@ type discordHandler struct {
 	consumer consumer.Metrics
 	cancel   context.CancelFunc
 	config   *Config
-	unm      *discordUnmarshaler
+	obsrecv  *receiverhelper.ObsReport
+	mb       *metadata.MetricsBuilder
+	mcCh     chan messageCreateEvent
 }
 
-func newDiscordHandler(consumer consumer.Metrics, cfg *Config, settings receiver.CreateSettings) (*discordHandler, error) {
+func newDiscordHandler(consumer consumer.Metrics, cfg *Config, settings receiver.CreateSettings, obsrecv *receiverhelper.ObsReport) (*discordHandler, error) {
 	s, err := discordgo.New("Bot " + cfg.Token)
 	if err != nil {
 		return nil, err
@@ -41,39 +47,63 @@ func newDiscordHandler(consumer consumer.Metrics, cfg *Config, settings receiver
 		session:  s,
 		consumer: consumer,
 		config:   cfg,
-		unm:      newDiscordUnmarshaler(cfg.MetricsBuilderConfig, settings),
+		obsrecv:  obsrecv,
+		mb:       metadata.NewMetricsBuilder(cfg.MetricsBuilderConfig, settings),
+		mcCh:     make(chan messageCreateEvent, 1000),
 	}
 	return dh, nil
+}
+
+const (
+	dataFormat = "discord"
+)
+
+type messageCreateEvent struct {
+	s *discordgo.Session
+	m *discordgo.MessageCreate
+}
+
+func (dh *discordHandler) messageCreateFunc(ctx context.Context) func(s *discordgo.Session, m *discordgo.MessageCreate) {
+	return func(s *discordgo.Session, m *discordgo.MessageCreate) {
+		dh.mcCh <- messageCreateEvent{
+			s: s,
+			m: m,
+		}
+	}
 }
 
 func (dh *discordHandler) run(ctx context.Context) error {
 	dh.session.AddHandler(dh.messageCreateFunc(ctx))
 	if err := dh.session.Open(); err != nil {
-		dh.unm.logger.Error(err.Error())
 		return err
 	}
 	defer dh.session.Close()
-	dh.unm.logger.Info("Discord receiver started")
 
-	<-ctx.Done()
-	dh.cancel()
-	dh.unm.logger.Info("Discord receiver stopped")
+	d, err := time.ParseDuration(dh.config.BufferInterval)
+	if err != nil {
+		return err
+	}
+	ticker := time.NewTicker(d)
+TICK:
+	for {
+		select {
+		case e := <-dh.mcCh:
+			dh.messageCreateToMetrics(e)
+		case <-ticker.C:
+			metrics := dh.mb.Emit()
+			dh.obsrecv.StartMetricsOp(ctx)
+			err := dh.consumer.ConsumeMetrics(ctx, metrics)
+			dh.obsrecv.EndMetricsOp(ctx, dataFormat, metrics.DataPointCount(), err)
+		case <-ctx.Done():
+			break TICK
+		}
+	}
 
 	return nil
 }
 
-func (dh *discordHandler) messageCreateFunc(ctx context.Context) func(s *discordgo.Session, m *discordgo.MessageCreate) {
-	handler := func(s *discordgo.Session, m *discordgo.MessageCreate) {
-		metrics, err := dh.unm.UnmarshalMessageCreateMetrics(m)
-		if err != nil {
-			dh.unm.logger.Error(err.Error())
-			return
-		}
-		err = dh.consumer.ConsumeMetrics(ctx, metrics)
-		if err != nil {
-			dh.unm.logger.Error(err.Error())
-			return
-		}
-	}
-	return handler
+func (dh *discordHandler) messageCreateToMetrics(e messageCreateEvent) {
+	now := pcommon.NewTimestampFromTime(time.Now())
+	dh.mb.RecordDiscordMessagesCountDataPoint(now, 1, e.m.ChannelID)
+	dh.mb.RecordDiscordMessagesLengthDataPoint(now, int64(len(e.m.Content)), e.m.ChannelID)
 }

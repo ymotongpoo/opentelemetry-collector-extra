@@ -48,10 +48,5 @@ func createMetricsReceiver(
 	if err != nil {
 		return nil, err
 	}
-	r := &discordReceiver{
-		consumer: consumer,
-		settings: settings,
-		config:   c,
-	}
-	return r, nil
+	return newDiscordReceiver(c, settings, consumer)
 }
