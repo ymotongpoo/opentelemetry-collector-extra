@@ -1,0 +1,13 @@
+default:
+all_set:
+  metrics:
+    discord.messages.count:
+      enabled: true
+    discord.messages.length:
+      enabled: true
+none_set:
+  metrics:
+    discord.messages.count:
+      enabled: false
+    discord.messages.length:
+      enabled: false

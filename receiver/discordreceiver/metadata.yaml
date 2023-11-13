@@ -1,0 +1,47 @@
+# Copyright 2023 Yoshi Yamaguchi
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#     http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+
+type: discord
+
+status:
+  class: receiver
+  stability:
+    development: [metrics]
+  codeowners:
+    active: [ymotongpoo]
+
+attributes:
+  discord.channel.id:
+    description: "The ID of the channel"
+    type: string
+
+metrics:
+  discord.messages.count:
+    description: "The number of messages sent to the channel"
+    unit: "{messages}"
+    sum:
+      monotonic: true
+      aggregation_temporality: cumulative
+      value_type: int
+    enabled: true
+    attributes: [discord.channel.id]
+  discord.messages.length:
+    description: "The length of message sent to the channel"
+    unit: "{characters}"
+    sum:
+      monotonic: true
+      aggregation_temporality: cumulative
+      value_type: int
+    enabled: true
+    attributes: [discord.channel.id]
