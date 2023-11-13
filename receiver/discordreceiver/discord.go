@@ -104,6 +104,25 @@ TICK:
 
 func (dh *discordHandler) messageCreateToMetrics(e messageCreateEvent) {
 	now := pcommon.NewTimestampFromTime(time.Now())
-	dh.mb.RecordDiscordMessagesCountDataPoint(now, 1, e.m.ChannelID)
-	dh.mb.RecordDiscordMessagesLengthDataPoint(now, int64(len(e.m.Content)), e.m.ChannelID)
+	channelID := e.m.ChannelID
+	matched := false
+	switch {
+	case dh.config.ServerWide:
+		channelID = "@all@"
+		matched = true
+	case len(dh.config.Channels) == 0:
+		matched = true
+	default:
+		for _, ch := range dh.config.Channels {
+			if ch == channelID {
+				matched = true
+				break
+			}
+		}
+	}
+	if !matched {
+		return
+	}
+	dh.mb.RecordDiscordMessagesCountDataPoint(now, 1, channelID)
+	dh.mb.RecordDiscordMessagesLengthDataPoint(now, int64(len(e.m.Content)), channelID)
 }
