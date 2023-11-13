@@ -1,0 +1,101 @@
+name: Bug report
+description: Create a report
+labels:
+  - "bug"
+  - "needs triage"
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for taking the time to fill out this bug report! Please make sure to fill out the entire form below, providing as much context as you can in order to help us triage and track down your bug as quickly as possible.
+
+  - type: dropdown
+    id: component
+    attributes:
+      label: Component(s)
+      description: Which component(s) are you having issues with?
+      multiple: true
+      options:
+        - receiver/discord
+        - documentation
+        - CI/CD
+    validations:
+      required: true
+
+  - type: textarea
+    attributes:
+      label: What happened?
+      description: Please provide as much detail as you reasonably can.
+      value: |
+        ## Description
+
+        ## Steps to Reproduce
+
+        ## Expected Result
+
+        ## Actual Result
+
+    validations:
+      required: true
+  - type: textarea
+    attributes:
+      label: Environment information
+      description: Please provide any additional information about your installation.
+      value: |
+        ## Environment
+        OS: (e.g., "Ubuntu 20.04")
+        Compiler(if manually compiled): (e.g., "go 14.2")
+  - type: textarea
+    attributes:
+      label: OpenTelemetry Collector builder configuration
+      description: Please provide the collector build configuration you are using (e.g. the YAML config file).
+      placeholder: |
+        dist:
+          module: github.com/ymotongpoo/opentelemetry-collector-extra/builder
+          name: otelcol-custom
+          description: Custom OpenTelemetry Collector binary
+          output_path: .
+
+        receivers:
+          - gomod: go.opentelemetry.io/collector/receiver/otlpreceiver v0.88.0
+
+        processors:
+          - gomod: go.opentelemetry.io/collector/processor/batchprocessor v0.88.0
+
+        exporters:
+          - gomod: go.opentelemetry.io/collector/exporter/debugexporter v0.88.0
+      render: yaml
+  - type: textarea
+    attributes:
+      label: OpenTelemetry Collector configuration
+      description: Please provide the configuration you are using (e.g. the YAML config file).
+      placeholder: | # Empty Collector config
+        receivers:
+        exporters:
+        processors:
+        extensions:
+        service:
+          pipelines:
+            traces:
+              receivers: []
+              exporters: []
+              processors: []
+            metrics:
+              receivers: []
+              exporters: []
+              processors: []
+            logs:
+              receivers: []
+              exporters: []
+              processors: []
+      render: yaml
+  - type: textarea
+    attributes:
+      label: Log output
+      description: |
+        Please copy and paste any relevant log output.
+      render: shell
+  - type: textarea
+    attributes:
+      label: Additional context
+      description: Any additional information you think may be relevant to this issue.
