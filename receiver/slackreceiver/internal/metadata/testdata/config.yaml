@@ -1,0 +1,13 @@
+default:
+all_set:
+  metrics:
+    slack.messages.count:
+      enabled: true
+    slack.messages.length:
+      enabled: true
+none_set:
+  metrics:
+    slack.messages.count:
+      enabled: false
+    slack.messages.length:
+      enabled: false
