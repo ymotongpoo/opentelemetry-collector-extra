@@ -22,6 +22,7 @@ receivers:
   - gomod: go.opentelemetry.io/collector/receiver/otlpreceiver v0.88.0
   - gomod: github.com/open-telemetry/opentelemetry-collector-contrib/receiver/prometheusreceiver v0.88.0
   - gomod: github.com/ymotongpoo/opentelemetry-collector-extra/receiver/discordreceiver v0.0.0
+  - gomod: github.com/ymotongpoo/opentelemetry-collector-extra/receiver/slackreceiver v0.0.0
 
 processors:
   - gomod: go.opentelemetry.io/collector/processor/batchprocessor v0.88.0
@@ -31,3 +32,4 @@ exporters:
 
 replaces:
   - github.com/ymotongpoo/opentelemetry-collector-extra/receiver/discordreceiver => ./receiver/discordreceiver
+  - github.com/ymotongpoo/opentelemetry-collector-extra/receiver/slackreceiver => ./receiver/slackreceiver

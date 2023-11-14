@@ -19,6 +19,9 @@ receivers:
       http:
   discord:
     token: USE_YOUR_TOKEN_HERE
+  slack:
+    bot_token: USE_YOUR_BOT_TOKEN_HERE
+    app_token: USE_YOUR_APP_TOKEN_HERE
 
 processors:
   batch:
