@@ -5,8 +5,8 @@ This is a repository for OpenTelemetry Collector components that are totally for
 ## Components
 
 * [receiver](./receiver/)
-  * [discord](./receiver/discord/)
-  * [slack](./receiver/slack/)
+  * [discord](./receiver/discordreceiver/)
+  * [slack](./receiver/slackreceiver/)
 
 ## Support
 
