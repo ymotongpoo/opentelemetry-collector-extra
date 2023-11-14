@@ -12,6 +12,9 @@ body:
       multiple: true
       options:
         - receiver/discord
+        - receiver/slack
+        - exporter/discord
+        - exporter/slack
         - documentation
         - CI/CD
         - other
