@@ -19,7 +19,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/ymotongpoo/opentelemetry-collector-extra/receiver/slackreceiver/internal/metadata"
+	metadata "github.com/ymotongpoo/opentelemetry-collector-extra/receiver/slackreceiver/internal/metadata"
 	"go.opentelemetry.io/collector/component"
 )
 

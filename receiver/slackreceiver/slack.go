@@ -35,7 +35,6 @@ type slackHandler struct {
 	client   *socketmode.Client
 	consumer consumer.Metrics
 	cancel   context.CancelFunc
-	settings receiver.CreateSettings
 	config   *Config
 	obsrecv  *receiverhelper.ObsReport
 	mb       *metadata.MetricsBuilder
@@ -50,11 +49,14 @@ func newSlackHandler(consumer consumer.Metrics, cfg *Config, settings receiver.C
 	if cli == nil {
 		return nil, errSlackClient
 	}
+	_, err := api.AuthTest()
+	if err != nil {
+		return nil, err
+	}
 
 	sh := &slackHandler{
 		client:   cli,
 		consumer: consumer,
-		settings: settings,
 		config:   cfg,
 		obsrecv:  obsrecv,
 		mb:       metadata.NewMetricsBuilder(cfg.MetricsBuilderConfig, settings),
@@ -68,7 +70,6 @@ const (
 )
 
 func (sh *slackHandler) run(ctx context.Context) error {
-	sh.settings.Logger.Info("start slack handler")
 	ctx, sh.cancel = context.WithCancel(ctx)
 	d, err := time.ParseDuration(sh.config.BufferInterval)
 	if err != nil {
@@ -96,23 +97,19 @@ TICK:
 }
 
 func (sh *slackHandler) eventsLoop() {
-	sh.settings.Logger.Info("start events loop")
-	for env := range sh.client.Events {
-		switch env.Type {
-		case socketmode.EventTypeEventsAPI:
-			sh.client.Ack(*env.Request)
-			payload, _ := env.Data.(slackevents.EventsAPIEvent)
-			switch e := payload.InnerEvent.Data.(type) {
-			case *slackevents.MessageEvent:
-				sh.settings.Logger.Info(e.Text)
-				sh.meCh <- e
-			default:
-				sh.settings.Logger.Info(payload.InnerEvent.Type)
+	go func() {
+		for env := range sh.client.Events {
+			switch env.Type {
+			case socketmode.EventTypeEventsAPI:
+				sh.client.Ack(*env.Request)
+				payload, _ := env.Data.(slackevents.EventsAPIEvent)
+				switch e := payload.InnerEvent.Data.(type) {
+				case *slackevents.MessageEvent:
+					sh.meCh <- e
+				}
 			}
-		default:
-			sh.settings.Logger.Info(string(env.Type))
 		}
-	}
+	}()
 	if err := sh.client.Run(); err != nil {
 		return
 	}
