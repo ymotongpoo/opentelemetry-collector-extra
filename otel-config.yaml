@@ -29,10 +29,13 @@ processors:
 exporters:
   debug:
     verbosity: debug
+  discord:
+    token: USE_YOUR_TOKEN_HERE
+    channel: "1234567891012345"
 
 service:
   pipelines:
     metrics:
-      receivers: [discord, otlp]
+      receivers: [otlp, discord, slack]
       processors: [batch]
-      exporters: [debug]
+      exporters: [debug, discord]
