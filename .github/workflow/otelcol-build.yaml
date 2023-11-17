@@ -17,6 +17,7 @@ run-name: Build custom OpenTelemetry Collector
 on:
   pull_request:
   push:
+    - "*"
 
 jobs:
   setup-ocb:
