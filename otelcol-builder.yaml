@@ -29,7 +29,9 @@ processors:
 
 exporters:
   - gomod: go.opentelemetry.io/collector/exporter/debugexporter v0.88.0
+  - gomod: github.com/ymotongpoo/opentelemetry-collector-extra/exporter/discordexporter v0.0.0
 
 replaces:
   - github.com/ymotongpoo/opentelemetry-collector-extra/receiver/discordreceiver => ./receiver/discordreceiver
   - github.com/ymotongpoo/opentelemetry-collector-extra/receiver/slackreceiver => ./receiver/slackreceiver
+  - github.com/ymotongpoo/opentelemetry-collector-extra/exporter/discordexporter => ./exporter/discordexporter

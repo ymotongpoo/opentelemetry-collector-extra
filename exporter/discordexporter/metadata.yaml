@@ -12,30 +12,11 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-receivers:
-  otlp:
-    protocols:
-      grpc:
-      http:
-  discord:
-    token: USE_YOUR_TOKEN_HERE
-  slack:
-    bot_token: USE_YOUR_BOT_TOKEN_HERE
-    app_token: USE_YOUR_APP_TOKEN_HERE
+type: discord
 
-processors:
-  batch:
-
-exporters:
-  debug:
-    verbosity: debug
-  discord:
-    token: USE_YOUR_TOKEN_HERE
-    channel: "1234567891012345"
-
-service:
-  pipelines:
-    metrics:
-      receivers: [otlp, discord, slack]
-      processors: [batch]
-      exporters: [debug, discord]
+status:
+  class: exporter
+  stability:
+    development: [metrics]
+  codeowners:
+    active: [ymotongpoo]
