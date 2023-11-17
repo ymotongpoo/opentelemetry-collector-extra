@@ -8,6 +8,9 @@ This is a repository for OpenTelemetry Collector components that are totally for
   * [discord](./receiver/discordreceiver/)
   * [slack](./receiver/slackreceiver/)
 
+* [exporter](./exporter/)
+  * [discord](./exporter/discordexporter/)
+
 ## Support
 
 Because each component in this repository is made for learning purpose and fun, so all source codes are totally voluntary maintained and not guaranteed to be stable.
