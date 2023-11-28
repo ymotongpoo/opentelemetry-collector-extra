@@ -15,9 +15,9 @@
 name: otelcol-build
 run-name: Build custom OpenTelemetry Collector
 on:
-  pull_request:
   push:
-    - "*"
+    branches:
+      - "**"
 
 jobs:
   setup-ocb:
