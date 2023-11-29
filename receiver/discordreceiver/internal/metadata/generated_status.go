@@ -9,4 +9,5 @@ import (
 const (
 	Type             = "discord"
 	MetricsStability = component.StabilityLevelDevelopment
+	LogsStability    = component.StabilityLevelDevelopment
 )

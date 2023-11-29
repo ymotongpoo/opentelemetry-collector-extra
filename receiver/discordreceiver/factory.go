@@ -30,6 +30,7 @@ func NewFactory() receiver.Factory {
 		metadata.Type,
 		createDefaultConfig,
 		receiver.WithMetrics(createMetricsReceiver, metadata.MetricsStability),
+		receiver.WithLogs(createLogsReceiver, metadata.LogsStability),
 	)
 }
 
@@ -48,5 +49,22 @@ func createMetricsReceiver(
 	if err != nil {
 		return nil, err
 	}
-	return newDiscordReceiver(c, settings, consumer)
+	return newDiscordMetricsReceiver(c, settings, consumer)
+}
+
+func createLogsReceiver(
+	_ context.Context,
+	settings receiver.CreateSettings,
+	cfg component.Config,
+	consumer consumer.Logs,
+) (receiver.Logs, error) {
+	if consumer == nil {
+		return nil, component.ErrNilNextConsumer
+	}
+	c := cfg.(*Config)
+	err := c.Validate()
+	if err != nil {
+		return nil, err
+	}
+	return newDiscordLogsReceiver(c, settings, consumer)
 }

@@ -17,7 +17,7 @@ type: discord
 status:
   class: receiver
   stability:
-    development: [metrics]
+    development: [metrics, logs]
   codeowners:
     active: [ymotongpoo]
 

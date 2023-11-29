@@ -25,15 +25,20 @@ import (
 )
 
 type discordReceiver struct {
-	consumer consumer.Metrics
-	settings receiver.CreateSettings
-	cancel   context.CancelFunc
-	config   *Config
-	dh       *discordHandler
-	obsrecv  *receiverhelper.ObsReport
+	metricsConsumer consumer.Metrics
+	logsConsumer    consumer.Logs
+	settings        receiver.CreateSettings
+	cancel          context.CancelFunc
+	config          *Config
+	dh              *discordHandler
+	obsrecv         *receiverhelper.ObsReport
 }
 
-func newDiscordReceiver(config *Config, settings receiver.CreateSettings, consumer consumer.Metrics) (*discordReceiver, error) {
+func newDiscordMetricsReceiver(
+	config *Config,
+	settings receiver.CreateSettings,
+	consumer consumer.Metrics,
+) (*discordReceiver, error) {
 	obsrecv, err := receiverhelper.NewObsReport(receiverhelper.ObsReportSettings{
 		ReceiverID:             settings.ID,
 		Transport:              "event",
@@ -43,10 +48,31 @@ func newDiscordReceiver(config *Config, settings receiver.CreateSettings, consum
 		return nil, err
 	}
 	return &discordReceiver{
-		consumer: consumer,
-		settings: settings,
-		config:   config,
-		obsrecv:  obsrecv,
+		metricsConsumer: consumer,
+		settings:        settings,
+		config:          config,
+		obsrecv:         obsrecv,
+	}, nil
+}
+
+func newDiscordLogsReceiver(
+	config *Config,
+	settings receiver.CreateSettings,
+	consumer consumer.Logs,
+) (*discordReceiver, error) {
+	obsrecv, err := receiverhelper.NewObsReport(receiverhelper.ObsReportSettings{
+		ReceiverID:             settings.ID,
+		Transport:              "event",
+		ReceiverCreateSettings: settings,
+	})
+	if err != nil {
+		return nil, err
+	}
+	return &discordReceiver{
+		logsConsumer: consumer,
+		settings:     settings,
+		config:       config,
+		obsrecv:      obsrecv,
 	}, nil
 }
 
@@ -54,7 +80,7 @@ func (r *discordReceiver) Start(ctx context.Context, _ component.Host) error {
 	ctx, r.cancel = context.WithCancel(ctx)
 
 	var err error
-	r.dh, err = newDiscordHandler(r.consumer, r.config, r.settings, r.obsrecv)
+	r.dh, err = newDiscordMetricsHandler(r.metricsConsumer, r.config, r.settings, r.obsrecv)
 	if err != nil {
 		return err
 	}

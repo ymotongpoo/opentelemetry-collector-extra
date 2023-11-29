@@ -28,28 +28,54 @@ import (
 )
 
 type discordHandler struct {
-	session  *discordgo.Session
-	consumer consumer.Metrics
-	cancel   context.CancelFunc
-	config   *Config
-	obsrecv  *receiverhelper.ObsReport
-	mb       *metadata.MetricsBuilder
-	mcCh     chan messageCreateEvent
+	session         *discordgo.Session
+	metricsConsumer consumer.Metrics
+	logsConsumer    consumer.Logs
+	cancel          context.CancelFunc
+	config          *Config
+	obsrecv         *receiverhelper.ObsReport
+	mb              *metadata.MetricsBuilder
+	mcCh            chan messageCreateEvent
 }
 
-func newDiscordHandler(consumer consumer.Metrics, cfg *Config, settings receiver.CreateSettings, obsrecv *receiverhelper.ObsReport) (*discordHandler, error) {
+func newDiscordMetricsHandler(
+	consumer consumer.Metrics,
+	cfg *Config,
+	settings receiver.CreateSettings,
+	obsrecv *receiverhelper.ObsReport,
+) (*discordHandler, error) {
 	s, err := discordgo.New("Bot " + cfg.Token)
 	if err != nil {
 		return nil, err
 	}
 
 	dh := &discordHandler{
-		session:  s,
-		consumer: consumer,
-		config:   cfg,
-		obsrecv:  obsrecv,
-		mb:       metadata.NewMetricsBuilder(cfg.MetricsBuilderConfig, settings),
-		mcCh:     make(chan messageCreateEvent, 1000),
+		session:         s,
+		metricsConsumer: consumer,
+		config:          cfg,
+		obsrecv:         obsrecv,
+		mb:              metadata.NewMetricsBuilder(cfg.MetricsBuilderConfig, settings),
+		mcCh:            make(chan messageCreateEvent, 1000),
+	}
+	return dh, nil
+}
+
+func newDiscordLogsHandler(
+	consumer consumer.Logs,
+	cfg *Config,
+	settings receiver.CreateSettings,
+	obsrecv *receiverhelper.ObsReport,
+) (*discordHandler, error) {
+	s, err := discordgo.New("Bot " + cfg.Token)
+	if err != nil {
+		return nil, err
+	}
+	dh := &discordHandler{
+		session:      s,
+		logsConsumer: consumer,
+		config:       cfg,
+		obsrecv:      obsrecv,
+		mcCh:         make(chan messageCreateEvent, 1000),
 	}
 	return dh, nil
 }
