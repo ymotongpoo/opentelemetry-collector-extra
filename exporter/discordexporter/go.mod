@@ -1,4 +1,4 @@
-module github.com/ymotongpoo/opentelemetry-collector-extra/receiver/discordreceiver
+module github.com/ymotongpoo/opentelemetry-collector-extra/exporter/discordexporter
 
 go 1.21.4
 
