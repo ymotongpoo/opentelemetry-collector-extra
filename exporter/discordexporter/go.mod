@@ -1,6 +1,6 @@
 module github.com/ymotongpoo/opentelemetry-collector-extra/exporter/discordexporter
 
-go 1.21.4
+go 1.21.5
 
 require (
 	github.com/bwmarrin/discordgo v0.27.1
