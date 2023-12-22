@@ -25,16 +25,24 @@ import (
 // Config defines configuration for Discord receiver.
 
 type Config struct {
-	// Token is the Discord bot token.
+	// Token is the Discord bot token
 	Token string `mapstructure:"token"`
 
+	// Metrics is metrics related configs
+	Metrics *MetricsConfig `mapstructure:"metrics"`
+
+	// Logs is logs related configs
+	Logs *LogsConfig `mapstructure:"logs"`
+}
+
+type MetricsConfig struct {
 	// BufferInterval is the interval period to buffer messages from Discord.
 	// Valid time units are "ns", "us" (or "µs"), "ms", "s", "m" and "h", which are
 	// supported by time.ParseDuration().
 	// Default is "30s".
 	BufferInterval string `mapstructure:"buffer_interval"`
 
-	// ServerWide is an optional setting to collect statistics from all channels in the server.
+	// ServerWide is an optional setting to collect logs and statistics from all channels in the server.
 	// If it is false, the receiver collects statistics per channel.
 	// If it is true, the receiver ignores the Channels setting.
 	// Default is false.
@@ -49,13 +57,27 @@ type Config struct {
 	MetricsBuilderConfig metadata.MetricsBuilderConfig
 }
 
+type LogsConfig struct {
+	// Channels is the option to decide which logs to collect based on channels.
+	// If it is empty, the receiver doesn't collect any logs.
+	// Default is empty, so you need to explicitly specify the channels.
+	Channels []string `mapstructure:"channels,omitempty"`
+}
+
 func createDefaultConfig() component.Config {
-	return &Config{
-		Token:                "",
+	mc := &MetricsConfig{
 		BufferInterval:       "30s",
 		ServerWide:           false,
 		Channels:             []string{},
 		MetricsBuilderConfig: metadata.DefaultMetricsBuilderConfig(),
+	}
+	lc := &LogsConfig{
+		Channels: []string{},
+	}
+	return &Config{
+		Token:   "",
+		Metrics: mc,
+		Logs:    lc,
 	}
 }
 
@@ -66,10 +88,10 @@ func (c Config) Validate() error {
 	if c.Token == "" {
 		return errors.New("token cannot be empty")
 	}
-	if c.ServerWide && len(c.Channels) > 0 {
+	if c.Metrics.ServerWide && len(c.Metrics.Channels) > 0 {
 		return errors.New("server_wide and channels cannot be set at the same time")
 	}
-	if _, err := time.ParseDuration(c.BufferInterval); err != nil {
+	if _, err := time.ParseDuration(c.Metrics.BufferInterval); err != nil {
 		return err
 	}
 	return nil

@@ -38,8 +38,9 @@ type discordHandler struct {
 	mcCh            chan messageCreateEvent
 }
 
-func newDiscordMetricsHandler(
-	consumer consumer.Metrics,
+func newDiscordHandler(
+	mc consumer.Metrics,
+	lc consumer.Logs,
 	cfg *Config,
 	settings receiver.CreateSettings,
 	obsrecv *receiverhelper.ObsReport,
@@ -51,31 +52,12 @@ func newDiscordMetricsHandler(
 
 	dh := &discordHandler{
 		session:         s,
-		metricsConsumer: consumer,
+		metricsConsumer: mc,
+		logsConsumer:    lc,
 		config:          cfg,
 		obsrecv:         obsrecv,
-		mb:              metadata.NewMetricsBuilder(cfg.MetricsBuilderConfig, settings),
+		mb:              metadata.NewMetricsBuilder(cfg.Metrics.MetricsBuilderConfig, settings),
 		mcCh:            make(chan messageCreateEvent, 1000),
-	}
-	return dh, nil
-}
-
-func newDiscordLogsHandler(
-	consumer consumer.Logs,
-	cfg *Config,
-	settings receiver.CreateSettings,
-	obsrecv *receiverhelper.ObsReport,
-) (*discordHandler, error) {
-	s, err := discordgo.New("Bot " + cfg.Token)
-	if err != nil {
-		return nil, err
-	}
-	dh := &discordHandler{
-		session:      s,
-		logsConsumer: consumer,
-		config:       cfg,
-		obsrecv:      obsrecv,
-		mcCh:         make(chan messageCreateEvent, 1000),
 	}
 	return dh, nil
 }
@@ -105,7 +87,7 @@ func (dh *discordHandler) run(ctx context.Context) error {
 	}
 	defer dh.session.Close()
 
-	d, err := time.ParseDuration(dh.config.BufferInterval)
+	d, err := time.ParseDuration(dh.config.Metrics.BufferInterval)
 	if err != nil {
 		return err
 	}
@@ -118,7 +100,7 @@ TICK:
 		case <-ticker.C:
 			metrics := dh.mb.Emit()
 			dh.obsrecv.StartMetricsOp(ctx)
-			err := dh.consumer.ConsumeMetrics(ctx, metrics)
+			err := dh.metricsConsumer.ConsumeMetrics(ctx, metrics)
 			dh.obsrecv.EndMetricsOp(ctx, dataFormat, metrics.DataPointCount(), err)
 		case <-ctx.Done():
 			break TICK
@@ -133,13 +115,13 @@ func (dh *discordHandler) messageCreateToMetrics(e messageCreateEvent) {
 	channelID := e.m.ChannelID
 	matched := false
 	switch {
-	case dh.config.ServerWide:
+	case dh.config.Metrics.ServerWide:
 		channelID = "@all@"
 		matched = true
-	case len(dh.config.Channels) == 0:
+	case len(dh.config.Metrics.Channels) == 0:
 		matched = true
 	default:
-		for _, ch := range dh.config.Channels {
+		for _, ch := range dh.config.Metrics.Channels {
 			if ch == channelID {
 				matched = true
 				break

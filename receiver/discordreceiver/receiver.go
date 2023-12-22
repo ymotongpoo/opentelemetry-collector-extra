@@ -80,7 +80,7 @@ func (r *discordReceiver) Start(ctx context.Context, _ component.Host) error {
 	ctx, r.cancel = context.WithCancel(ctx)
 
 	var err error
-	r.dh, err = newDiscordMetricsHandler(r.metricsConsumer, r.config, r.settings, r.obsrecv)
+	r.dh, err = newDiscordHandler(r.metricsConsumer, r.logsConsumer, r.config, r.settings, r.obsrecv)
 	if err != nil {
 		return err
 	}
