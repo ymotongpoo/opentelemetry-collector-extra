@@ -7,7 +7,7 @@ require (
 	github.com/slack-go/slack v0.12.3
 	github.com/stretchr/testify v1.8.4
 	go.opentelemetry.io/collector/component v0.90.0
-	go.opentelemetry.io/collector/confmap v0.90.0
+	go.opentelemetry.io/collector/confmap v0.91.0
 	go.opentelemetry.io/collector/consumer v0.90.0
 	go.opentelemetry.io/collector/pdata v1.0.0
 	go.opentelemetry.io/collector/receiver v0.90.0
