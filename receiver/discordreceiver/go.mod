@@ -1,6 +1,6 @@
 module github.com/ymotongpoo/opentelemetry-collector-extra/receiver/discordreceiver
 
-go 1.21.5
+go 1.22.0
 
 require (
 	github.com/bwmarrin/discordgo v0.27.1
