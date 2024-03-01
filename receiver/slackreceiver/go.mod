@@ -5,7 +5,7 @@ go 1.21.5
 require (
 	github.com/google/go-cmp v0.6.0
 	github.com/slack-go/slack v0.12.3
-	github.com/stretchr/testify v1.8.4
+	github.com/stretchr/testify v1.9.0
 	go.opentelemetry.io/collector/component v0.91.0
 	go.opentelemetry.io/collector/confmap v0.91.0
 	go.opentelemetry.io/collector/consumer v0.91.0
