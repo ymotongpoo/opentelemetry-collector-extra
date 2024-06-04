@@ -3,7 +3,7 @@ module github.com/ymotongpoo/opentelemetry-collector-extra/exporter/discordexpor
 go 1.21.5
 
 require (
-	github.com/bwmarrin/discordgo v0.27.1
+	github.com/bwmarrin/discordgo v0.28.1
 	go.opentelemetry.io/collector/component v0.91.0
 	go.opentelemetry.io/collector/consumer v0.102.0
 	go.opentelemetry.io/collector/exporter v0.91.0
