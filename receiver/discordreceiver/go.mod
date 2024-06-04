@@ -3,7 +3,7 @@ module github.com/ymotongpoo/opentelemetry-collector-extra/receiver/discordrecei
 go 1.21.5
 
 require (
-	github.com/bwmarrin/discordgo v0.27.1
+	github.com/bwmarrin/discordgo v0.28.1
 	github.com/google/go-cmp v0.6.0
 	github.com/stretchr/testify v1.9.0
 	go.opentelemetry.io/collector/component v0.102.0
