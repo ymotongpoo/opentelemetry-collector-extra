@@ -7,7 +7,7 @@ require (
 	github.com/google/go-cmp v0.6.0
 	github.com/stretchr/testify v1.9.0
 	go.opentelemetry.io/collector/component v0.102.0
-	go.opentelemetry.io/collector/confmap v0.102.0
+	go.opentelemetry.io/collector/confmap v0.102.1
 	go.opentelemetry.io/collector/consumer v0.102.0
 	go.opentelemetry.io/collector/pdata v1.9.0
 	go.opentelemetry.io/collector/receiver v0.102.0
