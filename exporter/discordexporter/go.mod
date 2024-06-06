@@ -5,7 +5,7 @@ go 1.21.5
 require (
 	github.com/bwmarrin/discordgo v0.28.1
 	go.opentelemetry.io/collector/component v0.102.0
-	go.opentelemetry.io/collector/consumer v0.102.0
+	go.opentelemetry.io/collector/consumer v0.102.1
 	go.opentelemetry.io/collector/exporter v0.102.0
 	go.opentelemetry.io/collector/pdata v1.9.0
 )
