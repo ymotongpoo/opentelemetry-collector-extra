@@ -5,9 +5,9 @@ go 1.21.5
 require (
 	github.com/bwmarrin/discordgo v0.28.1
 	go.opentelemetry.io/collector/component v0.102.1
-	go.opentelemetry.io/collector/consumer v0.102.1
+	go.opentelemetry.io/collector/consumer v0.103.0
 	go.opentelemetry.io/collector/exporter v0.102.1
-	go.opentelemetry.io/collector/pdata v1.9.0
+	go.opentelemetry.io/collector/pdata v1.10.0
 )
 
 require (
@@ -44,5 +44,5 @@ require (
 	golang.org/x/text v0.15.0 // indirect
 	google.golang.org/genproto/googleapis/rpc v0.0.0-20240520151616-dc85e6b867a5 // indirect
 	google.golang.org/grpc v1.64.0 // indirect
-	google.golang.org/protobuf v1.34.1 // indirect
+	google.golang.org/protobuf v1.34.2 // indirect
 )
