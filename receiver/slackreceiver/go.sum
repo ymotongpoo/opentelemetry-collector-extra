@@ -221,6 +221,8 @@ go.opentelemetry.io/collector/consumer v0.102.1 h1:0CkgHhxwx4lI/m+hWjh607xyjooW5
 go.opentelemetry.io/collector/consumer v0.102.1/go.mod h1:HoXqmrRV13jLnP3/Gg3fYNdRkDPoO7UW58hKiLyFF60=
 go.opentelemetry.io/collector/consumer v0.103.0 h1:L/7SA/U2ua5L4yTLChnI9I+IFGKYU5ufNQ76QKYcPYs=
 go.opentelemetry.io/collector/consumer v0.103.0/go.mod h1:7jdYb9kSSOsu2R618VRX0VJ+Jt3OrDvvUsDToHTEOLI=
+go.opentelemetry.io/collector/consumer v0.104.0 h1:Z1ZjapFp5mUcbkGEL96ljpqLIUMhRgQQpYKkDRtxy+4=
+go.opentelemetry.io/collector/consumer v0.104.0/go.mod h1:60zcIb0W9GW0z9uJCv6NmjpSbCfBOeRUyrtEwqK6Hzo=
 go.opentelemetry.io/collector/featuregate v1.0.0-rcv0017 h1:DtJQalPXMWQqT6jd2LZ1oKrOfLJJRCi+rh2LKnkj4Zo=
 go.opentelemetry.io/collector/featuregate v1.0.0-rcv0017/go.mod h1:fLmJMf1AoHttkF8p5oJAc4o5ZpHu8yO5XYJ7gbLCLzo=
 go.opentelemetry.io/collector/featuregate v1.0.0-rcv0018 h1:iK4muX3KIMqKk0xwKcRzu4ravgCtUdzsvuxxdz6A27g=
