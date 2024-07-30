@@ -200,6 +200,8 @@ go.opentelemetry.io/collector/consumer v0.103.0 h1:L/7SA/U2ua5L4yTLChnI9I+IFGKYU
 go.opentelemetry.io/collector/consumer v0.103.0/go.mod h1:7jdYb9kSSOsu2R618VRX0VJ+Jt3OrDvvUsDToHTEOLI=
 go.opentelemetry.io/collector/consumer v0.104.0 h1:Z1ZjapFp5mUcbkGEL96ljpqLIUMhRgQQpYKkDRtxy+4=
 go.opentelemetry.io/collector/consumer v0.104.0/go.mod h1:60zcIb0W9GW0z9uJCv6NmjpSbCfBOeRUyrtEwqK6Hzo=
+go.opentelemetry.io/collector/consumer v0.106.1 h1:+AQ/Kmoc/g0WP8thwymNkXk1jeWsHDK6XyYfdezcxcc=
+go.opentelemetry.io/collector/consumer v0.106.1/go.mod h1:oy6pR/v5o/N9cxsICskyt//bU8k8EG0JeOO1MTDfs5A=
 go.opentelemetry.io/collector/exporter v0.89.0 h1:8sYpJdKDQ2RuYOPKDsMz/lMJqp4WEWZgfJzyn9IgOag=
 go.opentelemetry.io/collector/exporter v0.89.0/go.mod h1:zR8PFXMHlG0qPIEdRPNaefxDNj4UVP47uJ4vbHs+YME=
 go.opentelemetry.io/collector/exporter v0.90.0 h1:XMpOprVtAG3yryRQ8fw6a9TZsL7t9jzCrYCvhHrtBw4=
