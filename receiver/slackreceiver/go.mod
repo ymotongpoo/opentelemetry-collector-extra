@@ -10,7 +10,7 @@ require (
 	go.opentelemetry.io/collector/confmap v0.106.1
 	go.opentelemetry.io/collector/consumer v0.106.1
 	go.opentelemetry.io/collector/pdata v1.12.0
-	go.opentelemetry.io/collector/receiver v0.106.1
+	go.opentelemetry.io/collector/receiver v0.121.0
 	go.uber.org/zap v1.27.0
 )
 
