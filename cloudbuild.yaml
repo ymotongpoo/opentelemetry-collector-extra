@@ -13,21 +13,21 @@
 # limitations under the License.
 
 steps:
-  - name: "golang:1.21"
+  - name: "golang:1.25"
     script: |
       GO111MODULE=on go install go.opentelemetry.io/collector/cmd/builder@latest
       cp /go/bin/builder /workspace/builder
     id: DOWNLOAD_OCB
     waitFor: ["-"]
 
-  - name: "golang:1.21"
+  - name: "golang:1.25"
     script: |
       pwd
       CGO_ENABLED=0 GOOS=linux GOARCH=amd64 GOOS=linux GOARCH=amd64 /workspace/builder --config=/workspace/otelcol-builder.yaml --name=otelcol-custom-linux
     id: BUILD_COLLECTOR_LINUX
     waitFor: ["DOWNLOAD_OCB"]
 
-  - name: "golang:1.21"
+  - name: "golang:1.25"
     script: |
       pwd
       CGO_ENABLED=0 GOOS=darwin GOARCH=arm64 /workspace/builder --config=/workspace/otelcol-builder.yaml --name=otelcol-custom-macos
