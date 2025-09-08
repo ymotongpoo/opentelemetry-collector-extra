@@ -6,7 +6,7 @@ require (
 	github.com/bwmarrin/discordgo v0.28.1
 	go.opentelemetry.io/collector/component v0.106.1
 	go.opentelemetry.io/collector/consumer v0.106.1
-	go.opentelemetry.io/collector/exporter v0.106.1
+	go.opentelemetry.io/collector/exporter v0.135.0
 	go.opentelemetry.io/collector/pdata v1.12.0
 )
 
