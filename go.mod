@@ -2,13 +2,14 @@
 
 module github.com/ymotongpoo/opentelemetry-collector-extra/builder
 
-go 1.24.0
+go 1.24.9
 
-toolchain go1.24.4
+toolchain go1.24.11
 
 require (
 	github.com/open-telemetry/opentelemetry-collector-contrib/receiver/prometheusreceiver v0.141.0
 	github.com/ymotongpoo/opentelemetry-collector-extra/exporter/discordexporter v0.0.0
+	github.com/ymotongpoo/opentelemetry-collector-extra/exporter/s3tablesexporter v0.0.0
 	github.com/ymotongpoo/opentelemetry-collector-extra/receiver/discordreceiver v0.0.0
 	github.com/ymotongpoo/opentelemetry-collector-extra/receiver/slackreceiver v0.0.0
 	go.opentelemetry.io/collector/component v1.47.0
@@ -44,6 +45,7 @@ require (
 	github.com/Code-Hex/go-generics-cache v1.5.1 // indirect
 	github.com/Microsoft/go-winio v0.6.2 // indirect
 	github.com/alecthomas/units v0.0.0-20240927000941-0f3dac36c52b // indirect
+	github.com/andybalholm/brotli v1.1.1 // indirect
 	github.com/armon/go-metrics v0.4.1 // indirect
 	github.com/asaskevich/govalidator v0.0.0-20230301143203-a9d515a09cc2 // indirect
 	github.com/aws/aws-sdk-go-v2 v1.39.2 // indirect
@@ -57,6 +59,7 @@ require (
 	github.com/aws/aws-sdk-go-v2/service/internal/accept-encoding v1.13.1 // indirect
 	github.com/aws/aws-sdk-go-v2/service/internal/presigned-url v1.13.9 // indirect
 	github.com/aws/aws-sdk-go-v2/service/lightsail v1.49.1 // indirect
+	github.com/aws/aws-sdk-go-v2/service/s3tables v1.2.0 // indirect
 	github.com/aws/aws-sdk-go-v2/service/sso v1.29.6 // indirect
 	github.com/aws/aws-sdk-go-v2/service/ssooidc v1.35.1 // indirect
 	github.com/aws/aws-sdk-go-v2/service/sts v1.38.6 // indirect
@@ -175,6 +178,9 @@ require (
 	github.com/opencontainers/go-digest v1.0.0 // indirect
 	github.com/opencontainers/image-spec v1.1.1 // indirect
 	github.com/ovh/go-ovh v1.9.0 // indirect
+	github.com/parquet-go/bitpack v1.0.0 // indirect
+	github.com/parquet-go/jsonlite v1.0.0 // indirect
+	github.com/parquet-go/parquet-go v0.26.2 // indirect
 	github.com/pierrec/lz4/v4 v4.1.22 // indirect
 	github.com/pkg/browser v0.0.0-20240102092130-5ac0b6a4141c // indirect
 	github.com/pkg/errors v0.9.1 // indirect
@@ -327,3 +333,5 @@ replace github.com/ymotongpoo/opentelemetry-collector-extra/receiver/discordrece
 replace github.com/ymotongpoo/opentelemetry-collector-extra/receiver/slackreceiver => ./receiver/slackreceiver
 
 replace github.com/ymotongpoo/opentelemetry-collector-extra/exporter/discordexporter => ./exporter/discordexporter
+
+replace github.com/ymotongpoo/opentelemetry-collector-extra/exporter/s3tablesexporter => ./exporter/s3tablesexporter

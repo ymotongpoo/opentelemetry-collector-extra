@@ -13,6 +13,7 @@ import (
 	"go.opentelemetry.io/collector/service/telemetry/otelconftelemetry"
 	debugexporter "go.opentelemetry.io/collector/exporter/debugexporter"
 	discordexporter "github.com/ymotongpoo/opentelemetry-collector-extra/exporter/discordexporter"
+	s3tablesexporter "github.com/ymotongpoo/opentelemetry-collector-extra/exporter/s3tablesexporter"
 	batchprocessor "go.opentelemetry.io/collector/processor/batchprocessor"
 	otlpreceiver "go.opentelemetry.io/collector/receiver/otlpreceiver"
 	prometheusreceiver "github.com/open-telemetry/opentelemetry-collector-contrib/receiver/prometheusreceiver"
@@ -51,6 +52,7 @@ func components() (otelcol.Factories, error) {
 	factories.Exporters, err = otelcol.MakeFactoryMap[exporter.Factory](
 		debugexporter.NewFactory(),
 		discordexporter.NewFactory(),
+		s3tablesexporter.NewFactory(),
 	)
 	if err != nil {
 		return otelcol.Factories{}, err
@@ -58,6 +60,7 @@ func components() (otelcol.Factories, error) {
 	factories.ExporterModules = make(map[component.Type]string, len(factories.Exporters))
 	factories.ExporterModules[debugexporter.NewFactory().Type()] = "go.opentelemetry.io/collector/exporter/debugexporter v0.141.0"
 	factories.ExporterModules[discordexporter.NewFactory().Type()] = "github.com/ymotongpoo/opentelemetry-collector-extra/exporter/discordexporter v0.0.0"
+	factories.ExporterModules[s3tablesexporter.NewFactory().Type()] = "github.com/ymotongpoo/opentelemetry-collector-extra/exporter/s3tablesexporter v0.0.0"
 
 	factories.Processors, err = otelcol.MakeFactoryMap[processor.Factory](
 		batchprocessor.NewFactory(),
