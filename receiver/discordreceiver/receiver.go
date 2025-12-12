@@ -26,14 +26,14 @@ import (
 
 type discordReceiver struct {
 	consumer consumer.Metrics
-	settings receiver.CreateSettings
+	settings receiver.Settings
 	cancel   context.CancelFunc
 	config   *Config
 	dh       *discordHandler
 	obsrecv  *receiverhelper.ObsReport
 }
 
-func newDiscordReceiver(config *Config, settings receiver.CreateSettings, consumer consumer.Metrics) (*discordReceiver, error) {
+func newDiscordReceiver(config *Config, settings receiver.Settings, consumer consumer.Metrics) (*discordReceiver, error) {
 	obsrecv, err := receiverhelper.NewObsReport(receiverhelper.ObsReportSettings{
 		ReceiverID:             settings.ID,
 		Transport:              "event",

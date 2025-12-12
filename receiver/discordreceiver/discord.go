@@ -37,7 +37,7 @@ type discordHandler struct {
 	mcCh     chan messageCreateEvent
 }
 
-func newDiscordHandler(consumer consumer.Metrics, cfg *Config, settings receiver.CreateSettings, obsrecv *receiverhelper.ObsReport) (*discordHandler, error) {
+func newDiscordHandler(consumer consumer.Metrics, cfg *Config, settings receiver.Settings, obsrecv *receiverhelper.ObsReport) (*discordHandler, error) {
 	s, err := discordgo.New("Bot " + cfg.Token)
 	if err != nil {
 		return nil, err
@@ -48,7 +48,7 @@ func newDiscordHandler(consumer consumer.Metrics, cfg *Config, settings receiver
 		consumer: consumer,
 		config:   cfg,
 		obsrecv:  obsrecv,
-		mb:       metadata.NewMetricsBuilder(cfg.MetricsBuilderConfig, settings),
+		mb:       metadata.NewMetricsBuilder(cfg.MetricsBuilderConfig, settings.TelemetrySettings),
 		mcCh:     make(chan messageCreateEvent, 1000),
 	}
 	return dh, nil

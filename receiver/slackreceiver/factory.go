@@ -16,6 +16,7 @@ package slackreceiver
 
 import (
 	"context"
+	"fmt"
 
 	"go.opentelemetry.io/collector/component"
 	"go.opentelemetry.io/collector/consumer"
@@ -27,7 +28,7 @@ import (
 // NewFactory returns a new factory for the Slack receiver.
 func NewFactory() receiver.Factory {
 	return receiver.NewFactory(
-		metadata.Type,
+		component.MustNewType(metadata.Type),
 		createDefaultConfig,
 		receiver.WithMetrics(createMetricsReceiver, metadata.MetricsStability),
 	)
@@ -35,12 +36,12 @@ func NewFactory() receiver.Factory {
 
 func createMetricsReceiver(
 	_ context.Context,
-	settings receiver.CreateSettings,
+	settings receiver.Settings,
 	cfg component.Config,
 	consumer consumer.Metrics,
 ) (receiver.Metrics, error) {
 	if consumer == nil {
-		return nil, component.ErrNilNextConsumer
+		return nil, fmt.Errorf("nil next consumer")
 	}
 
 	c := cfg.(*Config)

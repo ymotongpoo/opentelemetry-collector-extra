@@ -43,7 +43,7 @@ type slackHandler struct {
 
 var errSlackClient = errors.New("failed to create slack client")
 
-func newSlackHandler(consumer consumer.Metrics, cfg *Config, settings receiver.CreateSettings, obsrecv *receiverhelper.ObsReport) (*slackHandler, error) {
+func newSlackHandler(consumer consumer.Metrics, cfg *Config, settings receiver.Settings, obsrecv *receiverhelper.ObsReport) (*slackHandler, error) {
 	api := slack.New(cfg.BotToken, slack.OptionAppLevelToken(cfg.AppToken))
 	cli := socketmode.New(api)
 	if cli == nil {
@@ -59,7 +59,7 @@ func newSlackHandler(consumer consumer.Metrics, cfg *Config, settings receiver.C
 		consumer: consumer,
 		config:   cfg,
 		obsrecv:  obsrecv,
-		mb:       metadata.NewMetricsBuilder(cfg.MetricsBuilderConfig, settings),
+		mb:       metadata.NewMetricsBuilder(cfg.MetricsBuilderConfig, settings.TelemetrySettings),
 		meCh:     make(chan *slackevents.MessageEvent, 1000),
 	}
 	return sh, nil

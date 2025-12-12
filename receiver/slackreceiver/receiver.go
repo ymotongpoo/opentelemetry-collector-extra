@@ -26,14 +26,14 @@ import (
 
 type slackReceiver struct {
 	consumer consumer.Metrics
-	settings receiver.CreateSettings
+	settings receiver.Settings
 	cancel   context.CancelFunc
 	config   *Config
 	sh       *slackHandler
 	obsrecv  *receiverhelper.ObsReport
 }
 
-func newSlackReceiver(config *Config, settings receiver.CreateSettings, consumer consumer.Metrics) (*slackReceiver, error) {
+func newSlackReceiver(config *Config, settings receiver.Settings, consumer consumer.Metrics) (*slackReceiver, error) {
 	obsrecv, err := receiverhelper.NewObsReport(receiverhelper.ObsReportSettings{
 		ReceiverID:             settings.ID,
 		Transport:              "event",

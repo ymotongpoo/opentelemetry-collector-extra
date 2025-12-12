@@ -19,16 +19,16 @@ dist:
   output_path: .
 
 receivers:
-  - gomod: go.opentelemetry.io/collector/receiver/otlpreceiver v0.88.0
-  - gomod: github.com/open-telemetry/opentelemetry-collector-contrib/receiver/prometheusreceiver v0.88.0
+  - gomod: go.opentelemetry.io/collector/receiver/otlpreceiver v0.141.0
+  - gomod: github.com/open-telemetry/opentelemetry-collector-contrib/receiver/prometheusreceiver v0.141.0
   - gomod: github.com/ymotongpoo/opentelemetry-collector-extra/receiver/discordreceiver v0.0.0
   - gomod: github.com/ymotongpoo/opentelemetry-collector-extra/receiver/slackreceiver v0.0.0
 
 processors:
-  - gomod: go.opentelemetry.io/collector/processor/batchprocessor v0.88.0
+  - gomod: go.opentelemetry.io/collector/processor/batchprocessor v0.141.0
 
 exporters:
-  - gomod: go.opentelemetry.io/collector/exporter/debugexporter v0.88.0
+  - gomod: go.opentelemetry.io/collector/exporter/debugexporter v0.141.0
   - gomod: github.com/ymotongpoo/opentelemetry-collector-extra/exporter/discordexporter v0.0.0
 
 replaces:

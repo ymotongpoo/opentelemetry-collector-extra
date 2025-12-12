@@ -27,7 +27,7 @@ import (
 
 func NewFactory() exporter.Factory {
 	return exporter.NewFactory(
-		metadata.Type,
+		component.MustNewType(metadata.Type),
 		createDeafultConfig,
 		exporter.WithMetrics(createMetricsExporter, metadata.MetricsStability),
 	)
@@ -35,7 +35,7 @@ func NewFactory() exporter.Factory {
 
 func createMetricsExporter(
 	ctx context.Context,
-	param exporter.CreateSettings,
+	param exporter.Settings,
 	cfg component.Config,
 ) (exporter.Metrics, error) {
 	c := cfg.(*Config)
@@ -43,7 +43,7 @@ func createMetricsExporter(
 	if err != nil {
 		return nil, err
 	}
-	return exporterhelper.NewMetricsExporter(
+	return exporterhelper.NewMetrics(
 		ctx,
 		param,
 		cfg,

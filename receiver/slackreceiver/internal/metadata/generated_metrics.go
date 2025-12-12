@@ -8,7 +8,6 @@ import (
 	"go.opentelemetry.io/collector/component"
 	"go.opentelemetry.io/collector/pdata/pcommon"
 	"go.opentelemetry.io/collector/pdata/pmetric"
-	"go.opentelemetry.io/collector/receiver"
 )
 
 type metricSlackMessagesCount struct {
@@ -139,12 +138,12 @@ func WithStartTime(startTime pcommon.Timestamp) metricBuilderOption {
 	}
 }
 
-func NewMetricsBuilder(mbc MetricsBuilderConfig, settings receiver.CreateSettings, options ...metricBuilderOption) *MetricsBuilder {
+func NewMetricsBuilder(mbc MetricsBuilderConfig, settings component.TelemetrySettings, options ...metricBuilderOption) *MetricsBuilder {
 	mb := &MetricsBuilder{
 		config:                    mbc,
 		startTime:                 pcommon.NewTimestampFromTime(time.Now()),
 		metricsBuffer:             pmetric.NewMetrics(),
-		buildInfo:                 settings.BuildInfo,
+		buildInfo:                 component.NewDefaultBuildInfo(),
 		metricSlackMessagesCount:  newMetricSlackMessagesCount(mbc.Metrics.SlackMessagesCount),
 		metricSlackMessagesLength: newMetricSlackMessagesLength(mbc.Metrics.SlackMessagesLength),
 	}
