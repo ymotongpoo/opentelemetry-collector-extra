@@ -4,7 +4,7 @@ module github.com/ymotongpoo/opentelemetry-collector-extra/builder
 
 go 1.24.9
 
-toolchain go1.24.11
+toolchain go1.25.5
 
 require (
 	github.com/open-telemetry/opentelemetry-collector-contrib/receiver/prometheusreceiver v0.141.0
