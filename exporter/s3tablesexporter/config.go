@@ -18,6 +18,7 @@ package s3tablesexporter
 
 import (
 	"fmt"
+	"regexp"
 
 	"go.opentelemetry.io/collector/component"
 )
@@ -32,6 +33,22 @@ type Config struct {
 
 // Validate checks that the configuration is valid.
 func (cfg *Config) Validate() error {
+	// TableBucketArnの検証
+	if cfg.TableBucketArn == "" {
+		return fmt.Errorf("table_bucket_arn is required")
+	}
+
+	// ARN形式の検証
+	// 形式: arn:aws:s3tables:region:account-id:bucket/bucket-name
+	arnPattern := `^arn:aws:s3tables:[a-z0-9-]+:\d{12}:bucket/[a-z0-9][a-z0-9-]{1,61}[a-z0-9]$`
+	matched, err := regexp.MatchString(arnPattern, cfg.TableBucketArn)
+	if err != nil {
+		return fmt.Errorf("failed to validate table_bucket_arn: %w", err)
+	}
+	if !matched {
+		return fmt.Errorf("table_bucket_arn must follow the format arn:aws:s3tables:region:account-id:bucket/bucket-name")
+	}
+
 	if cfg.Region == "" {
 		return fmt.Errorf("region is required")
 	}
