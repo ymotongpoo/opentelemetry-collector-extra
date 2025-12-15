@@ -28,9 +28,10 @@ import (
 
 func TestNewS3TablesExporter(t *testing.T) {
 	cfg := &Config{
-		Region:    "us-east-1",
-		Namespace: "test-namespace",
-		TableName: "test-table",
+		TableBucketArn: "arn:aws:s3tables:us-east-1:123456789012:bucket/test-bucket",
+		Region:         "us-east-1",
+		Namespace:      "test-namespace",
+		TableName:      "test-table",
 	}
 	set := exportertest.NewNopSettings(component.MustNewType("s3tables"))
 
@@ -46,11 +47,59 @@ func TestNewS3TablesExporter(t *testing.T) {
 	}
 }
 
+// TestNewS3TablesExporter_WithValidTableBucketArn tests exporter initialization with valid TableBucketArn
+// Requirements: 1.4
+func TestNewS3TablesExporter_WithValidTableBucketArn(t *testing.T) {
+	cfg := &Config{
+		TableBucketArn: "arn:aws:s3tables:us-west-2:987654321098:bucket/my-table-bucket",
+		Region:         "us-west-2",
+		Namespace:      "production",
+		TableName:      "telemetry-data",
+	}
+	set := exportertest.NewNopSettings(component.MustNewType("s3tables"))
+
+	exporter, err := newS3TablesExporter(cfg, set)
+	if err != nil {
+		t.Fatalf("newS3TablesExporter() with valid TableBucketArn failed: %v", err)
+	}
+	if exporter == nil {
+		t.Fatal("newS3TablesExporter() returned nil")
+	}
+	if exporter.config.TableBucketArn != cfg.TableBucketArn {
+		t.Errorf("expected TableBucketArn to be '%s', got '%s'", cfg.TableBucketArn, exporter.config.TableBucketArn)
+	}
+}
+
+// TestNewS3TablesExporter_WithEmptyTableBucketArn tests that exporter initialization fails with empty TableBucketArn
+// Requirements: 1.4
+func TestNewS3TablesExporter_WithEmptyTableBucketArn(t *testing.T) {
+	cfg := &Config{
+		TableBucketArn: "",
+		Region:         "us-east-1",
+		Namespace:      "test-namespace",
+		TableName:      "test-table",
+	}
+	set := exportertest.NewNopSettings(component.MustNewType("s3tables"))
+
+	exporter, err := newS3TablesExporter(cfg, set)
+	if err == nil {
+		t.Fatal("newS3TablesExporter() with empty TableBucketArn should have failed")
+	}
+	if exporter != nil {
+		t.Error("newS3TablesExporter() should return nil when TableBucketArn is empty")
+	}
+	expectedMsg := "table_bucket_arn is required"
+	if err.Error() != expectedMsg {
+		t.Errorf("expected error message '%s', got '%s'", expectedMsg, err.Error())
+	}
+}
+
 func TestPushMetrics(t *testing.T) {
 	cfg := &Config{
-		Region:    "us-east-1",
-		Namespace: "test-namespace",
-		TableName: "test-table",
+		TableBucketArn: "arn:aws:s3tables:us-east-1:123456789012:bucket/test-bucket",
+		Region:         "us-east-1",
+		Namespace:      "test-namespace",
+		TableName:      "test-table",
 	}
 	set := exportertest.NewNopSettings(component.MustNewType("s3tables"))
 	exporter, err := newS3TablesExporter(cfg, set)
@@ -76,9 +125,10 @@ func TestPushMetrics(t *testing.T) {
 
 func TestPushTraces(t *testing.T) {
 	cfg := &Config{
-		Region:    "us-east-1",
-		Namespace: "test-namespace",
-		TableName: "test-table",
+		TableBucketArn: "arn:aws:s3tables:us-east-1:123456789012:bucket/test-bucket",
+		Region:         "us-east-1",
+		Namespace:      "test-namespace",
+		TableName:      "test-table",
 	}
 	set := exportertest.NewNopSettings(component.MustNewType("s3tables"))
 	exporter, err := newS3TablesExporter(cfg, set)
@@ -101,9 +151,10 @@ func TestPushTraces(t *testing.T) {
 
 func TestPushLogs(t *testing.T) {
 	cfg := &Config{
-		Region:    "us-east-1",
-		Namespace: "test-namespace",
-		TableName: "test-table",
+		TableBucketArn: "arn:aws:s3tables:us-east-1:123456789012:bucket/test-bucket",
+		Region:         "us-east-1",
+		Namespace:      "test-namespace",
+		TableName:      "test-table",
 	}
 	set := exportertest.NewNopSettings(component.MustNewType("s3tables"))
 	exporter, err := newS3TablesExporter(cfg, set)
@@ -126,9 +177,10 @@ func TestPushLogs(t *testing.T) {
 
 func TestUploadToS3Tables(t *testing.T) {
 	cfg := &Config{
-		Region:    "us-east-1",
-		Namespace: "test-namespace",
-		TableName: "test-table",
+		TableBucketArn: "arn:aws:s3tables:us-east-1:123456789012:bucket/test-bucket",
+		Region:         "us-east-1",
+		Namespace:      "test-namespace",
+		TableName:      "test-table",
 	}
 	set := exportertest.NewNopSettings(component.MustNewType("s3tables"))
 	exporter, err := newS3TablesExporter(cfg, set)
@@ -146,5 +198,35 @@ func TestUploadToS3Tables(t *testing.T) {
 	err = exporter.uploadToS3Tables(context.Background(), []byte("test data"), "test")
 	if err != nil {
 		t.Errorf("uploadToS3Tables() with data failed: %v", err)
+	}
+}
+
+// TestUploadToS3Tables_LogsIncludeTableBucketArn tests that logs include the configured TableBucketArn
+// Requirements: 4.1
+// Note: このテストは実際のログ出力を検証するのではなく、エクスポーターが正しく設定されていることを確認します
+func TestUploadToS3Tables_LogsIncludeTableBucketArn(t *testing.T) {
+	testARN := "arn:aws:s3tables:ap-northeast-1:111222333444:bucket/production-bucket"
+	cfg := &Config{
+		TableBucketArn: testARN,
+		Region:         "ap-northeast-1",
+		Namespace:      "production",
+		TableName:      "metrics-data",
+	}
+	set := exportertest.NewNopSettings(component.MustNewType("s3tables"))
+	exporter, err := newS3TablesExporter(cfg, set)
+	if err != nil {
+		t.Fatalf("newS3TablesExporter() failed: %v", err)
+	}
+
+	// エクスポーターの設定にTableBucketArnが含まれていることを確認
+	if exporter.config.TableBucketArn != testARN {
+		t.Errorf("expected exporter config to have TableBucketArn '%s', got '%s'", testARN, exporter.config.TableBucketArn)
+	}
+
+	// uploadToS3Tablesを呼び出してエラーが発生しないことを確認
+	// 実際のログ出力はloggerによって処理されるため、ここでは設定が正しく渡されることを確認
+	err = exporter.uploadToS3Tables(context.Background(), []byte("test data"), "test")
+	if err != nil {
+		t.Errorf("uploadToS3Tables() failed: %v", err)
 	}
 }

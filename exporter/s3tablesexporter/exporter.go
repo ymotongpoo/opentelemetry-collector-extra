@@ -38,6 +38,11 @@ type s3TablesExporter struct {
 
 // newS3TablesExporter creates a new S3 Tables exporter instance.
 func newS3TablesExporter(cfg *Config, set exporter.Settings) (*s3TablesExporter, error) {
+	// TableBucketArnが設定されているか検証
+	if cfg.TableBucketArn == "" {
+		return nil, fmt.Errorf("table_bucket_arn is required")
+	}
+
 	awsCfg, err := config.LoadDefaultConfig(context.TODO(), config.WithRegion(cfg.Region))
 	if err != nil {
 		return nil, fmt.Errorf("failed to load AWS config: %w", err)
@@ -53,7 +58,7 @@ func newS3TablesExporter(cfg *Config, set exporter.Settings) (*s3TablesExporter,
 // pushMetrics exports metrics data to S3 Tables in Parquet format.
 func (e *s3TablesExporter) pushMetrics(ctx context.Context, md pmetric.Metrics) error {
 	e.logger.Info("Exporting metrics to S3 Tables", "resource_count", md.ResourceMetrics().Len())
-	
+
 	parquetData, err := convertMetricsToParquet(md)
 	if err != nil {
 		return fmt.Errorf("failed to convert metrics to Parquet: %w", err)
@@ -65,7 +70,7 @@ func (e *s3TablesExporter) pushMetrics(ctx context.Context, md pmetric.Metrics) 
 // pushTraces exports traces data to S3 Tables in Parquet format.
 func (e *s3TablesExporter) pushTraces(ctx context.Context, td ptrace.Traces) error {
 	e.logger.Info("Exporting traces to S3 Tables", "resource_count", td.ResourceSpans().Len())
-	
+
 	parquetData, err := convertTracesToParquet(td)
 	if err != nil {
 		return fmt.Errorf("failed to convert traces to Parquet: %w", err)
@@ -77,7 +82,7 @@ func (e *s3TablesExporter) pushTraces(ctx context.Context, td ptrace.Traces) err
 // pushLogs exports logs data to S3 Tables in Parquet format.
 func (e *s3TablesExporter) pushLogs(ctx context.Context, ld plog.Logs) error {
 	e.logger.Info("Exporting logs to S3 Tables", "resource_count", ld.ResourceLogs().Len())
-	
+
 	parquetData, err := convertLogsToParquet(ld)
 	if err != nil {
 		return fmt.Errorf("failed to convert logs to Parquet: %w", err)
@@ -96,12 +101,14 @@ func (e *s3TablesExporter) uploadToS3Tables(ctx context.Context, data []byte, da
 	timestamp := time.Now().Format("2006/01/02/15/04/05")
 	key := fmt.Sprintf("%s/%s/%d.parquet", dataType, timestamp, time.Now().UnixNano())
 
-	// Simplified S3 Tables integration - actual implementation would use proper S3 Tables API
+	// TODO: 実際のS3 Tables API統合でARNを使用する
+	// S3 Tables APIを使用してテーブルバケットARNを指定したデータアップロードを実装する必要がある
 	e.logger.Info("Would upload to S3 Tables",
+		"table_bucket_arn", e.config.TableBucketArn,
 		"namespace", e.config.Namespace,
 		"table", e.config.TableName,
 		"key", key,
 		"size", len(data))
-	
+
 	return nil
 }

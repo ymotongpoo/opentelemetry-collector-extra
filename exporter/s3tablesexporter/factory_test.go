@@ -26,7 +26,7 @@ import (
 
 func TestNewFactory(t *testing.T) {
 	factory := NewFactory()
-	
+
 	if factory.Type().String() != typeStr {
 		t.Errorf("expected type %s, got %s", typeStr, factory.Type().String())
 	}
@@ -43,7 +43,9 @@ func TestNewFactory(t *testing.T) {
 
 func TestCreateMetricsExporter(t *testing.T) {
 	factory := NewFactory()
-	cfg := factory.CreateDefaultConfig()
+	cfg := factory.CreateDefaultConfig().(*Config)
+	// TableBucketArnを設定
+	cfg.TableBucketArn = "arn:aws:s3tables:us-east-1:123456789012:bucket/test-bucket"
 	set := exportertest.NewNopSettings(component.MustNewType("s3tables"))
 
 	exporter, err := factory.CreateMetrics(context.Background(), set, cfg)
@@ -57,7 +59,9 @@ func TestCreateMetricsExporter(t *testing.T) {
 
 func TestCreateTracesExporter(t *testing.T) {
 	factory := NewFactory()
-	cfg := factory.CreateDefaultConfig()
+	cfg := factory.CreateDefaultConfig().(*Config)
+	// TableBucketArnを設定
+	cfg.TableBucketArn = "arn:aws:s3tables:us-east-1:123456789012:bucket/test-bucket"
 	set := exportertest.NewNopSettings(component.MustNewType("s3tables"))
 
 	exporter, err := factory.CreateTraces(context.Background(), set, cfg)
@@ -71,7 +75,9 @@ func TestCreateTracesExporter(t *testing.T) {
 
 func TestCreateLogsExporter(t *testing.T) {
 	factory := NewFactory()
-	cfg := factory.CreateDefaultConfig()
+	cfg := factory.CreateDefaultConfig().(*Config)
+	// TableBucketArnを設定
+	cfg.TableBucketArn = "arn:aws:s3tables:us-east-1:123456789012:bucket/test-bucket"
 	set := exportertest.NewNopSettings(component.MustNewType("s3tables"))
 
 	exporter, err := factory.CreateLogs(context.Background(), set, cfg)

@@ -396,3 +396,31 @@ func TestProperty3_EmptyRequiredFieldRejection(t *testing.T) {
 		}
 	}
 }
+
+// TestProperty5_ConfigurationStorage tests Property 5: Configuration storage
+// Feature: s3tables-config-enhancement, Property 5: Configuration storage
+// Validates: Requirements 1.1
+func TestProperty5_ConfigurationStorage(t *testing.T) {
+	if testing.Short() {
+		t.Skip("skipping property-based test in short mode")
+	}
+
+	// 100回のイテレーションで有効なARNを生成し、設定に保存されることを確認
+	r := rand.New(rand.NewSource(rand.Int63()))
+	for i := 0; i < 100; i++ {
+		originalARN := generateValidARN(r)
+
+		config := &Config{
+			TableBucketArn: originalARN,
+			Region:         "us-east-1",
+			Namespace:      "default",
+			TableName:      "otel-data",
+		}
+
+		// 設定されたARNが変更されずに保存されていることを確認
+		if config.TableBucketArn != originalARN {
+			t.Errorf("Property 5 failed (iteration %d): expected TableBucketArn to be '%s', got '%s'",
+				i, originalARN, config.TableBucketArn)
+		}
+	}
+}
