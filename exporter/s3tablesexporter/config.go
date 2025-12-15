@@ -24,9 +24,10 @@ import (
 
 // Config defines the configuration for the S3 Tables exporter.
 type Config struct {
-	Region    string `mapstructure:"region"`
-	Namespace string `mapstructure:"namespace"`
-	TableName string `mapstructure:"table_name"`
+	TableBucketArn string `mapstructure:"table_bucket_arn"`
+	Region         string `mapstructure:"region"`
+	Namespace      string `mapstructure:"namespace"`
+	TableName      string `mapstructure:"table_name"`
 }
 
 // Validate checks that the configuration is valid.
@@ -46,8 +47,9 @@ func (cfg *Config) Validate() error {
 // createDefaultConfig creates the default configuration for the S3 Tables exporter.
 func createDefaultConfig() component.Config {
 	return &Config{
-		Region:    "us-east-1",
-		Namespace: "default",
-		TableName: "otel-data",
+		TableBucketArn: "",
+		Region:         "us-east-1",
+		Namespace:      "default",
+		TableName:      "otel-data",
 	}
 }

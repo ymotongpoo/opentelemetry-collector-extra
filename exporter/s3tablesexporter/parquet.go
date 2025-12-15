@@ -16,6 +16,7 @@ package s3tablesexporter
 
 import (
 	"bytes"
+	"fmt"
 
 	"github.com/parquet-go/parquet-go"
 	"go.opentelemetry.io/collector/pdata/plog"
@@ -30,7 +31,7 @@ type MetricRecord struct {
 	Type        string            `parquet:"type"`
 	Value       float64           `parquet:"value"`
 	Unit        string            `parquet:"unit"`
-	Attributes  map[string]any `parquet:"attributes"`
+	Attributes  string `parquet:"attributes"`
 	ResourceID  string            `parquet:"resource_id"`
 }
 
@@ -44,7 +45,7 @@ type TraceRecord struct {
 	EndTime     int64             `parquet:"end_time"`
 	Duration    int64             `parquet:"duration"`
 	Status      string            `parquet:"status"`
-	Attributes  map[string]any `parquet:"attributes"`
+	Attributes  string `parquet:"attributes"`
 	ResourceID  string            `parquet:"resource_id"`
 }
 
@@ -55,7 +56,7 @@ type LogRecord struct {
 	Body        string            `parquet:"body"`
 	TraceID     string            `parquet:"trace_id"`
 	SpanID      string            `parquet:"span_id"`
-	Attributes  map[string]any `parquet:"attributes"`
+	Attributes  string `parquet:"attributes"`
 	ResourceID  string            `parquet:"resource_id"`
 }
 
@@ -86,7 +87,7 @@ func convertMetricsToParquet(md pmetric.Metrics) ([]byte, error) {
 							Type:       "gauge",
 							Value:      dp.DoubleValue(),
 							Unit:       metric.Unit(),
-							Attributes: dp.Attributes().AsRaw(),
+							Attributes: getStringAttribute(dp.Attributes().AsRaw(), "key"),
 							ResourceID: resourceID,
 						})
 					}
@@ -99,7 +100,7 @@ func convertMetricsToParquet(md pmetric.Metrics) ([]byte, error) {
 							Type:       "sum",
 							Value:      dp.DoubleValue(),
 							Unit:       metric.Unit(),
-							Attributes: dp.Attributes().AsRaw(),
+							Attributes: getStringAttribute(dp.Attributes().AsRaw(), "key"),
 							ResourceID: resourceID,
 						})
 					}
@@ -137,7 +138,7 @@ func convertTracesToParquet(td ptrace.Traces) ([]byte, error) {
 					EndTime:    span.EndTimestamp().AsTime().UnixNano(),
 					Duration:   span.EndTimestamp().AsTime().Sub(span.StartTimestamp().AsTime()).Nanoseconds(),
 					Status:     span.Status().Code().String(),
-					Attributes: span.Attributes().AsRaw(),
+					Attributes: getStringAttribute(span.Attributes().AsRaw(), "key"),
 					ResourceID: resourceID,
 				})
 			}
@@ -170,7 +171,7 @@ func convertLogsToParquet(ld plog.Logs) ([]byte, error) {
 					Body:       log.Body().AsString(),
 					TraceID:    log.TraceID().String(),
 					SpanID:     log.SpanID().String(),
-					Attributes: log.Attributes().AsRaw(),
+					Attributes: getStringAttribute(log.Attributes().AsRaw(), "key"),
 					ResourceID: resourceID,
 				})
 			}
@@ -180,8 +181,20 @@ func convertLogsToParquet(ld plog.Logs) ([]byte, error) {
 	return writeParquet(records)
 }
 
+// getStringAttribute safely extracts a string attribute from a map.
+func getStringAttribute(attrs map[string]any, key string) string {
+	if val, ok := attrs[key]; ok {
+		return fmt.Sprintf("%v", val)
+	}
+	return ""
+}
+
 // writeParquet writes records to Parquet format using generic type T.
 func writeParquet[T any](records []T) ([]byte, error) {
+	if len(records) == 0 {
+		return []byte{}, nil
+	}
+	
 	var buf bytes.Buffer
 	writer := parquet.NewWriter(&buf)
 	

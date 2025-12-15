@@ -24,3 +24,6 @@ go.work
 .DS_Store
 .vscode
 
+# Kiro configs
+.kiro
+
