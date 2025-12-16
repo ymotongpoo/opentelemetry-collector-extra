@@ -132,22 +132,7 @@ func TestConfig_Validate(t *testing.T) {
 			expectedMsg: "namespace is required",
 		},
 		{
-			name: "missing traces in tables config",
-			config: &Config{
-				TableBucketArn: "arn:aws:s3tables:us-east-1:123456789012:bucket/my-bucket",
-				Region:         "us-east-1",
-				Namespace:      "test-namespace",
-				Tables: TableNamesConfig{
-					Traces:  "",
-					Metrics: "otel_metrics",
-					Logs:    "otel_logs",
-				},
-			},
-			wantErr:     true,
-			expectedMsg: "tables.traces is required",
-		},
-		{
-			name: "missing metrics in tables config",
+			name: "valid config with only traces",
 			config: &Config{
 				TableBucketArn: "arn:aws:s3tables:us-east-1:123456789012:bucket/my-bucket",
 				Region:         "us-east-1",
@@ -155,26 +140,53 @@ func TestConfig_Validate(t *testing.T) {
 				Tables: TableNamesConfig{
 					Traces:  "otel_traces",
 					Metrics: "",
-					Logs:    "otel_logs",
+					Logs:    "",
 				},
 			},
-			wantErr:     true,
-			expectedMsg: "tables.metrics is required",
+			wantErr: false,
 		},
 		{
-			name: "missing logs in tables config",
+			name: "valid config with only metrics",
 			config: &Config{
 				TableBucketArn: "arn:aws:s3tables:us-east-1:123456789012:bucket/my-bucket",
 				Region:         "us-east-1",
 				Namespace:      "test-namespace",
 				Tables: TableNamesConfig{
-					Traces:  "otel_traces",
+					Traces:  "",
 					Metrics: "otel_metrics",
 					Logs:    "",
 				},
 			},
+			wantErr: false,
+		},
+		{
+			name: "valid config with only logs",
+			config: &Config{
+				TableBucketArn: "arn:aws:s3tables:us-east-1:123456789012:bucket/my-bucket",
+				Region:         "us-east-1",
+				Namespace:      "test-namespace",
+				Tables: TableNamesConfig{
+					Traces:  "",
+					Metrics: "",
+					Logs:    "otel_logs",
+				},
+			},
+			wantErr: false,
+		},
+		{
+			name: "invalid config with all tables empty",
+			config: &Config{
+				TableBucketArn: "arn:aws:s3tables:us-east-1:123456789012:bucket/my-bucket",
+				Region:         "us-east-1",
+				Namespace:      "test-namespace",
+				Tables: TableNamesConfig{
+					Traces:  "",
+					Metrics: "",
+					Logs:    "",
+				},
+			},
 			wantErr:     true,
-			expectedMsg: "tables.logs is required",
+			expectedMsg: "at least one table name (traces, metrics, or logs) must be configured",
 		},
 		{
 			name: "valid compression - snappy",
@@ -537,7 +549,7 @@ func TestProperty3_EmptyRequiredFieldRejection(t *testing.T) {
 			expectedError: "namespace is required",
 		},
 		{
-			name: "empty tables.traces",
+			name: "all tables empty",
 			setupConfig: func() *Config {
 				return &Config{
 					TableBucketArn: generateValidARN(r),
@@ -545,44 +557,12 @@ func TestProperty3_EmptyRequiredFieldRejection(t *testing.T) {
 					Namespace:      "default",
 					Tables: TableNamesConfig{
 						Traces:  "",
-						Metrics: "otel_metrics",
-						Logs:    "otel_logs",
-					},
-				}
-			},
-			expectedError: "tables.traces is required",
-		},
-		{
-			name: "empty tables.metrics",
-			setupConfig: func() *Config {
-				return &Config{
-					TableBucketArn: generateValidARN(r),
-					Region:         "us-east-1",
-					Namespace:      "default",
-					Tables: TableNamesConfig{
-						Traces:  "otel_traces",
 						Metrics: "",
-						Logs:    "otel_logs",
-					},
-				}
-			},
-			expectedError: "tables.metrics is required",
-		},
-		{
-			name: "empty tables.logs",
-			setupConfig: func() *Config {
-				return &Config{
-					TableBucketArn: generateValidARN(r),
-					Region:         "us-east-1",
-					Namespace:      "default",
-					Tables: TableNamesConfig{
-						Traces:  "otel_traces",
-						Metrics: "otel_metrics",
 						Logs:    "",
 					},
 				}
 			},
-			expectedError: "tables.logs is required",
+			expectedError: "at least one table name (traces, metrics, or logs) must be configured",
 		},
 	}
 
@@ -630,6 +610,126 @@ func TestProperty5_ConfigurationStorage(t *testing.T) {
 		if config.TableBucketArn != originalARN {
 			t.Errorf("Property 5 failed (iteration %d): expected TableBucketArn to be '%s', got '%s'",
 				i, originalARN, config.TableBucketArn)
+		}
+	}
+}
+
+// TestProperty6_PartialTableConfiguration tests Property 6: Partial table configuration acceptance
+// Feature: s3tables-upload-implementation, Property 6: Partial table configuration acceptance
+// Validates: Requirements 7.1, 7.2, 7.3, 7.4
+func TestProperty6_PartialTableConfiguration(t *testing.T) {
+	if testing.Short() {
+		t.Skip("skipping property-based test in short mode")
+	}
+
+	r := rand.New(rand.NewSource(rand.Int63()))
+
+	// 各テレメトリータイプのみが設定されている場合のテスト
+	testCases := []struct {
+		name   string
+		tables TableNamesConfig
+	}{
+		{
+			name: "only traces",
+			tables: TableNamesConfig{
+				Traces:  "otel_traces",
+				Metrics: "",
+				Logs:    "",
+			},
+		},
+		{
+			name: "only metrics",
+			tables: TableNamesConfig{
+				Traces:  "",
+				Metrics: "otel_metrics",
+				Logs:    "",
+			},
+		},
+		{
+			name: "only logs",
+			tables: TableNamesConfig{
+				Traces:  "",
+				Metrics: "",
+				Logs:    "otel_logs",
+			},
+		},
+		{
+			name: "traces and metrics",
+			tables: TableNamesConfig{
+				Traces:  "otel_traces",
+				Metrics: "otel_metrics",
+				Logs:    "",
+			},
+		},
+		{
+			name: "traces and logs",
+			tables: TableNamesConfig{
+				Traces:  "otel_traces",
+				Metrics: "",
+				Logs:    "otel_logs",
+			},
+		},
+		{
+			name: "metrics and logs",
+			tables: TableNamesConfig{
+				Traces:  "",
+				Metrics: "otel_metrics",
+				Logs:    "otel_logs",
+			},
+		},
+	}
+
+	// 各テストケースを100回実行
+	for _, tc := range testCases {
+		for i := 0; i < 100; i++ {
+			config := &Config{
+				TableBucketArn: generateValidARN(r),
+				Region:         "us-east-1",
+				Namespace:      "default",
+				Tables:         tc.tables,
+			}
+
+			err := config.Validate()
+			if err != nil {
+				t.Errorf("Property 6 failed for %s (iteration %d): expected no error, but got '%s'",
+					tc.name, i, err.Error())
+			}
+		}
+	}
+}
+
+// TestProperty7_AllEmptyTableRejection tests Property 7: All empty table rejection
+// Feature: s3tables-upload-implementation, Property 7: All empty table rejection
+// Validates: Requirements 7.5
+func TestProperty7_AllEmptyTableRejection(t *testing.T) {
+	if testing.Short() {
+		t.Skip("skipping property-based test in short mode")
+	}
+
+	r := rand.New(rand.NewSource(rand.Int63()))
+
+	// 100回のイテレーションですべてのテーブル名が空の場合にエラーが返されることを確認
+	for i := 0; i < 100; i++ {
+		config := &Config{
+			TableBucketArn: generateValidARN(r),
+			Region:         "us-east-1",
+			Namespace:      "default",
+			Tables: TableNamesConfig{
+				Traces:  "",
+				Metrics: "",
+				Logs:    "",
+			},
+		}
+
+		err := config.Validate()
+		if err == nil {
+			t.Errorf("Property 7 failed (iteration %d): expected error for all empty tables, but got nil", i)
+		}
+
+		expectedMsg := "at least one table name (traces, metrics, or logs) must be configured"
+		if err != nil && err.Error() != expectedMsg {
+			t.Errorf("Property 7 failed (iteration %d): expected error message '%s', got '%s'",
+				i, expectedMsg, err.Error())
 		}
 	}
 }

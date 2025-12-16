@@ -65,14 +65,9 @@ func (cfg *Config) Validate() error {
 	}
 
 	// TableNamesConfigの検証
-	if cfg.Tables.Traces == "" {
-		return fmt.Errorf("tables.traces is required")
-	}
-	if cfg.Tables.Metrics == "" {
-		return fmt.Errorf("tables.metrics is required")
-	}
-	if cfg.Tables.Logs == "" {
-		return fmt.Errorf("tables.logs is required")
+	// 少なくとも1つのテーブル名が設定されている必要がある
+	if cfg.Tables.Traces == "" && cfg.Tables.Metrics == "" && cfg.Tables.Logs == "" {
+		return fmt.Errorf("at least one table name (traces, metrics, or logs) must be configured")
 	}
 
 	// Compression形式の検証

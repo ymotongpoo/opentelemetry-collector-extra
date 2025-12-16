@@ -334,6 +334,13 @@ func (e *s3TablesExporter) uploadToS3Tables(ctx context.Context, data []byte, da
 		return fmt.Errorf("unknown data type: %s", dataType)
 	}
 
+	// テーブル名が設定されていない場合はスキップ
+	if tableName == "" {
+		e.logger.Debug("Skipping upload: table name not configured",
+			"data_type", dataType)
+		return nil
+	}
+
 	e.logger.Info("Starting upload to S3 Tables",
 		"table_bucket_arn", e.config.TableBucketArn,
 		"namespace", e.config.Namespace,
