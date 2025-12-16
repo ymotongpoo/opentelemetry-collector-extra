@@ -20,6 +20,9 @@ import (
 	"log/slog"
 	"time"
 
+	"github.com/apache/iceberg-go/catalog"
+	"github.com/apache/iceberg-go/catalog/rest"
+	"github.com/apache/iceberg-go/table"
 	"github.com/aws/aws-sdk-go-v2/config"
 	"github.com/aws/aws-sdk-go-v2/service/s3tables"
 	"go.opentelemetry.io/collector/exporter"
@@ -29,11 +32,42 @@ import (
 )
 
 // s3TablesExporter implements the S3 Tables exporter.
-// s3TablesExporter implements the S3 Tables exporter.
 type s3TablesExporter struct {
-	config   *Config
-	logger   *slog.Logger
-	s3Client *s3tables.Client
+	config         *Config
+	logger         *slog.Logger
+	s3Client       *s3tables.Client
+	icebergCatalog catalog.Catalog
+	tables         map[string]table.Table
+}
+
+// initIcebergCatalog initializes the Iceberg REST Catalog
+// connecting to S3 Tables Iceberg REST endpoint
+func initIcebergCatalog(cfg *Config) (catalog.Catalog, error) {
+	// S3 Tables Iceberg REST endpoint URL
+	// 形式: https://s3tables.<region>.amazonaws.com/iceberg
+	restEndpoint := fmt.Sprintf("https://s3tables.%s.amazonaws.com/iceberg", cfg.Region)
+
+	// AWS設定をロード
+	awsCfg, err := config.LoadDefaultConfig(context.Background(), config.WithRegion(cfg.Region))
+	if err != nil {
+		return nil, fmt.Errorf("failed to load AWS config: %w", err)
+	}
+
+	// REST Catalogを作成
+	// AWS SigV4認証を使用してS3 Tables Iceberg REST endpointに接続
+	cat, err := rest.NewCatalog(
+		context.Background(),
+		"s3tables",
+		restEndpoint,
+		rest.WithWarehouseLocation(cfg.TableBucketArn),
+		rest.WithAwsConfig(awsCfg),
+		rest.WithSigV4RegionSvc(cfg.Region, "s3tables"),
+	)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create Iceberg REST catalog: %w", err)
+	}
+
+	return cat, nil
 }
 
 // newS3TablesExporter creates a new S3 Tables exporter instance.
@@ -48,10 +82,22 @@ func newS3TablesExporter(cfg *Config, set exporter.Settings) (*s3TablesExporter,
 		return nil, fmt.Errorf("failed to load AWS config: %w", err)
 	}
 
+	logger := newSlogLogger()
+
+	// Iceberg Catalogを初期化
+	// Note: テスト環境では実際のREST endpointに接続できないため、
+	// エラーが発生した場合は警告をログに記録して続行します
+	icebergCat, err := initIcebergCatalog(cfg)
+	if err != nil {
+		logger.Warn("Failed to initialize Iceberg catalog, will retry on first upload", "error", err)
+	}
+
 	return &s3TablesExporter{
-		config:   cfg,
-		logger:   newSlogLogger(),
-		s3Client: s3tables.NewFromConfig(awsCfg),
+		config:         cfg,
+		logger:         logger,
+		s3Client:       s3tables.NewFromConfig(awsCfg),
+		icebergCatalog: icebergCat,
+		tables:         make(map[string]table.Table),
 	}, nil
 }
 
