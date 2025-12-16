@@ -1,6 +1,52 @@
 # S3 Tables Exporter
 
-The S3 Tables exporter converts OpenTelemetry telemetry data (metrics, traces, and logs) to Parquet format and stores them in Amazon S3 Tables.
+The S3 Tables exporter converts OpenTelemetry telemetry data (metrics, traces, and logs) to Parquet format and stores them in Amazon S3 Tables using Apache Iceberg table format.
+
+## Apache Iceberg Integration
+
+S3 Tables uses Apache Iceberg as its table format. This exporter integrates with S3 Tables through the Iceberg REST API, providing:
+
+- **Automatic metadata management**: Iceberg metadata is automatically updated when data is written
+- **Schema evolution**: Supports schema changes over time while maintaining backward compatibility
+- **Time travel queries**: Query historical data snapshots
+- **Partition management**: Efficient data organization for optimized queries
+- **Direct queryability**: Data is immediately queryable through AWS Athena, Apache Spark, and other Iceberg-compatible query engines
+
+### How It Works
+
+1. **Catalog Initialization**: The exporter connects to the S3 Tables Iceberg REST endpoint (`https://s3tables.<region>.amazonaws.com/iceberg`) using AWS SigV4 authentication
+2. **Schema Definition**: OTLP data structures are converted to Iceberg schemas with appropriate data types
+3. **Data Writing**: Parquet files are written to S3 and registered in the Iceberg table metadata
+4. **Metadata Updates**: Iceberg automatically tracks all data files, schema versions, and table snapshots
+
+### Iceberg Schemas
+
+The exporter defines separate Iceberg schemas for each telemetry type:
+
+#### Metrics Schema
+- `timestamp` (timestamp with timezone): Metric timestamp
+- `resource_attributes` (map<string, string>): Resource attributes
+- `metric_name` (string): Metric name
+- `metric_type` (string): Metric type (gauge, sum, histogram, etc.)
+- `value` (double): Metric value
+- `attributes` (map<string, string>): Metric attributes
+
+#### Traces Schema
+- `trace_id` (binary): Trace ID
+- `span_id` (binary): Span ID
+- `parent_span_id` (binary): Parent span ID
+- `name` (string): Span name
+- `start_time` (timestamp with timezone): Start time
+- `end_time` (timestamp with timezone): End time
+- `attributes` (map<string, string>): Span attributes
+- `resource_attributes` (map<string, string>): Resource attributes
+
+#### Logs Schema
+- `timestamp` (timestamp with timezone): Log timestamp
+- `severity` (string): Log level
+- `body` (string): Log message
+- `attributes` (map<string, string>): Log attributes
+- `resource_attributes` (map<string, string>): Resource attributes
 
 ## Configuration
 
@@ -9,16 +55,25 @@ exporters:
   s3tables:
     table_bucket_arn: arn:aws:s3tables:us-east-1:123456789012:bucket/my-table-bucket
     region: us-east-1
-    namespace: my-namespace
-    table_name: otel-data
+    namespace: telemetry
+    tables:
+      traces: otel_traces
+      metrics: otel_metrics
+      logs: otel_logs
+    compression: snappy
 ```
 
 ### Configuration Parameters
 
 - `table_bucket_arn` (required): Amazon Resource Name (ARN) of the S3 Tables bucket. Must follow the format `arn:aws:s3tables:region:account-id:bucket/bucket-name`
-- `region` (required): AWS region where the S3 Tables are located
-- `namespace` (required): S3 Tables namespace
-- `table_name` (required): Name of the table to store data
+- `region` (required): AWS region where the S3 Tables are located (default: `us-east-1`)
+- `namespace` (required): Iceberg namespace for organizing related tables
+- `tables` (optional): Table names for each telemetry type
+  - `traces` (optional): Table name for trace data (default: `otel_traces`)
+  - `metrics` (optional): Table name for metrics data (default: `otel_metrics`)
+  - `logs` (optional): Table name for log data (default: `otel_logs`)
+  - Note: At least one table name must be configured
+- `compression` (optional): Parquet compression format - `none`, `snappy`, `gzip`, or `zstd` (default: `snappy`)
 
 **Note:** The `table_bucket_arn` must be a valid S3 Tables bucket ARN. The ARN format consists of:
 - Prefix: `arn:aws:s3tables`
@@ -28,12 +83,17 @@ exporters:
 
 ## Features
 
-- Converts OTLP data to Parquet format
-- Supports metrics, traces, and logs
-- Integrates with Amazon S3 Tables service
+- Converts OTLP data to Parquet format with Apache Iceberg metadata
+- Supports metrics, traces, and logs with separate table configurations
+- Integrates with Amazon S3 Tables via Iceberg REST API
 - Efficient columnar storage for analytics
+- Automatic schema management and evolution
+- Configurable Parquet compression (snappy, gzip, zstd, none)
+- Flexible table naming per telemetry type
 
 ## Example Usage
+
+### Full Configuration (All Telemetry Types)
 
 ```yaml
 receivers:
@@ -50,7 +110,11 @@ exporters:
     table_bucket_arn: arn:aws:s3tables:us-east-1:123456789012:bucket/my-table-bucket
     region: us-east-1
     namespace: telemetry
-    table_name: otel-data
+    tables:
+      traces: otel_traces
+      metrics: otel_metrics
+      logs: otel_logs
+    compression: snappy
 
 service:
   pipelines:
@@ -67,3 +131,222 @@ service:
       processors: [batch]
       exporters: [s3tables]
 ```
+
+### Metrics Only Configuration
+
+```yaml
+exporters:
+  s3tables:
+    table_bucket_arn: arn:aws:s3tables:us-east-1:123456789012:bucket/my-table-bucket
+    region: us-east-1
+    namespace: monitoring
+    tables:
+      metrics: application_metrics
+    compression: zstd
+
+service:
+  pipelines:
+    metrics:
+      receivers: [otlp]
+      processors: [batch]
+      exporters: [s3tables]
+```
+
+### Traces Only Configuration
+
+```yaml
+exporters:
+  s3tables:
+    table_bucket_arn: arn:aws:s3tables:us-east-1:123456789012:bucket/my-table-bucket
+    region: us-east-1
+    namespace: tracing
+    tables:
+      traces: distributed_traces
+    compression: snappy
+
+service:
+  pipelines:
+    traces:
+      receivers: [otlp]
+      processors: [batch]
+      exporters: [s3tables]
+```
+
+## Querying Data
+
+Once data is written to S3 Tables, you can query it using various Iceberg-compatible query engines:
+
+### Amazon Athena
+
+```sql
+-- Query metrics from the last hour
+SELECT * FROM telemetry.otel_metrics
+WHERE timestamp > CURRENT_TIMESTAMP - INTERVAL '1' HOUR;
+
+-- Analyze trace spans by service
+SELECT
+  resource_attributes['service.name'] as service_name,
+  COUNT(*) as span_count,
+  AVG(end_time - start_time) as avg_duration
+FROM telemetry.otel_traces
+WHERE start_time > CURRENT_TIMESTAMP - INTERVAL '1' DAY
+GROUP BY resource_attributes['service.name'];
+
+-- Search logs by severity
+SELECT timestamp, severity, body
+FROM telemetry.otel_logs
+WHERE severity IN ('ERROR', 'FATAL')
+  AND timestamp > CURRENT_TIMESTAMP - INTERVAL '1' HOUR
+ORDER BY timestamp DESC;
+```
+
+### Apache Spark
+
+```python
+from pyspark.sql import SparkSession
+
+# Initialize Spark with Iceberg support
+spark = SparkSession.builder \
+    .appName("S3TablesQuery") \
+    .config("spark.sql.catalog.s3tables", "org.apache.iceberg.spark.SparkCatalog") \
+    .config("spark.sql.catalog.s3tables.catalog-impl", "org.apache.iceberg.rest.RESTCatalog") \
+    .config("spark.sql.catalog.s3tables.uri", "https://s3tables.us-east-1.amazonaws.com/iceberg") \
+    .getOrCreate()
+
+# Query traces
+df = spark.table("s3tables.telemetry.otel_traces")
+df.filter(df.timestamp > "2025-01-16").show()
+
+# Analyze metrics
+metrics_df = spark.table("s3tables.telemetry.otel_metrics")
+metrics_df.groupBy("metric_name").count().show()
+```
+
+### AWS Glue
+
+Data written to S3 Tables is automatically registered in the AWS Glue Data Catalog and can be processed using AWS Glue ETL jobs.
+
+## IAM Permissions
+
+The IAM role or user running the OpenTelemetry Collector must have the following permissions:
+
+```json
+{
+  "Version": "2012-10-17",
+  "Statement": [
+    {
+      "Effect": "Allow",
+      "Action": [
+        "s3tables:GetTable",
+        "s3tables:GetTableMetadata",
+        "s3tables:PutTableData"
+      ],
+      "Resource": "arn:aws:s3tables:*:*:bucket/*/table/*"
+    },
+    {
+      "Effect": "Allow",
+      "Action": [
+        "s3:PutObject",
+        "s3:GetObject"
+      ],
+      "Resource": "arn:aws:s3:::*"
+    }
+  ]
+}
+```
+
+## Troubleshooting
+
+### Common Errors and Solutions
+
+#### Error: "failed to initialize Iceberg catalog"
+
+**Cause**: Unable to connect to the S3 Tables Iceberg REST endpoint.
+
+**Solutions**:
+1. Verify the `table_bucket_arn` is correct and the table bucket exists
+2. Check that the `region` matches the region where your table bucket is located
+3. Ensure AWS credentials are properly configured (environment variables, IAM role, or AWS config file)
+4. Verify network connectivity to `https://s3tables.<region>.amazonaws.com/iceberg`
+5. Check that AWS SigV4 authentication is working correctly
+
+#### Error: "failed to create or get table"
+
+**Cause**: Unable to create or access the Iceberg table in the specified namespace.
+
+**Solutions**:
+1. Verify the `namespace` exists in your table bucket (it will be created automatically if it doesn't exist)
+2. Check IAM permissions include `s3tables:GetTable` and `s3tables:PutTableData`
+3. Ensure the table name follows naming conventions (alphanumeric and underscores)
+4. Check CloudWatch Logs for detailed error messages
+
+#### Error: "context canceled" or "context deadline exceeded"
+
+**Cause**: The operation was cancelled or timed out before completion.
+
+**Solutions**:
+1. Increase the timeout in your OpenTelemetry Collector configuration
+2. Check network latency to AWS services
+3. Reduce batch size in the batch processor to avoid timeouts
+4. Monitor system resources (CPU, memory) on the collector host
+5. Consider using exponential backoff retry strategy
+
+#### Error: "failed to upload to S3 Tables"
+
+**Cause**: Network error or S3 API failure during data upload.
+
+**Solutions**:
+1. Check network connectivity to S3 endpoints
+2. Verify IAM permissions include `s3:PutObject` on the bucket
+3. Check S3 service health in the AWS region
+4. Review CloudWatch Logs for detailed S3 error messages
+5. Ensure the Parquet data is valid and not corrupted
+
+#### Error: "invalid table configuration: all table names are empty"
+
+**Cause**: No table names are configured in the `tables` section.
+
+**Solutions**:
+1. Configure at least one table name in the `tables` section:
+   ```yaml
+   tables:
+     metrics: otel_metrics  # At least one must be set
+   ```
+2. Remove unused telemetry pipelines from the service configuration
+3. Ensure the configuration matches your actual telemetry collection needs
+
+#### Schema Evolution Issues
+
+**Symptom**: New fields in telemetry data are not appearing in query results.
+
+**Solutions**:
+1. Iceberg automatically handles schema evolution, but there may be a delay
+2. Check the Iceberg table metadata to verify schema updates
+3. Refresh table metadata in your query engine (e.g., `MSCK REPAIR TABLE` in Athena)
+4. Verify that new fields are compatible with existing schema types
+
+### Debug Logging
+
+To enable debug logging for troubleshooting:
+
+```yaml
+service:
+  telemetry:
+    logs:
+      level: debug
+```
+
+This will output detailed information about:
+- Iceberg catalog initialization
+- Table creation and schema management
+- Data upload operations
+- Error details with full context
+
+### Getting Help
+
+If you encounter issues not covered here:
+1. Check the OpenTelemetry Collector logs for detailed error messages
+2. Review AWS CloudWatch Logs for S3 Tables API errors
+3. Verify your configuration against the examples in this README
+4. Check the [AWS S3 Tables documentation](https://docs.aws.amazon.com/s3tables/)
+5. Review the [Apache Iceberg documentation](https://iceberg.apache.org/)
