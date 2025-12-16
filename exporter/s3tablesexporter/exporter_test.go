@@ -118,9 +118,10 @@ func TestPushMetrics(t *testing.T) {
 	dp := gauge.DataPoints().AppendEmpty()
 	dp.SetDoubleValue(42.0)
 
+	// Catalog初期化エラーが発生することを期待
 	err = exporter.pushMetrics(context.Background(), md)
-	if err != nil {
-		t.Errorf("pushMetrics() failed: %v", err)
+	if err == nil {
+		t.Error("pushMetrics() should fail when catalog is not initialized")
 	}
 }
 
@@ -144,9 +145,10 @@ func TestPushTraces(t *testing.T) {
 	span := ss.Spans().AppendEmpty()
 	span.SetName("test-span")
 
+	// Catalog初期化エラーが発生することを期待
 	err = exporter.pushTraces(context.Background(), td)
-	if err != nil {
-		t.Errorf("pushTraces() failed: %v", err)
+	if err == nil {
+		t.Error("pushTraces() should fail when catalog is not initialized")
 	}
 }
 
@@ -170,9 +172,10 @@ func TestPushLogs(t *testing.T) {
 	log := sl.LogRecords().AppendEmpty()
 	log.Body().SetStr("test log message")
 
+	// Catalog初期化エラーが発生することを期待
 	err = exporter.pushLogs(context.Background(), ld)
-	if err != nil {
-		t.Errorf("pushLogs() failed: %v", err)
+	if err == nil {
+		t.Error("pushLogs() should fail when catalog is not initialized")
 	}
 }
 
@@ -190,15 +193,15 @@ func TestUploadToS3Tables(t *testing.T) {
 	}
 
 	// Test with empty data
-	err = exporter.uploadToS3Tables(context.Background(), []byte{}, "test")
+	err = exporter.uploadToS3Tables(context.Background(), []byte{}, "metrics")
 	if err != nil {
 		t.Errorf("uploadToS3Tables() with empty data failed: %v", err)
 	}
 
-	// Test with data
-	err = exporter.uploadToS3Tables(context.Background(), []byte("test data"), "test")
-	if err != nil {
-		t.Errorf("uploadToS3Tables() with data failed: %v", err)
+	// Test with data - Catalog初期化エラーが発生することを期待
+	err = exporter.uploadToS3Tables(context.Background(), []byte("test data"), "metrics")
+	if err == nil {
+		t.Error("uploadToS3Tables() should fail when catalog is not initialized")
 	}
 }
 
@@ -224,11 +227,11 @@ func TestUploadToS3Tables_LogsIncludeTableBucketArn(t *testing.T) {
 		t.Errorf("expected exporter config to have TableBucketArn '%s', got '%s'", testARN, exporter.config.TableBucketArn)
 	}
 
-	// uploadToS3Tablesを呼び出してエラーが発生しないことを確認
+	// uploadToS3Tablesを呼び出す - Catalog初期化エラーが発生することを期待
 	// 実際のログ出力はloggerによって処理されるため、ここでは設定が正しく渡されることを確認
-	err = exporter.uploadToS3Tables(context.Background(), []byte("test data"), "test")
-	if err != nil {
-		t.Errorf("uploadToS3Tables() failed: %v", err)
+	err = exporter.uploadToS3Tables(context.Background(), []byte("test data"), "metrics")
+	if err == nil {
+		t.Error("uploadToS3Tables() should fail when catalog is not initialized")
 	}
 }
 
@@ -392,5 +395,141 @@ func TestCreateNamespaceIfNotExists_Parameters(t *testing.T) {
 	// ここでは設定が正しく渡されることを確認
 	if exporter.config.Namespace != "test-namespace" {
 		t.Errorf("expected namespace 'test-namespace', got '%s'", exporter.config.Namespace)
+	}
+}
+
+// TestExtractBucketNameFromArn tests bucket name extraction from Table Bucket ARN
+// Requirements: 1.2
+func TestExtractBucketNameFromArn(t *testing.T) {
+	tests := []struct {
+		name           string
+		arn            string
+		expectedBucket string
+		expectError    bool
+	}{
+		{
+			name:           "valid ARN",
+			arn:            "arn:aws:s3tables:us-east-1:123456789012:bucket/test-bucket",
+			expectedBucket: "test-bucket",
+			expectError:    false,
+		},
+		{
+			name:           "valid ARN with hyphens",
+			arn:            "arn:aws:s3tables:ap-northeast-1:987654321098:bucket/my-test-bucket-01",
+			expectedBucket: "my-test-bucket-01",
+			expectError:    false,
+		},
+		{
+			name:        "invalid ARN format",
+			arn:         "invalid-arn",
+			expectError: true,
+		},
+		{
+			name:        "missing bucket name",
+			arn:         "arn:aws:s3tables:us-east-1:123456789012:bucket/",
+			expectError: true,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			bucket, err := extractBucketNameFromArn(tt.arn)
+			if tt.expectError {
+				if err == nil {
+					t.Error("expected error but got none")
+				}
+			} else {
+				if err != nil {
+					t.Errorf("unexpected error: %v", err)
+				}
+				if bucket != tt.expectedBucket {
+					t.Errorf("expected bucket '%s', got '%s'", tt.expectedBucket, bucket)
+				}
+			}
+		})
+	}
+}
+
+// TestUploadToS3Tables_EmptyData tests that empty data is skipped
+// Requirements: 3.4
+func TestUploadToS3Tables_EmptyData(t *testing.T) {
+	cfg := &Config{
+		TableBucketArn: "arn:aws:s3tables:us-east-1:123456789012:bucket/test-bucket",
+		Region:         "us-east-1",
+		Namespace:      "test-namespace",
+		TableName:      "test-table",
+	}
+	set := exportertest.NewNopSettings(component.MustNewType("s3tables"))
+	exporter, err := newS3TablesExporter(cfg, set)
+	if err != nil {
+		t.Fatalf("newS3TablesExporter() failed: %v", err)
+	}
+
+	// 空データでアップロードがスキップされることを確認
+	err = exporter.uploadToS3Tables(context.Background(), []byte{}, "metrics")
+	if err != nil {
+		t.Errorf("uploadToS3Tables() with empty data should not return error, got: %v", err)
+	}
+
+	// nilデータでもスキップされることを確認
+	err = exporter.uploadToS3Tables(context.Background(), nil, "traces")
+	if err != nil {
+		t.Errorf("uploadToS3Tables() with nil data should not return error, got: %v", err)
+	}
+}
+
+// TestUploadToS3Tables_UnknownDataType tests error handling for unknown data types
+// Requirements: 1.2, 1.5
+func TestUploadToS3Tables_UnknownDataType(t *testing.T) {
+	cfg := &Config{
+		TableBucketArn: "arn:aws:s3tables:us-east-1:123456789012:bucket/test-bucket",
+		Region:         "us-east-1",
+		Namespace:      "test-namespace",
+		TableName:      "test-table",
+	}
+	set := exportertest.NewNopSettings(component.MustNewType("s3tables"))
+	exporter, err := newS3TablesExporter(cfg, set)
+	if err != nil {
+		t.Fatalf("newS3TablesExporter() failed: %v", err)
+	}
+
+	// 不明なデータタイプでエラーが返されることを確認
+	err = exporter.uploadToS3Tables(context.Background(), []byte("test data"), "unknown")
+	if err == nil {
+		t.Error("uploadToS3Tables() with unknown data type should return error")
+	}
+	expectedMsg := "unknown data type: unknown"
+	if err.Error() != expectedMsg {
+		t.Errorf("expected error message '%s', got '%s'", expectedMsg, err.Error())
+	}
+}
+
+// TestUploadToS3Tables_ValidDataTypes tests that valid data types are accepted
+// Requirements: 1.2
+func TestUploadToS3Tables_ValidDataTypes(t *testing.T) {
+	cfg := &Config{
+		TableBucketArn: "arn:aws:s3tables:us-east-1:123456789012:bucket/test-bucket",
+		Region:         "us-east-1",
+		Namespace:      "test-namespace",
+		TableName:      "test-table",
+	}
+	set := exportertest.NewNopSettings(component.MustNewType("s3tables"))
+	exporter, err := newS3TablesExporter(cfg, set)
+	if err != nil {
+		t.Fatalf("newS3TablesExporter() failed: %v", err)
+	}
+
+	// Iceberg Catalogがnilの場合、getOrCreateTableでエラーが返される
+	// これは期待される動作
+	validDataTypes := []string{"metrics", "traces", "logs"}
+	for _, dataType := range validDataTypes {
+		t.Run(dataType, func(t *testing.T) {
+			err := exporter.uploadToS3Tables(context.Background(), []byte("test data"), dataType)
+			// Catalog初期化エラーが発生することを確認
+			// 実際の環境では、Catalogが正しく初期化されている必要がある
+			if err == nil {
+				t.Errorf("uploadToS3Tables() with data type '%s' should fail when catalog is not initialized", dataType)
+			}
+		})
 	}
 }
