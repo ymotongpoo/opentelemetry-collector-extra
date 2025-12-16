@@ -20,6 +20,7 @@ import (
 	"log/slog"
 	"time"
 
+	"github.com/apache/iceberg-go"
 	"github.com/apache/iceberg-go/catalog"
 	"github.com/apache/iceberg-go/catalog/rest"
 	"github.com/apache/iceberg-go/table"
@@ -37,7 +38,7 @@ type s3TablesExporter struct {
 	logger         *slog.Logger
 	s3Client       *s3tables.Client
 	icebergCatalog catalog.Catalog
-	tables         map[string]table.Table
+	tables         map[string]*table.Table
 }
 
 // initIcebergCatalog initializes the Iceberg REST Catalog
@@ -97,7 +98,7 @@ func newS3TablesExporter(cfg *Config, set exporter.Settings) (*s3TablesExporter,
 		logger:         logger,
 		s3Client:       s3tables.NewFromConfig(awsCfg),
 		icebergCatalog: icebergCat,
-		tables:         make(map[string]table.Table),
+		tables:         make(map[string]*table.Table),
 	}, nil
 }
 
@@ -135,6 +136,77 @@ func (e *s3TablesExporter) pushLogs(ctx context.Context, ld plog.Logs) error {
 	}
 
 	return e.uploadToS3Tables(ctx, parquetData, "logs")
+}
+
+// createNamespaceIfNotExists creates a namespace if it doesn't exist
+// Namespaceが存在しない場合は新規作成
+func (e *s3TablesExporter) createNamespaceIfNotExists(ctx context.Context, namespace string) error {
+	// Namespaceが存在するか確認
+	_, err := e.icebergCatalog.LoadNamespaceProperties(ctx, []string{namespace})
+	if err == nil {
+		// Namespaceが既に存在する
+		return nil
+	}
+
+	// Namespaceを作成
+	e.logger.Info("Namespace not found, creating new namespace", "namespace", namespace)
+	err = e.icebergCatalog.CreateNamespace(ctx, []string{namespace}, nil)
+	if err != nil {
+		return fmt.Errorf("failed to create namespace: %w", err)
+	}
+
+	return nil
+}
+
+// getOrCreateTable gets an existing table or creates a new one
+// 指定されたNamespaceとTable Nameでテーブルを取得
+// テーブルが存在しない場合は新規作成
+// テーブル参照をキャッシュして再利用
+func (e *s3TablesExporter) getOrCreateTable(
+	ctx context.Context,
+	namespace string,
+	tableName string,
+	schema *iceberg.Schema,
+) (*table.Table, error) {
+	// キャッシュキーを生成
+	cacheKey := fmt.Sprintf("%s.%s", namespace, tableName)
+
+	// キャッシュからテーブルを取得
+	if tbl, ok := e.tables[cacheKey]; ok {
+		return tbl, nil
+	}
+
+	// Iceberg Catalogが初期化されていない場合はエラー
+	if e.icebergCatalog == nil {
+		return nil, fmt.Errorf("iceberg catalog is not initialized")
+	}
+
+	// Namespaceを作成（存在しない場合）
+	if err := e.createNamespaceIfNotExists(ctx, namespace); err != nil {
+		return nil, fmt.Errorf("failed to create namespace: %w", err)
+	}
+
+	// テーブル識別子を作成
+	tableIdent := table.Identifier{namespace, tableName}
+
+	// テーブルを取得
+	tbl, err := e.icebergCatalog.LoadTable(ctx, tableIdent)
+	if err != nil {
+		// テーブルが存在しない場合は新規作成
+		e.logger.Info("Table not found, creating new table",
+			"namespace", namespace,
+			"table", tableName)
+
+		tbl, err = e.icebergCatalog.CreateTable(ctx, tableIdent, schema)
+		if err != nil {
+			return nil, fmt.Errorf("failed to create table: %w", err)
+		}
+	}
+
+	// テーブルをキャッシュ
+	e.tables[cacheKey] = tbl
+
+	return tbl, nil
 }
 
 // uploadToS3Tables uploads the Parquet data to S3 Tables.
