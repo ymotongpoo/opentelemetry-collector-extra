@@ -317,40 +317,44 @@ func (e *s3TablesExporter) uploadToS3Tables(ctx context.Context, data []byte, da
 	}
 
 	// アップロード開始のログ出力
-	e.logger.Info("Starting upload to S3 Tables",
-		"table_bucket_arn", e.config.TableBucketArn,
-		"namespace", e.config.Namespace,
-		"table", e.config.TableName,
-		"data_type", dataType,
-		"size", len(data))
-
-	// データタイプに応じたスキーマを取得
+	// データタイプに応じたテーブル名とスキーマを取得
+	var tableName string
 	var schema *iceberg.Schema
 	switch dataType {
 	case "metrics":
+		tableName = e.config.Tables.Metrics
 		schema = createMetricsSchema()
 	case "traces":
+		tableName = e.config.Tables.Traces
 		schema = createTracesSchema()
 	case "logs":
+		tableName = e.config.Tables.Logs
 		schema = createLogsSchema()
 	default:
 		return fmt.Errorf("unknown data type: %s", dataType)
 	}
 
+	e.logger.Info("Starting upload to S3 Tables",
+		"table_bucket_arn", e.config.TableBucketArn,
+		"namespace", e.config.Namespace,
+		"table", tableName,
+		"data_type", dataType,
+		"size", len(data))
+
 	// Iceberg Catalogを使用してテーブルを取得または作成
-	tbl, err := e.getOrCreateTable(ctx, e.config.Namespace, e.config.TableName, schema)
+	tbl, err := e.getOrCreateTable(ctx, e.config.Namespace, tableName, schema)
 	if err != nil {
 		// コンテキストキャンセルのチェック
 		if ctx.Err() != nil {
 			e.logger.Warn("Upload cancelled during table creation",
 				"namespace", e.config.Namespace,
-				"table", e.config.TableName,
+				"table", tableName,
 				"error", ctx.Err())
 			return fmt.Errorf("upload cancelled during table creation: %w", ctx.Err())
 		}
 		e.logger.Error("Failed to get or create table",
 			"namespace", e.config.Namespace,
-			"table", e.config.TableName,
+			"table", tableName,
 			"error", err)
 		return fmt.Errorf("failed to get or create table: %w", err)
 	}

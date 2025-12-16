@@ -35,7 +35,6 @@ type Config struct {
 	TableBucketArn string           `mapstructure:"table_bucket_arn"`
 	Region         string           `mapstructure:"region"`
 	Namespace      string           `mapstructure:"namespace"`
-	TableName      string           `mapstructure:"table_name"` // 後方互換性のため保持
 	Tables         TableNamesConfig `mapstructure:"tables"`
 	Compression    string           `mapstructure:"compression"`
 }
@@ -65,22 +64,15 @@ func (cfg *Config) Validate() error {
 		return fmt.Errorf("namespace is required")
 	}
 
-	// 後方互換性: TableNameまたはTablesのいずれかが設定されている必要がある
-	if cfg.TableName == "" && cfg.Tables.Traces == "" && cfg.Tables.Metrics == "" && cfg.Tables.Logs == "" {
-		return fmt.Errorf("either table_name or tables configuration is required")
-	}
-
 	// TableNamesConfigの検証
-	if cfg.Tables.Traces != "" || cfg.Tables.Metrics != "" || cfg.Tables.Logs != "" {
-		if cfg.Tables.Traces == "" {
-			return fmt.Errorf("tables.traces is required when using tables configuration")
-		}
-		if cfg.Tables.Metrics == "" {
-			return fmt.Errorf("tables.metrics is required when using tables configuration")
-		}
-		if cfg.Tables.Logs == "" {
-			return fmt.Errorf("tables.logs is required when using tables configuration")
-		}
+	if cfg.Tables.Traces == "" {
+		return fmt.Errorf("tables.traces is required")
+	}
+	if cfg.Tables.Metrics == "" {
+		return fmt.Errorf("tables.metrics is required")
+	}
+	if cfg.Tables.Logs == "" {
+		return fmt.Errorf("tables.logs is required")
 	}
 
 	// Compression形式の検証
@@ -105,7 +97,6 @@ func createDefaultConfig() component.Config {
 		TableBucketArn: "",
 		Region:         "us-east-1",
 		Namespace:      "default",
-		TableName:      "otel-data", // 後方互換性のため保持
 		Tables: TableNamesConfig{
 			Traces:  "otel_traces",
 			Metrics: "otel_metrics",

@@ -28,93 +28,6 @@ func TestConfig_Validate(t *testing.T) {
 		expectedMsg string
 	}{
 		{
-			name: "valid config with table bucket ARN",
-			config: &Config{
-				TableBucketArn: "arn:aws:s3tables:us-east-1:123456789012:bucket/my-bucket",
-				Region:         "us-east-1",
-				Namespace:      "test-namespace",
-				TableName:      "test-table",
-			},
-			wantErr: false,
-		},
-		{
-			name: "missing table bucket ARN",
-			config: &Config{
-				TableBucketArn: "",
-				Region:         "us-east-1",
-				Namespace:      "test-namespace",
-				TableName:      "test-table",
-			},
-			wantErr:     true,
-			expectedMsg: "table_bucket_arn is required",
-		},
-		{
-			name: "invalid ARN format - wrong service",
-			config: &Config{
-				TableBucketArn: "arn:aws:s3:us-east-1:123456789012:bucket/my-bucket",
-				Region:         "us-east-1",
-				Namespace:      "test-namespace",
-				TableName:      "test-table",
-			},
-			wantErr:     true,
-			expectedMsg: "table_bucket_arn must follow the format arn:aws:s3tables:region:account-id:bucket/bucket-name",
-		},
-		{
-			name: "invalid ARN format - short account ID",
-			config: &Config{
-				TableBucketArn: "arn:aws:s3tables:us-east-1:12345:bucket/my-bucket",
-				Region:         "us-east-1",
-				Namespace:      "test-namespace",
-				TableName:      "test-table",
-			},
-			wantErr:     true,
-			expectedMsg: "table_bucket_arn must follow the format arn:aws:s3tables:region:account-id:bucket/bucket-name",
-		},
-		{
-			name: "invalid ARN format - bucket name with uppercase",
-			config: &Config{
-				TableBucketArn: "arn:aws:s3tables:us-east-1:123456789012:bucket/MyBucket",
-				Region:         "us-east-1",
-				Namespace:      "test-namespace",
-				TableName:      "test-table",
-			},
-			wantErr:     true,
-			expectedMsg: "table_bucket_arn must follow the format arn:aws:s3tables:region:account-id:bucket/bucket-name",
-		},
-		{
-			name: "missing region",
-			config: &Config{
-				TableBucketArn: "arn:aws:s3tables:us-east-1:123456789012:bucket/my-bucket",
-				Region:         "",
-				Namespace:      "test-namespace",
-				TableName:      "test-table",
-			},
-			wantErr:     true,
-			expectedMsg: "region is required",
-		},
-		{
-			name: "missing namespace",
-			config: &Config{
-				TableBucketArn: "arn:aws:s3tables:us-east-1:123456789012:bucket/my-bucket",
-				Region:         "us-east-1",
-				Namespace:      "",
-				TableName:      "test-table",
-			},
-			wantErr:     true,
-			expectedMsg: "namespace is required",
-		},
-		{
-			name: "missing table name and tables config",
-			config: &Config{
-				TableBucketArn: "arn:aws:s3tables:us-east-1:123456789012:bucket/my-bucket",
-				Region:         "us-east-1",
-				Namespace:      "test-namespace",
-				TableName:      "",
-			},
-			wantErr:     true,
-			expectedMsg: "either table_name or tables configuration is required",
-		},
-		{
 			name: "valid config with tables configuration",
 			config: &Config{
 				TableBucketArn: "arn:aws:s3tables:us-east-1:123456789012:bucket/my-bucket",
@@ -129,6 +42,96 @@ func TestConfig_Validate(t *testing.T) {
 			wantErr: false,
 		},
 		{
+			name: "missing table bucket ARN",
+			config: &Config{
+				TableBucketArn: "",
+				Region:         "us-east-1",
+				Namespace:      "test-namespace",
+				Tables: TableNamesConfig{
+					Traces:  "otel_traces",
+					Metrics: "otel_metrics",
+					Logs:    "otel_logs",
+				},
+			},
+			wantErr:     true,
+			expectedMsg: "table_bucket_arn is required",
+		},
+		{
+			name: "invalid ARN format - wrong service",
+			config: &Config{
+				TableBucketArn: "arn:aws:s3:us-east-1:123456789012:bucket/my-bucket",
+				Region:         "us-east-1",
+				Namespace:      "test-namespace",
+				Tables: TableNamesConfig{
+					Traces:  "otel_traces",
+					Metrics: "otel_metrics",
+					Logs:    "otel_logs",
+				},
+			},
+			wantErr:     true,
+			expectedMsg: "table_bucket_arn must follow the format arn:aws:s3tables:region:account-id:bucket/bucket-name",
+		},
+		{
+			name: "invalid ARN format - short account ID",
+			config: &Config{
+				TableBucketArn: "arn:aws:s3tables:us-east-1:12345:bucket/my-bucket",
+				Region:         "us-east-1",
+				Namespace:      "test-namespace",
+				Tables: TableNamesConfig{
+					Traces:  "otel_traces",
+					Metrics: "otel_metrics",
+					Logs:    "otel_logs",
+				},
+			},
+			wantErr:     true,
+			expectedMsg: "table_bucket_arn must follow the format arn:aws:s3tables:region:account-id:bucket/bucket-name",
+		},
+		{
+			name: "invalid ARN format - bucket name with uppercase",
+			config: &Config{
+				TableBucketArn: "arn:aws:s3tables:us-east-1:123456789012:bucket/MyBucket",
+				Region:         "us-east-1",
+				Namespace:      "test-namespace",
+				Tables: TableNamesConfig{
+					Traces:  "otel_traces",
+					Metrics: "otel_metrics",
+					Logs:    "otel_logs",
+				},
+			},
+			wantErr:     true,
+			expectedMsg: "table_bucket_arn must follow the format arn:aws:s3tables:region:account-id:bucket/bucket-name",
+		},
+		{
+			name: "missing region",
+			config: &Config{
+				TableBucketArn: "arn:aws:s3tables:us-east-1:123456789012:bucket/my-bucket",
+				Region:         "",
+				Namespace:      "test-namespace",
+				Tables: TableNamesConfig{
+					Traces:  "otel_traces",
+					Metrics: "otel_metrics",
+					Logs:    "otel_logs",
+				},
+			},
+			wantErr:     true,
+			expectedMsg: "region is required",
+		},
+		{
+			name: "missing namespace",
+			config: &Config{
+				TableBucketArn: "arn:aws:s3tables:us-east-1:123456789012:bucket/my-bucket",
+				Region:         "us-east-1",
+				Namespace:      "",
+				Tables: TableNamesConfig{
+					Traces:  "otel_traces",
+					Metrics: "otel_metrics",
+					Logs:    "otel_logs",
+				},
+			},
+			wantErr:     true,
+			expectedMsg: "namespace is required",
+		},
+		{
 			name: "missing traces in tables config",
 			config: &Config{
 				TableBucketArn: "arn:aws:s3tables:us-east-1:123456789012:bucket/my-bucket",
@@ -141,7 +144,7 @@ func TestConfig_Validate(t *testing.T) {
 				},
 			},
 			wantErr:     true,
-			expectedMsg: "tables.traces is required when using tables configuration",
+			expectedMsg: "tables.traces is required",
 		},
 		{
 			name: "missing metrics in tables config",
@@ -156,7 +159,7 @@ func TestConfig_Validate(t *testing.T) {
 				},
 			},
 			wantErr:     true,
-			expectedMsg: "tables.metrics is required when using tables configuration",
+			expectedMsg: "tables.metrics is required",
 		},
 		{
 			name: "missing logs in tables config",
@@ -171,7 +174,7 @@ func TestConfig_Validate(t *testing.T) {
 				},
 			},
 			wantErr:     true,
-			expectedMsg: "tables.logs is required when using tables configuration",
+			expectedMsg: "tables.logs is required",
 		},
 		{
 			name: "valid compression - snappy",
@@ -179,8 +182,12 @@ func TestConfig_Validate(t *testing.T) {
 				TableBucketArn: "arn:aws:s3tables:us-east-1:123456789012:bucket/my-bucket",
 				Region:         "us-east-1",
 				Namespace:      "test-namespace",
-				TableName:      "test-table",
-				Compression:    "snappy",
+				Tables: TableNamesConfig{
+					Traces:  "otel_traces",
+					Metrics: "otel_metrics",
+					Logs:    "otel_logs",
+				},
+				Compression: "snappy",
 			},
 			wantErr: false,
 		},
@@ -190,8 +197,12 @@ func TestConfig_Validate(t *testing.T) {
 				TableBucketArn: "arn:aws:s3tables:us-east-1:123456789012:bucket/my-bucket",
 				Region:         "us-east-1",
 				Namespace:      "test-namespace",
-				TableName:      "test-table",
-				Compression:    "gzip",
+				Tables: TableNamesConfig{
+					Traces:  "otel_traces",
+					Metrics: "otel_metrics",
+					Logs:    "otel_logs",
+				},
+				Compression: "gzip",
 			},
 			wantErr: false,
 		},
@@ -201,8 +212,12 @@ func TestConfig_Validate(t *testing.T) {
 				TableBucketArn: "arn:aws:s3tables:us-east-1:123456789012:bucket/my-bucket",
 				Region:         "us-east-1",
 				Namespace:      "test-namespace",
-				TableName:      "test-table",
-				Compression:    "zstd",
+				Tables: TableNamesConfig{
+					Traces:  "otel_traces",
+					Metrics: "otel_metrics",
+					Logs:    "otel_logs",
+				},
+				Compression: "zstd",
 			},
 			wantErr: false,
 		},
@@ -212,8 +227,12 @@ func TestConfig_Validate(t *testing.T) {
 				TableBucketArn: "arn:aws:s3tables:us-east-1:123456789012:bucket/my-bucket",
 				Region:         "us-east-1",
 				Namespace:      "test-namespace",
-				TableName:      "test-table",
-				Compression:    "none",
+				Tables: TableNamesConfig{
+					Traces:  "otel_traces",
+					Metrics: "otel_metrics",
+					Logs:    "otel_logs",
+				},
+				Compression: "none",
 			},
 			wantErr: false,
 		},
@@ -223,8 +242,12 @@ func TestConfig_Validate(t *testing.T) {
 				TableBucketArn: "arn:aws:s3tables:us-east-1:123456789012:bucket/my-bucket",
 				Region:         "us-east-1",
 				Namespace:      "test-namespace",
-				TableName:      "test-table",
-				Compression:    "invalid",
+				Tables: TableNamesConfig{
+					Traces:  "otel_traces",
+					Metrics: "otel_metrics",
+					Logs:    "otel_logs",
+				},
+				Compression: "invalid",
 			},
 			wantErr:     true,
 			expectedMsg: "compression must be one of: none, snappy, gzip, zstd",
@@ -259,9 +282,6 @@ func TestCreateDefaultConfig(t *testing.T) {
 	}
 	if config.Namespace != "default" {
 		t.Errorf("expected Namespace to be 'default', got %s", config.Namespace)
-	}
-	if config.TableName != "otel-data" {
-		t.Errorf("expected TableName to be 'otel-data', got %s", config.TableName)
 	}
 
 	// 新しい設定項目のデフォルト値を検証
@@ -343,7 +363,11 @@ func TestProperty1_ValidARNAcceptance(t *testing.T) {
 			TableBucketArn: arn,
 			Region:         "us-east-1",
 			Namespace:      "default",
-			TableName:      "otel-data",
+			Tables: TableNamesConfig{
+				Traces:  "otel_traces",
+				Metrics: "otel_metrics",
+				Logs:    "otel_logs",
+			},
 		}
 
 		err := config.Validate()
@@ -429,7 +453,11 @@ func TestProperty2_InvalidARNRejection(t *testing.T) {
 			TableBucketArn: arn,
 			Region:         "us-east-1",
 			Namespace:      "default",
-			TableName:      "otel-data",
+			Tables: TableNamesConfig{
+				Traces:  "otel_traces",
+				Metrics: "otel_metrics",
+				Logs:    "otel_logs",
+			},
 		}
 
 		err := config.Validate()
@@ -467,7 +495,11 @@ func TestProperty3_EmptyRequiredFieldRejection(t *testing.T) {
 					TableBucketArn: "",
 					Region:         "us-east-1",
 					Namespace:      "default",
-					TableName:      "otel-data",
+					Tables: TableNamesConfig{
+						Traces:  "otel_traces",
+						Metrics: "otel_metrics",
+						Logs:    "otel_logs",
+					},
 				}
 			},
 			expectedError: "table_bucket_arn is required",
@@ -479,7 +511,11 @@ func TestProperty3_EmptyRequiredFieldRejection(t *testing.T) {
 					TableBucketArn: generateValidARN(r),
 					Region:         "",
 					Namespace:      "default",
-					TableName:      "otel-data",
+					Tables: TableNamesConfig{
+						Traces:  "otel_traces",
+						Metrics: "otel_metrics",
+						Logs:    "otel_logs",
+					},
 				}
 			},
 			expectedError: "region is required",
@@ -491,22 +527,62 @@ func TestProperty3_EmptyRequiredFieldRejection(t *testing.T) {
 					TableBucketArn: generateValidARN(r),
 					Region:         "us-east-1",
 					Namespace:      "",
-					TableName:      "otel-data",
+					Tables: TableNamesConfig{
+						Traces:  "otel_traces",
+						Metrics: "otel_metrics",
+						Logs:    "otel_logs",
+					},
 				}
 			},
 			expectedError: "namespace is required",
 		},
 		{
-			name: "empty table_name and tables",
+			name: "empty tables.traces",
 			setupConfig: func() *Config {
 				return &Config{
 					TableBucketArn: generateValidARN(r),
 					Region:         "us-east-1",
 					Namespace:      "default",
-					TableName:      "",
+					Tables: TableNamesConfig{
+						Traces:  "",
+						Metrics: "otel_metrics",
+						Logs:    "otel_logs",
+					},
 				}
 			},
-			expectedError: "either table_name or tables configuration is required",
+			expectedError: "tables.traces is required",
+		},
+		{
+			name: "empty tables.metrics",
+			setupConfig: func() *Config {
+				return &Config{
+					TableBucketArn: generateValidARN(r),
+					Region:         "us-east-1",
+					Namespace:      "default",
+					Tables: TableNamesConfig{
+						Traces:  "otel_traces",
+						Metrics: "",
+						Logs:    "otel_logs",
+					},
+				}
+			},
+			expectedError: "tables.metrics is required",
+		},
+		{
+			name: "empty tables.logs",
+			setupConfig: func() *Config {
+				return &Config{
+					TableBucketArn: generateValidARN(r),
+					Region:         "us-east-1",
+					Namespace:      "default",
+					Tables: TableNamesConfig{
+						Traces:  "otel_traces",
+						Metrics: "otel_metrics",
+						Logs:    "",
+					},
+				}
+			},
+			expectedError: "tables.logs is required",
 		},
 	}
 
@@ -543,7 +619,11 @@ func TestProperty5_ConfigurationStorage(t *testing.T) {
 			TableBucketArn: originalARN,
 			Region:         "us-east-1",
 			Namespace:      "default",
-			TableName:      "otel-data",
+			Tables: TableNamesConfig{
+				Traces:  "otel_traces",
+				Metrics: "otel_metrics",
+				Logs:    "otel_logs",
+			},
 		}
 
 		// 設定されたARNが変更されずに保存されていることを確認

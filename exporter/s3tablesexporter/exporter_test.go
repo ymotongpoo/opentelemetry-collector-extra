@@ -32,7 +32,11 @@ func TestNewS3TablesExporter(t *testing.T) {
 		TableBucketArn: "arn:aws:s3tables:us-east-1:123456789012:bucket/test-bucket",
 		Region:         "us-east-1",
 		Namespace:      "test-namespace",
-		TableName:      "test-table",
+		Tables: TableNamesConfig{
+		Traces:  "otel_traces",
+		Metrics: "otel_metrics",
+		Logs:    "otel_logs",
+	},
 	}
 	set := exportertest.NewNopSettings(component.MustNewType("s3tables"))
 
@@ -55,7 +59,11 @@ func TestNewS3TablesExporter_WithValidTableBucketArn(t *testing.T) {
 		TableBucketArn: "arn:aws:s3tables:us-west-2:987654321098:bucket/my-table-bucket",
 		Region:         "us-west-2",
 		Namespace:      "production",
-		TableName:      "telemetry-data",
+		Tables: TableNamesConfig{
+			Traces:  "otel_traces",
+			Metrics: "otel_metrics",
+			Logs:    "otel_logs",
+		},
 	}
 	set := exportertest.NewNopSettings(component.MustNewType("s3tables"))
 
@@ -78,7 +86,11 @@ func TestNewS3TablesExporter_WithEmptyTableBucketArn(t *testing.T) {
 		TableBucketArn: "",
 		Region:         "us-east-1",
 		Namespace:      "test-namespace",
-		TableName:      "test-table",
+		Tables: TableNamesConfig{
+		Traces:  "otel_traces",
+		Metrics: "otel_metrics",
+		Logs:    "otel_logs",
+	},
 	}
 	set := exportertest.NewNopSettings(component.MustNewType("s3tables"))
 
@@ -100,7 +112,11 @@ func TestPushMetrics(t *testing.T) {
 		TableBucketArn: "arn:aws:s3tables:us-east-1:123456789012:bucket/test-bucket",
 		Region:         "us-east-1",
 		Namespace:      "test-namespace",
-		TableName:      "test-table",
+		Tables: TableNamesConfig{
+		Traces:  "otel_traces",
+		Metrics: "otel_metrics",
+		Logs:    "otel_logs",
+	},
 	}
 	set := exportertest.NewNopSettings(component.MustNewType("s3tables"))
 	exporter, err := newS3TablesExporter(cfg, set)
@@ -130,7 +146,11 @@ func TestPushTraces(t *testing.T) {
 		TableBucketArn: "arn:aws:s3tables:us-east-1:123456789012:bucket/test-bucket",
 		Region:         "us-east-1",
 		Namespace:      "test-namespace",
-		TableName:      "test-table",
+		Tables: TableNamesConfig{
+		Traces:  "otel_traces",
+		Metrics: "otel_metrics",
+		Logs:    "otel_logs",
+	},
 	}
 	set := exportertest.NewNopSettings(component.MustNewType("s3tables"))
 	exporter, err := newS3TablesExporter(cfg, set)
@@ -157,7 +177,11 @@ func TestPushLogs(t *testing.T) {
 		TableBucketArn: "arn:aws:s3tables:us-east-1:123456789012:bucket/test-bucket",
 		Region:         "us-east-1",
 		Namespace:      "test-namespace",
-		TableName:      "test-table",
+		Tables: TableNamesConfig{
+		Traces:  "otel_traces",
+		Metrics: "otel_metrics",
+		Logs:    "otel_logs",
+	},
 	}
 	set := exportertest.NewNopSettings(component.MustNewType("s3tables"))
 	exporter, err := newS3TablesExporter(cfg, set)
@@ -184,7 +208,11 @@ func TestUploadToS3Tables(t *testing.T) {
 		TableBucketArn: "arn:aws:s3tables:us-east-1:123456789012:bucket/test-bucket",
 		Region:         "us-east-1",
 		Namespace:      "test-namespace",
-		TableName:      "test-table",
+		Tables: TableNamesConfig{
+		Traces:  "otel_traces",
+		Metrics: "otel_metrics",
+		Logs:    "otel_logs",
+	},
 	}
 	set := exportertest.NewNopSettings(component.MustNewType("s3tables"))
 	exporter, err := newS3TablesExporter(cfg, set)
@@ -214,7 +242,11 @@ func TestUploadToS3Tables_LogsIncludeTableBucketArn(t *testing.T) {
 		TableBucketArn: testARN,
 		Region:         "ap-northeast-1",
 		Namespace:      "production",
-		TableName:      "metrics-data",
+		Tables: TableNamesConfig{
+			Traces:  "otel_traces",
+			Metrics: "otel_metrics",
+			Logs:    "otel_logs",
+		},
 	}
 	set := exportertest.NewNopSettings(component.MustNewType("s3tables"))
 	exporter, err := newS3TablesExporter(cfg, set)
@@ -251,7 +283,11 @@ func TestInitIcebergCatalog_Parameters(t *testing.T) {
 				TableBucketArn: "arn:aws:s3tables:us-east-1:123456789012:bucket/test-bucket",
 				Region:         "us-east-1",
 				Namespace:      "test-namespace",
-				TableName:      "test-table",
+				Tables: TableNamesConfig{
+		Traces:  "otel_traces",
+		Metrics: "otel_metrics",
+		Logs:    "otel_logs",
+	},
 			},
 			expectedRegion: "us-east-1",
 			expectedARN:    "arn:aws:s3tables:us-east-1:123456789012:bucket/test-bucket",
@@ -262,7 +298,11 @@ func TestInitIcebergCatalog_Parameters(t *testing.T) {
 				TableBucketArn: "arn:aws:s3tables:ap-northeast-1:987654321098:bucket/prod-bucket",
 				Region:         "ap-northeast-1",
 				Namespace:      "production",
-				TableName:      "otel-data",
+				Tables: TableNamesConfig{
+					Traces:  "otel_traces",
+					Metrics: "otel_metrics",
+					Logs:    "otel_logs",
+				},
 			},
 			expectedRegion: "ap-northeast-1",
 			expectedARN:    "arn:aws:s3tables:ap-northeast-1:987654321098:bucket/prod-bucket",
@@ -296,7 +336,11 @@ func TestNewS3TablesExporter_CatalogFieldsInitialized(t *testing.T) {
 		TableBucketArn: "arn:aws:s3tables:us-west-2:123456789012:bucket/test-bucket",
 		Region:         "us-west-2",
 		Namespace:      "test-namespace",
-		TableName:      "test-table",
+		Tables: TableNamesConfig{
+		Traces:  "otel_traces",
+		Metrics: "otel_metrics",
+		Logs:    "otel_logs",
+	},
 	}
 
 	// Catalog初期化に必要なパラメータが正しく設定されていることを確認
@@ -323,7 +367,11 @@ func TestGetOrCreateTable_UsesCorrectParameters(t *testing.T) {
 		TableBucketArn: "arn:aws:s3tables:us-east-1:123456789012:bucket/test-bucket",
 		Region:         "us-east-1",
 		Namespace:      "test-namespace",
-		TableName:      "test-table",
+		Tables: TableNamesConfig{
+		Traces:  "otel_traces",
+		Metrics: "otel_metrics",
+		Logs:    "otel_logs",
+	},
 	}
 	set := exportertest.NewNopSettings(component.MustNewType("s3tables"))
 	exporter, err := newS3TablesExporter(cfg, set)
@@ -355,7 +403,11 @@ func TestGetOrCreateTable_CachesTableReference(t *testing.T) {
 		TableBucketArn: "arn:aws:s3tables:us-east-1:123456789012:bucket/test-bucket",
 		Region:         "us-east-1",
 		Namespace:      "test-namespace",
-		TableName:      "test-table",
+		Tables: TableNamesConfig{
+		Traces:  "otel_traces",
+		Metrics: "otel_metrics",
+		Logs:    "otel_logs",
+	},
 	}
 	set := exportertest.NewNopSettings(component.MustNewType("s3tables"))
 	exporter, err := newS3TablesExporter(cfg, set)
@@ -382,7 +434,11 @@ func TestCreateNamespaceIfNotExists_Parameters(t *testing.T) {
 		TableBucketArn: "arn:aws:s3tables:us-east-1:123456789012:bucket/test-bucket",
 		Region:         "us-east-1",
 		Namespace:      "test-namespace",
-		TableName:      "test-table",
+		Tables: TableNamesConfig{
+		Traces:  "otel_traces",
+		Metrics: "otel_metrics",
+		Logs:    "otel_logs",
+	},
 	}
 	set := exportertest.NewNopSettings(component.MustNewType("s3tables"))
 	exporter, err := newS3TablesExporter(cfg, set)
@@ -457,7 +513,11 @@ func TestUploadToS3Tables_EmptyData(t *testing.T) {
 		TableBucketArn: "arn:aws:s3tables:us-east-1:123456789012:bucket/test-bucket",
 		Region:         "us-east-1",
 		Namespace:      "test-namespace",
-		TableName:      "test-table",
+		Tables: TableNamesConfig{
+		Traces:  "otel_traces",
+		Metrics: "otel_metrics",
+		Logs:    "otel_logs",
+	},
 	}
 	set := exportertest.NewNopSettings(component.MustNewType("s3tables"))
 	exporter, err := newS3TablesExporter(cfg, set)
@@ -485,7 +545,11 @@ func TestUploadToS3Tables_UnknownDataType(t *testing.T) {
 		TableBucketArn: "arn:aws:s3tables:us-east-1:123456789012:bucket/test-bucket",
 		Region:         "us-east-1",
 		Namespace:      "test-namespace",
-		TableName:      "test-table",
+		Tables: TableNamesConfig{
+		Traces:  "otel_traces",
+		Metrics: "otel_metrics",
+		Logs:    "otel_logs",
+	},
 	}
 	set := exportertest.NewNopSettings(component.MustNewType("s3tables"))
 	exporter, err := newS3TablesExporter(cfg, set)
@@ -511,7 +575,11 @@ func TestUploadToS3Tables_ValidDataTypes(t *testing.T) {
 		TableBucketArn: "arn:aws:s3tables:us-east-1:123456789012:bucket/test-bucket",
 		Region:         "us-east-1",
 		Namespace:      "test-namespace",
-		TableName:      "test-table",
+		Tables: TableNamesConfig{
+		Traces:  "otel_traces",
+		Metrics: "otel_metrics",
+		Logs:    "otel_logs",
+	},
 	}
 	set := exportertest.NewNopSettings(component.MustNewType("s3tables"))
 	exporter, err := newS3TablesExporter(cfg, set)
@@ -541,7 +609,11 @@ func TestUploadToS3Tables_ContextCancellation(t *testing.T) {
 		TableBucketArn: "arn:aws:s3tables:us-east-1:123456789012:bucket/test-bucket",
 		Region:         "us-east-1",
 		Namespace:      "test-namespace",
-		TableName:      "test-table",
+		Tables: TableNamesConfig{
+		Traces:  "otel_traces",
+		Metrics: "otel_metrics",
+		Logs:    "otel_logs",
+	},
 	}
 	set := exportertest.NewNopSettings(component.MustNewType("s3tables"))
 	exporter, err := newS3TablesExporter(cfg, set)
@@ -575,7 +647,11 @@ func TestUploadToS3Tables_ErrorMessageContext(t *testing.T) {
 		TableBucketArn: "arn:aws:s3tables:us-east-1:123456789012:bucket/test-bucket",
 		Region:         "us-east-1",
 		Namespace:      "test-namespace",
-		TableName:      "test-table",
+		Tables: TableNamesConfig{
+		Traces:  "otel_traces",
+		Metrics: "otel_metrics",
+		Logs:    "otel_logs",
+	},
 	}
 	set := exportertest.NewNopSettings(component.MustNewType("s3tables"))
 	exporter, err := newS3TablesExporter(cfg, set)
@@ -632,7 +708,11 @@ func TestInitIcebergCatalog_ErrorContext(t *testing.T) {
 		TableBucketArn: "arn:aws:s3tables:invalid-region:123456789012:bucket/test-bucket",
 		Region:         "invalid-region",
 		Namespace:      "test-namespace",
-		TableName:      "test-table",
+		Tables: TableNamesConfig{
+		Traces:  "otel_traces",
+		Metrics: "otel_metrics",
+		Logs:    "otel_logs",
+	},
 	}
 
 	_, err := initIcebergCatalog(cfg)
@@ -679,7 +759,11 @@ func TestProperty_ErrorMessageCompleteness(t *testing.T) {
 					TableBucketArn: "arn:aws:s3tables:test-region:123456789012:bucket/test-bucket",
 					Region:         "test-region",
 					Namespace:      "test-namespace",
-					TableName:      "test-table",
+					Tables: TableNamesConfig{
+		Traces:  "otel_traces",
+		Metrics: "otel_metrics",
+		Logs:    "otel_logs",
+	},
 				}
 				_, err := initIcebergCatalog(cfg)
 				return err
@@ -694,7 +778,11 @@ func TestProperty_ErrorMessageCompleteness(t *testing.T) {
 					TableBucketArn: "arn:aws:s3tables:us-east-1:123456789012:bucket/test-bucket",
 					Region:         "us-east-1",
 					Namespace:      "production-ns",
-					TableName:      "production-table",
+					Tables: TableNamesConfig{
+						Traces:  "otel_traces",
+						Metrics: "otel_metrics",
+						Logs:    "otel_logs",
+					},
 				}
 				set := exportertest.NewNopSettings(component.MustNewType("s3tables"))
 				exporter, err := newS3TablesExporter(cfg, set)
@@ -705,7 +793,7 @@ func TestProperty_ErrorMessageCompleteness(t *testing.T) {
 				// uploadToS3Tablesを呼び出すことで、エラーメッセージにnamespaceとtable nameが含まれる
 				return exporter.uploadToS3Tables(context.Background(), []byte("test data"), "metrics")
 			},
-			expectedContexts: []string{"production-ns", "production-table"},
+			expectedContexts: []string{"production-ns", "otel_metrics"},
 			description: "テーブル作成エラーにはnamespaceとtable nameが含まれる",
 		},
 		{
@@ -715,7 +803,11 @@ func TestProperty_ErrorMessageCompleteness(t *testing.T) {
 					TableBucketArn: "arn:aws:s3tables:us-east-1:123456789012:bucket/test-bucket",
 					Region:         "us-east-1",
 					Namespace:      "test-namespace",
-					TableName:      "test-table",
+					Tables: TableNamesConfig{
+		Traces:  "otel_traces",
+		Metrics: "otel_metrics",
+		Logs:    "otel_logs",
+	},
 				}
 				set := exportertest.NewNopSettings(component.MustNewType("s3tables"))
 				exporter, err := newS3TablesExporter(cfg, set)
@@ -735,7 +827,11 @@ func TestProperty_ErrorMessageCompleteness(t *testing.T) {
 					TableBucketArn: "arn:aws:s3tables:us-east-1:123456789012:bucket/test-bucket",
 					Region:         "us-east-1",
 					Namespace:      "test-namespace",
-					TableName:      "test-table",
+					Tables: TableNamesConfig{
+		Traces:  "otel_traces",
+		Metrics: "otel_metrics",
+		Logs:    "otel_logs",
+	},
 				}
 				set := exportertest.NewNopSettings(component.MustNewType("s3tables"))
 				exporter, err := newS3TablesExporter(cfg, set)
