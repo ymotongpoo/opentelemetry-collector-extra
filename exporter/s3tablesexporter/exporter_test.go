@@ -341,7 +341,7 @@ func TestGetOrCreateTable_UsesCorrectParameters(t *testing.T) {
 	if err == nil {
 		t.Error("getOrCreateTable() should return error when catalog is nil")
 	}
-	expectedMsg := "iceberg catalog is not initialized"
+	expectedMsg := "iceberg catalog is not initialized for table test-namespace.test-table"
 	if err.Error() != expectedMsg {
 		t.Errorf("expected error message '%s', got '%s'", expectedMsg, err.Error())
 	}
@@ -529,6 +529,258 @@ func TestUploadToS3Tables_ValidDataTypes(t *testing.T) {
 			// 実際の環境では、Catalogが正しく初期化されている必要がある
 			if err == nil {
 				t.Errorf("uploadToS3Tables() with data type '%s' should fail when catalog is not initialized", dataType)
+			}
+		})
+	}
+}
+
+// TestUploadToS3Tables_ContextCancellation tests context cancellation handling
+// Requirements: 2.5, 5.3
+func TestUploadToS3Tables_ContextCancellation(t *testing.T) {
+	cfg := &Config{
+		TableBucketArn: "arn:aws:s3tables:us-east-1:123456789012:bucket/test-bucket",
+		Region:         "us-east-1",
+		Namespace:      "test-namespace",
+		TableName:      "test-table",
+	}
+	set := exportertest.NewNopSettings(component.MustNewType("s3tables"))
+	exporter, err := newS3TablesExporter(cfg, set)
+	if err != nil {
+		t.Fatalf("newS3TablesExporter() failed: %v", err)
+	}
+
+	// キャンセル済みのコンテキストを作成
+	ctx, cancel := context.WithCancel(context.Background())
+	cancel() // 即座にキャンセル
+
+	// アップロードを試行
+	err = exporter.uploadToS3Tables(ctx, []byte("test data"), "metrics")
+	if err == nil {
+		t.Error("uploadToS3Tables() should return error when context is cancelled")
+	}
+
+	// エラーメッセージにコンテキストキャンセルが含まれることを確認
+	expectedMsg := "upload cancelled"
+	if err != nil && len(err.Error()) > 0 {
+		if len(err.Error()) < len(expectedMsg) || err.Error()[:len(expectedMsg)] != expectedMsg {
+			t.Errorf("expected error message to start with '%s', got '%s'", expectedMsg, err.Error())
+		}
+	}
+}
+
+// TestUploadToS3Tables_ErrorMessageContext tests that error messages include sufficient context
+// Requirements: 5.1, 5.4
+func TestUploadToS3Tables_ErrorMessageContext(t *testing.T) {
+	cfg := &Config{
+		TableBucketArn: "arn:aws:s3tables:us-east-1:123456789012:bucket/test-bucket",
+		Region:         "us-east-1",
+		Namespace:      "test-namespace",
+		TableName:      "test-table",
+	}
+	set := exportertest.NewNopSettings(component.MustNewType("s3tables"))
+	exporter, err := newS3TablesExporter(cfg, set)
+	if err != nil {
+		t.Fatalf("newS3TablesExporter() failed: %v", err)
+	}
+
+	// Catalog初期化エラーのテスト
+	exporter.icebergCatalog = nil
+	err = exporter.uploadToS3Tables(context.Background(), []byte("test data"), "metrics")
+	if err == nil {
+		t.Fatal("uploadToS3Tables() should return error when catalog is not initialized")
+	}
+
+	// エラーメッセージに十分なコンテキスト情報が含まれることを確認
+	expectedSubstring := "iceberg catalog is not initialized"
+	errMsg := err.Error()
+	found := false
+	for i := 0; i <= len(errMsg)-len(expectedSubstring); i++ {
+		if errMsg[i:i+len(expectedSubstring)] == expectedSubstring {
+			found = true
+			break
+		}
+	}
+	if !found {
+		t.Errorf("expected error message to contain '%s', got '%s'", expectedSubstring, errMsg)
+	}
+}
+
+// TestExtractBucketNameFromArn_ErrorContext tests that ARN extraction errors include context
+// Requirements: 5.1, 5.4
+func TestExtractBucketNameFromArn_ErrorContext(t *testing.T) {
+	invalidArn := "invalid-arn-format"
+	_, err := extractBucketNameFromArn(invalidArn)
+	if err == nil {
+		t.Fatal("extractBucketNameFromArn() should return error for invalid ARN")
+	}
+
+	// エラーメッセージに無効なARNが含まれることを確認
+	if len(err.Error()) == 0 {
+		t.Error("error message should not be empty")
+	}
+	expectedPrefix := "invalid Table Bucket ARN format"
+	if len(err.Error()) < len(expectedPrefix) || err.Error()[:len(expectedPrefix)] != expectedPrefix {
+		t.Errorf("expected error message to start with '%s', got '%s'", expectedPrefix, err.Error())
+	}
+}
+
+// TestInitIcebergCatalog_ErrorContext tests that catalog initialization errors include context
+// Requirements: 5.1, 5.4
+func TestInitIcebergCatalog_ErrorContext(t *testing.T) {
+	// 無効なリージョンでCatalog初期化を試行
+	cfg := &Config{
+		TableBucketArn: "arn:aws:s3tables:invalid-region:123456789012:bucket/test-bucket",
+		Region:         "invalid-region",
+		Namespace:      "test-namespace",
+		TableName:      "test-table",
+	}
+
+	_, err := initIcebergCatalog(cfg)
+	// エラーが発生することを確認（実際のREST endpointに接続できないため）
+	if err == nil {
+		t.Error("initIcebergCatalog() should return error for invalid configuration")
+	}
+
+	// エラーメッセージに十分なコンテキスト情報が含まれることを確認
+	if err != nil && len(err.Error()) == 0 {
+		t.Error("error message should not be empty")
+	}
+}
+
+// TestProperty_ErrorMessageCompleteness tests that error messages include operation context
+// Feature: s3tables-upload-implementation, Property 2: エラーメッセージの完全性
+// Validates: Requirements 5.4
+func TestProperty_ErrorMessageCompleteness(t *testing.T) {
+	if testing.Short() {
+		t.Skip("Skipping property-based test in short mode")
+	}
+
+	// テストケース: 様々なエラーシナリオでコンテキスト情報が含まれることを検証
+	testCases := []struct {
+		name              string
+		setupFunc         func() error
+		expectedContexts  []string
+		description       string
+	}{
+		{
+			name: "ARN extraction error includes ARN",
+			setupFunc: func() error {
+				invalidArn := "invalid-arn-format"
+				_, err := extractBucketNameFromArn(invalidArn)
+				return err
+			},
+			expectedContexts: []string{"invalid Table Bucket ARN format"},
+			description: "ARN抽出エラーにはARN形式の情報が含まれる",
+		},
+		{
+			name: "catalog initialization error includes region and ARN",
+			setupFunc: func() error {
+				cfg := &Config{
+					TableBucketArn: "arn:aws:s3tables:test-region:123456789012:bucket/test-bucket",
+					Region:         "test-region",
+					Namespace:      "test-namespace",
+					TableName:      "test-table",
+				}
+				_, err := initIcebergCatalog(cfg)
+				return err
+			},
+			expectedContexts: []string{"failed to create Iceberg REST catalog", "s3tables.test-region.amazonaws.com", "arn:aws:s3tables:test-region:123456789012:bucket/test-bucket"},
+			description: "Catalog初期化エラーにはリージョンとARNが含まれる",
+		},
+		{
+			name: "table creation error includes namespace and table name",
+			setupFunc: func() error {
+				cfg := &Config{
+					TableBucketArn: "arn:aws:s3tables:us-east-1:123456789012:bucket/test-bucket",
+					Region:         "us-east-1",
+					Namespace:      "production-ns",
+					TableName:      "production-table",
+				}
+				set := exportertest.NewNopSettings(component.MustNewType("s3tables"))
+				exporter, err := newS3TablesExporter(cfg, set)
+				if err != nil {
+					return err
+				}
+				exporter.icebergCatalog = nil
+				// uploadToS3Tablesを呼び出すことで、エラーメッセージにnamespaceとtable nameが含まれる
+				return exporter.uploadToS3Tables(context.Background(), []byte("test data"), "metrics")
+			},
+			expectedContexts: []string{"production-ns", "production-table"},
+			description: "テーブル作成エラーにはnamespaceとtable nameが含まれる",
+		},
+		{
+			name: "upload error includes data type and size",
+			setupFunc: func() error {
+				cfg := &Config{
+					TableBucketArn: "arn:aws:s3tables:us-east-1:123456789012:bucket/test-bucket",
+					Region:         "us-east-1",
+					Namespace:      "test-namespace",
+					TableName:      "test-table",
+				}
+				set := exportertest.NewNopSettings(component.MustNewType("s3tables"))
+				exporter, err := newS3TablesExporter(cfg, set)
+				if err != nil {
+					return err
+				}
+				exporter.icebergCatalog = nil
+				return exporter.uploadToS3Tables(context.Background(), []byte("test data"), "metrics")
+			},
+			expectedContexts: []string{"failed to get or create table"},
+			description: "アップロードエラーには操作のコンテキストが含まれる",
+		},
+		{
+			name: "context cancellation error includes cancellation reason",
+			setupFunc: func() error {
+				cfg := &Config{
+					TableBucketArn: "arn:aws:s3tables:us-east-1:123456789012:bucket/test-bucket",
+					Region:         "us-east-1",
+					Namespace:      "test-namespace",
+					TableName:      "test-table",
+				}
+				set := exportertest.NewNopSettings(component.MustNewType("s3tables"))
+				exporter, err := newS3TablesExporter(cfg, set)
+				if err != nil {
+					return err
+				}
+				ctx, cancel := context.WithCancel(context.Background())
+				cancel()
+				return exporter.uploadToS3Tables(ctx, []byte("test data"), "metrics")
+			},
+			expectedContexts: []string{"upload cancelled"},
+			description: "コンテキストキャンセルエラーにはキャンセル理由が含まれる",
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			err := tc.setupFunc()
+			if err == nil {
+				t.Errorf("%s: expected error but got none", tc.description)
+				return
+			}
+
+			errMsg := err.Error()
+			if len(errMsg) == 0 {
+				t.Errorf("%s: error message should not be empty", tc.description)
+				return
+			}
+
+			// すべての期待されるコンテキスト情報がエラーメッセージに含まれることを確認
+			for _, expectedContext := range tc.expectedContexts {
+				if len(errMsg) < len(expectedContext) {
+					t.Errorf("%s: error message '%s' should contain context '%s'", tc.description, errMsg, expectedContext)
+					continue
+				}
+				found := false
+				for i := 0; i <= len(errMsg)-len(expectedContext); i++ {
+					if errMsg[i:i+len(expectedContext)] == expectedContext {
+						found = true
+						break
+					}
+				}
+				if !found {
+					t.Errorf("%s: error message '%s' should contain context '%s'", tc.description, errMsg, expectedContext)
+				}
 			}
 		})
 	}

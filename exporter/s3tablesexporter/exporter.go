@@ -55,7 +55,7 @@ func initIcebergCatalog(cfg *Config) (catalog.Catalog, error) {
 	// AWS設定をロード
 	awsCfg, err := config.LoadDefaultConfig(context.Background(), config.WithRegion(cfg.Region))
 	if err != nil {
-		return nil, fmt.Errorf("failed to load AWS config: %w", err)
+		return nil, fmt.Errorf("failed to load AWS config for region %s: %w", cfg.Region, err)
 	}
 
 	// REST Catalogを作成
@@ -69,7 +69,8 @@ func initIcebergCatalog(cfg *Config) (catalog.Catalog, error) {
 		rest.WithSigV4RegionSvc(cfg.Region, "s3tables"),
 	)
 	if err != nil {
-		return nil, fmt.Errorf("failed to create Iceberg REST catalog: %w", err)
+		return nil, fmt.Errorf("failed to create Iceberg REST catalog at %s with warehouse %s: %w",
+			restEndpoint, cfg.TableBucketArn, err)
 	}
 
 	return cat, nil
@@ -84,7 +85,7 @@ func newS3TablesExporter(cfg *Config, set exporter.Settings) (*s3TablesExporter,
 
 	awsCfg, err := config.LoadDefaultConfig(context.TODO(), config.WithRegion(cfg.Region))
 	if err != nil {
-		return nil, fmt.Errorf("failed to load AWS config: %w", err)
+		return nil, fmt.Errorf("failed to load AWS config for region %s: %w", cfg.Region, err)
 	}
 
 	logger := newSlogLogger()
@@ -94,7 +95,10 @@ func newS3TablesExporter(cfg *Config, set exporter.Settings) (*s3TablesExporter,
 	// エラーが発生した場合は警告をログに記録して続行します
 	icebergCat, err := initIcebergCatalog(cfg)
 	if err != nil {
-		logger.Warn("Failed to initialize Iceberg catalog, will retry on first upload", "error", err)
+		logger.Warn("Failed to initialize Iceberg catalog, will retry on first upload",
+			"error", err,
+			"region", cfg.Region,
+			"table_bucket_arn", cfg.TableBucketArn)
 	}
 
 	return &s3TablesExporter{
@@ -157,9 +161,13 @@ func (e *s3TablesExporter) createNamespaceIfNotExists(ctx context.Context, names
 	e.logger.Info("Namespace not found, creating new namespace", "namespace", namespace)
 	err = e.icebergCatalog.CreateNamespace(ctx, []string{namespace}, nil)
 	if err != nil {
-		return fmt.Errorf("failed to create namespace: %w", err)
+		e.logger.Error("Failed to create namespace via Iceberg REST API",
+			"namespace", namespace,
+			"error", err)
+		return fmt.Errorf("failed to create namespace %s: %w", namespace, err)
 	}
 
+	e.logger.Info("Successfully created namespace", "namespace", namespace)
 	return nil
 }
 
@@ -183,12 +191,12 @@ func (e *s3TablesExporter) getOrCreateTable(
 
 	// Iceberg Catalogが初期化されていない場合はエラー
 	if e.icebergCatalog == nil {
-		return nil, fmt.Errorf("iceberg catalog is not initialized")
+		return nil, fmt.Errorf("iceberg catalog is not initialized for table %s.%s", namespace, tableName)
 	}
 
 	// Namespaceを作成（存在しない場合）
 	if err := e.createNamespaceIfNotExists(ctx, namespace); err != nil {
-		return nil, fmt.Errorf("failed to create namespace: %w", err)
+		return nil, fmt.Errorf("failed to ensure namespace exists for table %s.%s: %w", namespace, tableName, err)
 	}
 
 	// テーブル識別子を作成
@@ -204,8 +212,13 @@ func (e *s3TablesExporter) getOrCreateTable(
 
 		tbl, err = e.icebergCatalog.CreateTable(ctx, tableIdent, schema)
 		if err != nil {
-			return nil, fmt.Errorf("failed to create table: %w", err)
+			e.logger.Error("Failed to create table via Iceberg REST API",
+				"namespace", namespace,
+				"table", tableName,
+				"error", err)
+			return nil, fmt.Errorf("failed to create table %s.%s: %w", namespace, tableName, err)
 		}
+		e.logger.Info("Successfully created table", "namespace", namespace, "table", tableName)
 	}
 
 	// テーブルをキャッシュ
@@ -230,7 +243,10 @@ func (e *s3TablesExporter) writeToIcebergTable(
 	// 形式: arn:aws:s3tables:region:account-id:bucket/bucket-name
 	bucketName, err := extractBucketNameFromArn(e.config.TableBucketArn)
 	if err != nil {
-		return fmt.Errorf("failed to extract bucket name from ARN: %w", err)
+		e.logger.Error("Failed to extract bucket name from ARN",
+			"arn", e.config.TableBucketArn,
+			"error", err)
+		return fmt.Errorf("failed to extract bucket name from ARN %s: %w", e.config.TableBucketArn, err)
 	}
 
 	// S3にParquetファイルをアップロード
@@ -240,7 +256,12 @@ func (e *s3TablesExporter) writeToIcebergTable(
 		Body:   bytes.NewReader(data),
 	})
 	if err != nil {
-		return fmt.Errorf("failed to upload Parquet file to S3: %w", err)
+		e.logger.Error("Failed to upload Parquet file to S3",
+			"bucket", bucketName,
+			"key", key,
+			"size", len(data),
+			"error", err)
+		return fmt.Errorf("failed to upload Parquet file to S3 bucket %s with key %s: %w", bucketName, key, err)
 	}
 
 	// 2. Icebergテーブルにデータファイルを追加
@@ -279,6 +300,16 @@ func extractBucketNameFromArn(arn string) (string, error) {
 
 // uploadToS3Tables uploads the Parquet data to S3 Tables.
 func (e *s3TablesExporter) uploadToS3Tables(ctx context.Context, data []byte, dataType string) error {
+	// コンテキストキャンセルのチェック
+	select {
+	case <-ctx.Done():
+		e.logger.Warn("Upload cancelled before starting",
+			"data_type", dataType,
+			"error", ctx.Err())
+		return fmt.Errorf("upload cancelled: %w", ctx.Err())
+	default:
+	}
+
 	// 空データのハンドリング
 	if len(data) == 0 {
 		e.logger.Debug("Skipping upload: no data to upload", "data_type", dataType)
@@ -309,6 +340,14 @@ func (e *s3TablesExporter) uploadToS3Tables(ctx context.Context, data []byte, da
 	// Iceberg Catalogを使用してテーブルを取得または作成
 	tbl, err := e.getOrCreateTable(ctx, e.config.Namespace, e.config.TableName, schema)
 	if err != nil {
+		// コンテキストキャンセルのチェック
+		if ctx.Err() != nil {
+			e.logger.Warn("Upload cancelled during table creation",
+				"namespace", e.config.Namespace,
+				"table", e.config.TableName,
+				"error", ctx.Err())
+			return fmt.Errorf("upload cancelled during table creation: %w", ctx.Err())
+		}
 		e.logger.Error("Failed to get or create table",
 			"namespace", e.config.Namespace,
 			"table", e.config.TableName,
@@ -319,6 +358,13 @@ func (e *s3TablesExporter) uploadToS3Tables(ctx context.Context, data []byte, da
 	// データ書き込み関数を呼び出し
 	err = e.writeToIcebergTable(ctx, tbl, data, dataType)
 	if err != nil {
+		// コンテキストキャンセルのチェック
+		if ctx.Err() != nil {
+			e.logger.Warn("Upload cancelled during data write",
+				"table", (*tbl).Identifier(),
+				"error", ctx.Err())
+			return fmt.Errorf("upload cancelled during data write: %w", ctx.Err())
+		}
 		e.logger.Error("Failed to write data to Iceberg table",
 			"table", (*tbl).Identifier(),
 			"error", err)
