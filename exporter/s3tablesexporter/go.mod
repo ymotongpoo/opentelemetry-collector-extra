@@ -5,11 +5,12 @@ go 1.24.9
 toolchain go1.24.11
 
 require (
+	github.com/aws/aws-sdk-go-v2 v1.41.0
 	github.com/aws/aws-sdk-go-v2/config v1.32.6
 	github.com/aws/aws-sdk-go-v2/service/s3 v1.94.0
 	github.com/aws/aws-sdk-go-v2/service/s3tables v1.13.1
 	github.com/google/uuid v1.6.0
-	github.com/parquet-go/parquet-go v0.26.2
+	github.com/parquet-go/parquet-go v0.26.3
 	go.opentelemetry.io/collector/component v1.47.0
 	go.opentelemetry.io/collector/component/componenttest v0.141.0
 	go.opentelemetry.io/collector/exporter v1.47.0
@@ -21,7 +22,6 @@ require (
 
 require (
 	github.com/andybalholm/brotli v1.2.0 // indirect
-	github.com/aws/aws-sdk-go-v2 v1.41.0 // indirect
 	github.com/aws/aws-sdk-go-v2/aws/protocol/eventstream v1.7.4 // indirect
 	github.com/aws/aws-sdk-go-v2/credentials v1.19.6 // indirect
 	github.com/aws/aws-sdk-go-v2/feature/ec2/imds v1.18.16 // indirect
