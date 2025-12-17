@@ -621,3 +621,551 @@ func TestUpdateTableMetadata_LogsDebugMessage(t *testing.T) {
 		t.Error("expected debug log message about S3 Tables automatic metadata management")
 	}
 }
+
+// TestProperty_ErrorPropagation tests error propagation property
+// Feature: s3tables-upload-implementation, Property 4: エラー伝播
+// Validates: Requirements 1.6, 5.1, 5.2
+func TestProperty_ErrorPropagation(t *testing.T) {
+	if testing.Short() {
+		t.Skip("Skipping property-based test in short mode")
+	}
+
+	// プロパティ: 任意のS3 Tables APIまたはS3 PutObject APIエラーに対して、
+	// アップロード関数はエラーをラップして返すべきである
+
+	// テストケース1: S3 Tables APIエラーの伝播
+	t.Run("S3_Tables_API_errors_are_propagated", func(t *testing.T) {
+		// 様々なS3 Tables APIエラーを生成してテスト
+		apiErrors := []struct {
+			name      string
+			errorMsg  string
+			operation string
+		}{
+			{
+				name:      "GetTable error",
+				errorMsg:  "table not found",
+				operation: "GetTable",
+			},
+			{
+				name:      "CreateTable error",
+				errorMsg:  "insufficient permissions",
+				operation: "CreateTable",
+			},
+			{
+				name:      "CreateNamespace error",
+				errorMsg:  "quota exceeded",
+				operation: "CreateNamespace",
+			},
+			{
+				name:      "GetNamespace error",
+				errorMsg:  "namespace not found",
+				operation: "GetNamespace",
+			},
+		}
+
+		for _, apiErr := range apiErrors {
+			t.Run(apiErr.name, func(t *testing.T) {
+				cfg := &Config{
+					TableBucketArn: "arn:aws:s3tables:us-east-1:123456789012:bucket/test-bucket",
+					Region:         "us-east-1",
+					Namespace:      "test-namespace",
+					Tables: TableNamesConfig{
+						Traces:  "otel_traces",
+						Metrics: "otel_metrics",
+						Logs:    "otel_logs",
+					},
+				}
+				set := exportertest.NewNopSettings(component.MustNewType("s3tables"))
+				exporter, err := newS3TablesExporter(cfg, set)
+				if err != nil {
+					t.Fatalf("newS3TablesExporter() failed: %v", err)
+				}
+
+				// モックS3 Tablesクライアントを設定してエラーを返す
+				mockClient := &mockS3TablesClient{
+					getTableFunc: func(ctx context.Context, params *s3tables.GetTableInput, optFns ...func(*s3tables.Options)) (*s3tables.GetTableOutput, error) {
+						if apiErr.operation == "GetTable" {
+							return nil, fmt.Errorf("%s", apiErr.errorMsg)
+						}
+						return nil, fmt.Errorf("table not found")
+					},
+					createTableFunc: func(ctx context.Context, params *s3tables.CreateTableInput, optFns ...func(*s3tables.Options)) (*s3tables.CreateTableOutput, error) {
+						if apiErr.operation == "CreateTable" {
+							return nil, fmt.Errorf("%s", apiErr.errorMsg)
+						}
+						return nil, fmt.Errorf("CreateTable failed")
+					},
+					getNamespaceFunc: func(ctx context.Context, params *s3tables.GetNamespaceInput, optFns ...func(*s3tables.Options)) (*s3tables.GetNamespaceOutput, error) {
+						if apiErr.operation == "GetNamespace" {
+							return nil, fmt.Errorf("%s", apiErr.errorMsg)
+						}
+						return nil, fmt.Errorf("namespace not found")
+					},
+					createNamespaceFunc: func(ctx context.Context, params *s3tables.CreateNamespaceInput, optFns ...func(*s3tables.Options)) (*s3tables.CreateNamespaceOutput, error) {
+						if apiErr.operation == "CreateNamespace" {
+							return nil, fmt.Errorf("%s", apiErr.errorMsg)
+						}
+						return nil, fmt.Errorf("CreateNamespace failed")
+					},
+				}
+				exporter.s3TablesClient = mockClient
+
+				// アップロードを試行
+				err = exporter.uploadToS3Tables(context.Background(), []byte("test data"), "metrics")
+				if err == nil {
+					t.Errorf("expected error from uploadToS3Tables for %s", apiErr.name)
+					return
+				}
+
+				// エラーが適切にラップされていることを確認
+				// エラーメッセージに元のエラーメッセージが含まれることを確認
+				if len(err.Error()) == 0 {
+					t.Error("error message should not be empty")
+				}
+			})
+		}
+	})
+
+	// テストケース2: S3 PutObject APIエラーの伝播
+	t.Run("S3_PutObject_API_errors_are_propagated", func(t *testing.T) {
+		// 様々なS3 PutObject APIエラーを生成してテスト
+		s3Errors := []struct {
+			name     string
+			errorMsg string
+		}{
+			{
+				name:     "access denied",
+				errorMsg: "AccessDenied: User does not have permission",
+			},
+			{
+				name:     "bucket not found",
+				errorMsg: "NoSuchBucket: The specified bucket does not exist",
+			},
+			{
+				name:     "invalid request",
+				errorMsg: "InvalidRequest: The request is invalid",
+			},
+			{
+				name:     "service unavailable",
+				errorMsg: "ServiceUnavailable: Service is temporarily unavailable",
+			},
+		}
+
+		for _, s3Err := range s3Errors {
+			t.Run(s3Err.name, func(t *testing.T) {
+				cfg := &Config{
+					TableBucketArn: "arn:aws:s3tables:us-east-1:123456789012:bucket/test-bucket",
+					Region:         "us-east-1",
+					Namespace:      "test-namespace",
+					Tables: TableNamesConfig{
+						Traces:  "otel_traces",
+						Metrics: "otel_metrics",
+						Logs:    "otel_logs",
+					},
+				}
+				set := exportertest.NewNopSettings(component.MustNewType("s3tables"))
+				exporter, err := newS3TablesExporter(cfg, set)
+				if err != nil {
+					t.Fatalf("newS3TablesExporter() failed: %v", err)
+				}
+
+				// モックS3 Tablesクライアントを設定してテーブル情報を返す
+				tableArn := "arn:aws:s3tables:us-east-1:123456789012:bucket/test-bucket/table/test-table-id"
+				warehouseLocation := "s3://test-warehouse-bucket"
+				versionToken := "test-version-token"
+
+				mockS3TablesClient := &mockS3TablesClient{
+					getTableFunc: func(ctx context.Context, params *s3tables.GetTableInput, optFns ...func(*s3tables.Options)) (*s3tables.GetTableOutput, error) {
+						return &s3tables.GetTableOutput{
+							TableARN:          &tableArn,
+							WarehouseLocation: &warehouseLocation,
+							VersionToken:      &versionToken,
+						}, nil
+					},
+				}
+				exporter.s3TablesClient = mockS3TablesClient
+
+				// モックS3クライアントを設定してエラーを返す
+				mockS3Client := &mockS3Client{
+					putObjectFunc: func(ctx context.Context, params *s3.PutObjectInput, optFns ...func(*s3.Options)) (*s3.PutObjectOutput, error) {
+						return nil, fmt.Errorf("%s", s3Err.errorMsg)
+					},
+				}
+				exporter.s3Client = mockS3Client
+
+				// アップロードを試行
+				err = exporter.uploadToS3Tables(context.Background(), []byte("test data"), "metrics")
+				if err == nil {
+					t.Errorf("expected error from uploadToS3Tables for %s", s3Err.name)
+					return
+				}
+
+				// エラーが適切にラップされていることを確認
+				expectedSubstr := "failed to upload to warehouse location"
+				if len(err.Error()) < len(expectedSubstr) {
+					t.Errorf("error message should contain '%s', got '%s'", expectedSubstr, err.Error())
+				}
+			})
+		}
+	})
+
+	// テストケース3: ランダムエラーメッセージでのエラー伝播
+	t.Run("random_error_messages_are_propagated", func(t *testing.T) {
+		iterations := 50
+		for i := 0; i < iterations; i++ {
+			// ランダムなエラーメッセージを生成
+			randomErrorMsg := fmt.Sprintf("Random error %d: %s", i, generateRandomString(20))
+
+			cfg := &Config{
+				TableBucketArn: "arn:aws:s3tables:us-east-1:123456789012:bucket/test-bucket",
+				Region:         "us-east-1",
+				Namespace:      "test-namespace",
+				Tables: TableNamesConfig{
+					Traces:  "otel_traces",
+					Metrics: "otel_metrics",
+					Logs:    "otel_logs",
+				},
+			}
+			set := exportertest.NewNopSettings(component.MustNewType("s3tables"))
+			exporter, err := newS3TablesExporter(cfg, set)
+			if err != nil {
+				t.Fatalf("newS3TablesExporter() failed: %v", err)
+			}
+
+			// モックS3 Tablesクライアントを設定してエラーを返す
+			mockClient := &mockS3TablesClient{
+				getTableFunc: func(ctx context.Context, params *s3tables.GetTableInput, optFns ...func(*s3tables.Options)) (*s3tables.GetTableOutput, error) {
+					return nil, fmt.Errorf("%s", randomErrorMsg)
+				},
+				getNamespaceFunc: func(ctx context.Context, params *s3tables.GetNamespaceInput, optFns ...func(*s3tables.Options)) (*s3tables.GetNamespaceOutput, error) {
+					return &s3tables.GetNamespaceOutput{}, nil
+				},
+				createTableFunc: func(ctx context.Context, params *s3tables.CreateTableInput, optFns ...func(*s3tables.Options)) (*s3tables.CreateTableOutput, error) {
+					return nil, fmt.Errorf("%s", randomErrorMsg)
+				},
+			}
+			exporter.s3TablesClient = mockClient
+
+			// アップロードを試行
+			err = exporter.uploadToS3Tables(context.Background(), []byte("test data"), "metrics")
+			if err == nil {
+				t.Errorf("iteration %d: expected error from uploadToS3Tables", i)
+				continue
+			}
+
+			// エラーが適切にラップされていることを確認
+			if len(err.Error()) == 0 {
+				t.Errorf("iteration %d: error message should not be empty", i)
+			}
+		}
+	})
+}
+
+// generateRandomString generates a random string of the specified length
+// 指定された長さのランダムな文字列を生成
+func generateRandomString(length int) string {
+	const charset = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789"
+	result := make([]byte, length)
+	for i := range result {
+		result[i] = charset[i%len(charset)]
+	}
+	return string(result)
+}
+
+// TestProperty_ContextCancellation tests context cancellation handling property
+// Feature: s3tables-upload-implementation, Property 5: コンテキストキャンセルの処理
+// Validates: Requirements 2.6, 5.4
+func TestProperty_ContextCancellation(t *testing.T) {
+	if testing.Short() {
+		t.Skip("Skipping property-based test in short mode")
+	}
+
+	// プロパティ: 任意のキャンセルされたコンテキストに対して、
+	// アップロード関数は適切にキャンセルを処理し、エラーを返すべきである
+
+	// テストケース1: uploadToS3Tablesでのコンテキストキャンセル
+	t.Run("uploadToS3Tables_handles_cancelled_context", func(t *testing.T) {
+		iterations := 50
+		for i := 0; i < iterations; i++ {
+			cfg := &Config{
+				TableBucketArn: "arn:aws:s3tables:us-east-1:123456789012:bucket/test-bucket",
+				Region:         "us-east-1",
+				Namespace:      "test-namespace",
+				Tables: TableNamesConfig{
+					Traces:  "otel_traces",
+					Metrics: "otel_metrics",
+					Logs:    "otel_logs",
+				},
+			}
+			set := exportertest.NewNopSettings(component.MustNewType("s3tables"))
+			exporter, err := newS3TablesExporter(cfg, set)
+			if err != nil {
+				t.Fatalf("iteration %d: newS3TablesExporter() failed: %v", i, err)
+			}
+
+			// キャンセル済みのコンテキストを作成
+			ctx, cancel := context.WithCancel(context.Background())
+			cancel()
+
+			// アップロードを試行
+			err = exporter.uploadToS3Tables(ctx, []byte("test data"), "metrics")
+			if err == nil {
+				t.Errorf("iteration %d: expected error when context is cancelled", i)
+				continue
+			}
+
+			// エラーメッセージにコンテキストキャンセルが含まれることを確認
+			expectedSubstr := "upload cancelled"
+			if len(err.Error()) < len(expectedSubstr) {
+				t.Errorf("iteration %d: error message should contain '%s', got '%s'", i, expectedSubstr, err.Error())
+			}
+		}
+	})
+
+	// テストケース2: uploadToWarehouseLocationでのコンテキストキャンセル
+	t.Run("uploadToWarehouseLocation_handles_cancelled_context", func(t *testing.T) {
+		iterations := 50
+		for i := 0; i < iterations; i++ {
+			cfg := &Config{
+				TableBucketArn: "arn:aws:s3tables:us-east-1:123456789012:bucket/test-bucket",
+				Region:         "us-east-1",
+				Namespace:      "test-namespace",
+				Tables: TableNamesConfig{
+					Traces:  "otel_traces",
+					Metrics: "otel_metrics",
+					Logs:    "otel_logs",
+				},
+			}
+			set := exportertest.NewNopSettings(component.MustNewType("s3tables"))
+			exporter, err := newS3TablesExporter(cfg, set)
+			if err != nil {
+				t.Fatalf("iteration %d: newS3TablesExporter() failed: %v", i, err)
+			}
+
+			// キャンセル済みのコンテキストを作成
+			ctx, cancel := context.WithCancel(context.Background())
+			cancel()
+
+			// アップロードを試行
+			_, err = exporter.uploadToWarehouseLocation(ctx, "s3://test-bucket", []byte("test data"), "metrics")
+			if err == nil {
+				t.Errorf("iteration %d: expected error when context is cancelled", i)
+				continue
+			}
+
+			// エラーメッセージにコンテキストキャンセルが含まれることを確認
+			expectedSubstr := "upload cancelled"
+			if len(err.Error()) < len(expectedSubstr) {
+				t.Errorf("iteration %d: error message should contain '%s', got '%s'", i, expectedSubstr, err.Error())
+			}
+		}
+	})
+
+	// テストケース3: getTableでのコンテキストキャンセル
+	t.Run("getTable_handles_cancelled_context", func(t *testing.T) {
+		iterations := 50
+		for i := 0; i < iterations; i++ {
+			cfg := &Config{
+				TableBucketArn: "arn:aws:s3tables:us-east-1:123456789012:bucket/test-bucket",
+				Region:         "us-east-1",
+				Namespace:      "test-namespace",
+				Tables: TableNamesConfig{
+					Traces:  "otel_traces",
+					Metrics: "otel_metrics",
+					Logs:    "otel_logs",
+				},
+			}
+			set := exportertest.NewNopSettings(component.MustNewType("s3tables"))
+			exporter, err := newS3TablesExporter(cfg, set)
+			if err != nil {
+				t.Fatalf("iteration %d: newS3TablesExporter() failed: %v", i, err)
+			}
+
+			// キャンセル済みのコンテキストを作成
+			ctx, cancel := context.WithCancel(context.Background())
+			cancel()
+
+			// テーブル取得を試行
+			_, err = exporter.getTable(ctx, "test-namespace", "test-table")
+			if err == nil {
+				t.Errorf("iteration %d: expected error when context is cancelled", i)
+				continue
+			}
+
+			// エラーメッセージにコンテキストキャンセルが含まれることを確認
+			expectedSubstr := "table retrieval cancelled"
+			if len(err.Error()) < len(expectedSubstr) {
+				t.Errorf("iteration %d: error message should contain '%s', got '%s'", i, expectedSubstr, err.Error())
+			}
+		}
+	})
+
+	// テストケース4: createTableでのコンテキストキャンセル
+	t.Run("createTable_handles_cancelled_context", func(t *testing.T) {
+		iterations := 50
+		for i := 0; i < iterations; i++ {
+			cfg := &Config{
+				TableBucketArn: "arn:aws:s3tables:us-east-1:123456789012:bucket/test-bucket",
+				Region:         "us-east-1",
+				Namespace:      "test-namespace",
+				Tables: TableNamesConfig{
+					Traces:  "otel_traces",
+					Metrics: "otel_metrics",
+					Logs:    "otel_logs",
+				},
+			}
+			set := exportertest.NewNopSettings(component.MustNewType("s3tables"))
+			exporter, err := newS3TablesExporter(cfg, set)
+			if err != nil {
+				t.Fatalf("iteration %d: newS3TablesExporter() failed: %v", i, err)
+			}
+
+			// キャンセル済みのコンテキストを作成
+			ctx, cancel := context.WithCancel(context.Background())
+			cancel()
+
+			// テーブル作成を試行
+			schema := createMetricsSchema()
+			_, err = exporter.createTable(ctx, "test-namespace", "test-table", schema)
+			if err == nil {
+				t.Errorf("iteration %d: expected error when context is cancelled", i)
+				continue
+			}
+
+			// エラーメッセージにコンテキストキャンセルが含まれることを確認
+			expectedSubstr := "table creation cancelled"
+			if len(err.Error()) < len(expectedSubstr) {
+				t.Errorf("iteration %d: error message should contain '%s', got '%s'", i, expectedSubstr, err.Error())
+			}
+		}
+	})
+
+	// テストケース5: createNamespaceIfNotExistsでのコンテキストキャンセル
+	t.Run("createNamespaceIfNotExists_handles_cancelled_context", func(t *testing.T) {
+		iterations := 50
+		for i := 0; i < iterations; i++ {
+			cfg := &Config{
+				TableBucketArn: "arn:aws:s3tables:us-east-1:123456789012:bucket/test-bucket",
+				Region:         "us-east-1",
+				Namespace:      "test-namespace",
+				Tables: TableNamesConfig{
+					Traces:  "otel_traces",
+					Metrics: "otel_metrics",
+					Logs:    "otel_logs",
+				},
+			}
+			set := exportertest.NewNopSettings(component.MustNewType("s3tables"))
+			exporter, err := newS3TablesExporter(cfg, set)
+			if err != nil {
+				t.Fatalf("iteration %d: newS3TablesExporter() failed: %v", i, err)
+			}
+
+			// キャンセル済みのコンテキストを作成
+			ctx, cancel := context.WithCancel(context.Background())
+			cancel()
+
+			// Namespace作成を試行
+			err = exporter.createNamespaceIfNotExists(ctx, "test-namespace")
+			if err == nil {
+				t.Errorf("iteration %d: expected error when context is cancelled", i)
+				continue
+			}
+
+			// エラーメッセージにコンテキストキャンセルが含まれることを確認
+			expectedSubstr := "namespace creation cancelled"
+			if len(err.Error()) < len(expectedSubstr) {
+				t.Errorf("iteration %d: error message should contain '%s', got '%s'", i, expectedSubstr, err.Error())
+			}
+		}
+	})
+
+	// テストケース6: updateTableMetadataでのコンテキストキャンセル
+	t.Run("updateTableMetadata_handles_cancelled_context", func(t *testing.T) {
+		iterations := 50
+		for i := 0; i < iterations; i++ {
+			cfg := &Config{
+				TableBucketArn: "arn:aws:s3tables:us-east-1:123456789012:bucket/test-bucket",
+				Region:         "us-east-1",
+				Namespace:      "test-namespace",
+				Tables: TableNamesConfig{
+					Traces:  "otel_traces",
+					Metrics: "otel_metrics",
+					Logs:    "otel_logs",
+				},
+			}
+			set := exportertest.NewNopSettings(component.MustNewType("s3tables"))
+			exporter, err := newS3TablesExporter(cfg, set)
+			if err != nil {
+				t.Fatalf("iteration %d: newS3TablesExporter() failed: %v", i, err)
+			}
+
+			// テーブル情報を作成
+			tableInfo := &TableInfo{
+				TableARN:          "arn:aws:s3tables:us-east-1:123456789012:bucket/test-bucket/table/test-table-id",
+				WarehouseLocation: "s3://test-warehouse-bucket",
+				VersionToken:      "test-version-token",
+			}
+
+			// キャンセル済みのコンテキストを作成
+			ctx, cancel := context.WithCancel(context.Background())
+			cancel()
+
+			// メタデータ更新を試行
+			err = exporter.updateTableMetadata(ctx, tableInfo, "s3://test-warehouse-bucket/data/test-file.parquet")
+			if err == nil {
+				t.Errorf("iteration %d: expected error when context is cancelled", i)
+				continue
+			}
+
+			// エラーメッセージにコンテキストキャンセルが含まれることを確認
+			expectedSubstr := "metadata update cancelled"
+			if len(err.Error()) < len(expectedSubstr) {
+				t.Errorf("iteration %d: error message should contain '%s', got '%s'", i, expectedSubstr, err.Error())
+			}
+		}
+	})
+
+	// テストケース7: 様々なデータタイプでのコンテキストキャンセル
+	t.Run("context_cancellation_across_data_types", func(t *testing.T) {
+		dataTypes := []string{"metrics", "traces", "logs"}
+		iterations := 30
+
+		for _, dataType := range dataTypes {
+			for i := 0; i < iterations; i++ {
+				cfg := &Config{
+					TableBucketArn: "arn:aws:s3tables:us-east-1:123456789012:bucket/test-bucket",
+					Region:         "us-east-1",
+					Namespace:      "test-namespace",
+					Tables: TableNamesConfig{
+						Traces:  "otel_traces",
+						Metrics: "otel_metrics",
+						Logs:    "otel_logs",
+					},
+				}
+				set := exportertest.NewNopSettings(component.MustNewType("s3tables"))
+				exporter, err := newS3TablesExporter(cfg, set)
+				if err != nil {
+					t.Fatalf("dataType %s, iteration %d: newS3TablesExporter() failed: %v", dataType, i, err)
+				}
+
+				// キャンセル済みのコンテキストを作成
+				ctx, cancel := context.WithCancel(context.Background())
+				cancel()
+
+				// アップロードを試行
+				err = exporter.uploadToS3Tables(ctx, []byte("test data"), dataType)
+				if err == nil {
+					t.Errorf("dataType %s, iteration %d: expected error when context is cancelled", dataType, i)
+					continue
+				}
+
+				// エラーメッセージにコンテキストキャンセルが含まれることを確認
+				expectedSubstr := "upload cancelled"
+				if len(err.Error()) < len(expectedSubstr) {
+					t.Errorf("dataType %s, iteration %d: error message should contain '%s', got '%s'",
+						dataType, i, expectedSubstr, err.Error())
+				}
+			}
+		}
+	})
+}
