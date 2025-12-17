@@ -49,11 +49,20 @@ type s3ClientInterface interface {
 	PutObject(ctx context.Context, params *s3.PutObjectInput, optFns ...func(*s3.Options)) (*s3.PutObjectOutput, error)
 }
 
+// s3TablesClientInterface defines the S3 Tables client interface for testing
+// テスト用のS3 Tablesクライアントインターフェース
+type s3TablesClientInterface interface {
+	GetTable(ctx context.Context, params *s3tables.GetTableInput, optFns ...func(*s3tables.Options)) (*s3tables.GetTableOutput, error)
+	CreateTable(ctx context.Context, params *s3tables.CreateTableInput, optFns ...func(*s3tables.Options)) (*s3tables.CreateTableOutput, error)
+	GetNamespace(ctx context.Context, params *s3tables.GetNamespaceInput, optFns ...func(*s3tables.Options)) (*s3tables.GetNamespaceOutput, error)
+	CreateNamespace(ctx context.Context, params *s3tables.CreateNamespaceInput, optFns ...func(*s3tables.Options)) (*s3tables.CreateNamespaceOutput, error)
+}
+
 // s3TablesExporter implements the S3 Tables exporter.
 type s3TablesExporter struct {
 	config         *Config
 	logger         *slog.Logger
-	s3TablesClient *s3tables.Client
+	s3TablesClient s3TablesClientInterface
 	s3Client       s3ClientInterface
 	tableCache     map[string]*TableInfo // キャッシュキーは "namespace.tableName" 形式
 }
