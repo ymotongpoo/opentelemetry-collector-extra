@@ -8,6 +8,7 @@ require (
 	github.com/aws/aws-sdk-go-v2/config v1.32.6
 	github.com/aws/aws-sdk-go-v2/service/s3 v1.94.0
 	github.com/aws/aws-sdk-go-v2/service/s3tables v1.13.1
+	github.com/google/uuid v1.6.0
 	github.com/parquet-go/parquet-go v0.26.2
 	go.opentelemetry.io/collector/component v1.47.0
 	go.opentelemetry.io/collector/component/componenttest v0.141.0
@@ -43,7 +44,6 @@ require (
 	github.com/go-logr/stdr v1.2.2 // indirect
 	github.com/go-viper/mapstructure/v2 v2.4.0 // indirect
 	github.com/gobwas/glob v0.2.3 // indirect
-	github.com/google/uuid v1.6.0 // indirect
 	github.com/hashicorp/go-version v1.7.0 // indirect
 	github.com/json-iterator/go v1.1.12 // indirect
 	github.com/klauspost/compress v1.18.0 // indirect

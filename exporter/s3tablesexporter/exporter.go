@@ -15,16 +15,20 @@
 package s3tablesexporter
 
 import (
+	"bytes"
 	"context"
 	"encoding/json"
 	"fmt"
 	"log/slog"
 	"regexp"
+	"time"
 
+	"github.com/aws/aws-sdk-go-v2/aws"
 	"github.com/aws/aws-sdk-go-v2/config"
 	"github.com/aws/aws-sdk-go-v2/service/s3"
 	"github.com/aws/aws-sdk-go-v2/service/s3tables"
 	"github.com/aws/aws-sdk-go-v2/service/s3tables/types"
+	"github.com/google/uuid"
 	"go.opentelemetry.io/collector/exporter"
 	"go.opentelemetry.io/collector/pdata/plog"
 	"go.opentelemetry.io/collector/pdata/pmetric"
@@ -39,12 +43,18 @@ type TableInfo struct {
 	VersionToken      string
 }
 
+// s3ClientInterface defines the S3 client interface for testing
+// テスト用のS3クライアントインターフェース
+type s3ClientInterface interface {
+	PutObject(ctx context.Context, params *s3.PutObjectInput, optFns ...func(*s3.Options)) (*s3.PutObjectOutput, error)
+}
+
 // s3TablesExporter implements the S3 Tables exporter.
 type s3TablesExporter struct {
 	config         *Config
 	logger         *slog.Logger
 	s3TablesClient *s3tables.Client
-	s3Client       *s3.Client
+	s3Client       s3ClientInterface
 	tableCache     map[string]*TableInfo // キャッシュキーは "namespace.tableName" 形式
 }
 
@@ -209,6 +219,75 @@ func extractBucketNameFromArn(arn string) (string, error) {
 		return "", fmt.Errorf("invalid Table Bucket ARN format: %s", arn)
 	}
 	return matches[1], nil
+}
+
+// extractBucketFromWarehouseLocation extracts the bucket name from a warehouse location
+// Warehouse locationからバケット名を抽出
+// 形式: s3://bucket-name または s3://bucket-name/path
+func extractBucketFromWarehouseLocation(warehouseLocation string) (string, error) {
+	// s3://形式の検証
+	s3Pattern := regexp.MustCompile(`^s3://([^/]+)`)
+	matches := s3Pattern.FindStringSubmatch(warehouseLocation)
+	if len(matches) != 2 {
+		return "", fmt.Errorf("invalid warehouse location format: %s (expected s3://bucket-name)", warehouseLocation)
+	}
+	return matches[1], nil
+}
+
+// generateDataFileKey generates an Iceberg-format object key for data files
+// Iceberg形式のデータファイル用オブジェクトキーを生成
+// 形式: data/{timestamp}-{uuid}.parquet
+func generateDataFileKey(dataType string) string {
+	// タイムスタンプを生成（YYYYMMDDHHmmss形式）
+	timestamp := time.Now().UTC().Format("20060102-150405")
+	// UUIDを生成
+	id := uuid.New().String()
+	// キーを生成
+	return fmt.Sprintf("data/%s-%s.parquet", timestamp, id)
+}
+
+// uploadToWarehouseLocation uploads Parquet data to the table's warehouse location
+// Warehouse locationにParquetデータをアップロード
+func (e *s3TablesExporter) uploadToWarehouseLocation(ctx context.Context, warehouseLocation string, data []byte, dataType string) (string, error) {
+	// コンテキストキャンセルのチェック
+	select {
+	case <-ctx.Done():
+		return "", fmt.Errorf("upload cancelled: %w", ctx.Err())
+	default:
+	}
+
+	// Warehouse locationからバケット名を抽出
+	bucketName, err := extractBucketFromWarehouseLocation(warehouseLocation)
+	if err != nil {
+		return "", fmt.Errorf("failed to extract bucket name from warehouse location: %w", err)
+	}
+
+	// Iceberg形式のオブジェクトキーを生成
+	objectKey := generateDataFileKey(dataType)
+
+	// S3 PutObject APIを使用してアップロード
+	putInput := &s3.PutObjectInput{
+		Bucket: aws.String(bucketName),
+		Key:    aws.String(objectKey),
+		Body:   bytes.NewReader(data),
+	}
+
+	_, err = e.s3Client.PutObject(ctx, putInput)
+	if err != nil {
+		return "", fmt.Errorf("failed to upload Parquet file to warehouse location: %w", err)
+	}
+
+	// アップロードされたファイルのS3パスを返す
+	s3Path := fmt.Sprintf("s3://%s/%s", bucketName, objectKey)
+
+	e.logger.Debug("Uploaded Parquet file to warehouse location",
+		"warehouse_location", warehouseLocation,
+		"bucket", bucketName,
+		"key", objectKey,
+		"s3_path", s3Path,
+		"size", len(data))
+
+	return s3Path, nil
 }
 
 // getOrCreateTable gets an existing table or creates a new one
