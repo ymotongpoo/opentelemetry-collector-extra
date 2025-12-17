@@ -16,6 +16,7 @@ package s3tablesexporter
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"log/slog"
 	"regexp"
@@ -23,11 +24,20 @@ import (
 	"github.com/aws/aws-sdk-go-v2/config"
 	"github.com/aws/aws-sdk-go-v2/service/s3"
 	"github.com/aws/aws-sdk-go-v2/service/s3tables"
+	"github.com/aws/aws-sdk-go-v2/service/s3tables/types"
 	"go.opentelemetry.io/collector/exporter"
 	"go.opentelemetry.io/collector/pdata/plog"
 	"go.opentelemetry.io/collector/pdata/pmetric"
 	"go.opentelemetry.io/collector/pdata/ptrace"
 )
+
+// TableInfo holds cached table information
+// テーブル情報をキャッシュするための構造体
+type TableInfo struct {
+	TableARN          string
+	WarehouseLocation string
+	VersionToken      string
+}
 
 // s3TablesExporter implements the S3 Tables exporter.
 type s3TablesExporter struct {
@@ -35,6 +45,7 @@ type s3TablesExporter struct {
 	logger         *slog.Logger
 	s3TablesClient *s3tables.Client
 	s3Client       *s3.Client
+	tableCache     map[string]*TableInfo // キャッシュキーは "namespace.tableName" 形式
 }
 
 // newS3TablesExporter creates a new S3 Tables exporter instance.
@@ -56,6 +67,7 @@ func newS3TablesExporter(cfg *Config, set exporter.Settings) (*s3TablesExporter,
 		logger:         logger,
 		s3TablesClient: s3tables.NewFromConfig(awsCfg),
 		s3Client:       s3.NewFromConfig(awsCfg),
+		tableCache:     make(map[string]*TableInfo),
 	}, nil
 }
 
@@ -95,6 +107,97 @@ func (e *s3TablesExporter) pushLogs(ctx context.Context, ld plog.Logs) error {
 	return e.uploadToS3Tables(ctx, parquetData, "logs")
 }
 
+// marshalSchemaToJSON converts a schema map to JSON string
+// スキーママップをJSON文字列に変換
+func marshalSchemaToJSON(schema map[string]interface{}) (string, error) {
+	jsonBytes, err := json.Marshal(schema)
+	if err != nil {
+		return "", fmt.Errorf("failed to marshal schema: %w", err)
+	}
+	return string(jsonBytes), nil
+}
+
+// convertToIcebergSchema converts a schema map to IcebergSchema
+// スキーママップをIcebergSchema形式に変換
+func convertToIcebergSchema(schema map[string]interface{}) (*types.IcebergSchema, error) {
+	// スキーマのフィールドを抽出
+	fieldsInterface, ok := schema["fields"]
+	if !ok {
+		return nil, fmt.Errorf("schema missing 'fields' key")
+	}
+
+	fieldsSlice, ok := fieldsInterface.([]map[string]interface{})
+	if !ok {
+		return nil, fmt.Errorf("schema 'fields' is not a slice of maps")
+	}
+
+	// SchemaFieldsに変換
+	schemaFields := make([]types.SchemaField, 0, len(fieldsSlice))
+	for _, fieldMap := range fieldsSlice {
+		field, err := convertToSchemaField(fieldMap)
+		if err != nil {
+			return nil, fmt.Errorf("failed to convert field: %w", err)
+		}
+		schemaFields = append(schemaFields, field)
+	}
+
+	return &types.IcebergSchema{
+		Fields: schemaFields,
+	}, nil
+}
+
+// convertToSchemaField converts a field map to SchemaField
+// フィールドマップをSchemaField形式に変換
+func convertToSchemaField(fieldMap map[string]interface{}) (types.SchemaField, error) {
+	// 名前を取得
+	nameInterface, ok := fieldMap["name"]
+	if !ok {
+		return types.SchemaField{}, fmt.Errorf("field missing 'name' key")
+	}
+	name, ok := nameInterface.(string)
+	if !ok {
+		return types.SchemaField{}, fmt.Errorf("field 'name' is not a string")
+	}
+
+	// タイプを取得
+	typeInterface, ok := fieldMap["type"]
+	if !ok {
+		return types.SchemaField{}, fmt.Errorf("field missing 'type' key")
+	}
+
+	// タイプが文字列の場合（プリミティブ型）
+	var fieldType string
+	if typeStr, ok := typeInterface.(string); ok {
+		fieldType = typeStr
+	} else if typeMap, ok := typeInterface.(map[string]interface{}); ok {
+		// タイプがマップの場合（複合型）
+		// map型の場合は "map<key_type, value_type>" 形式に変換
+		if typeMap["type"] == "map" {
+			keyType, _ := typeMap["key"].(string)
+			valueType, _ := typeMap["value"].(string)
+			fieldType = fmt.Sprintf("map<%s, %s>", keyType, valueType)
+		} else {
+			return types.SchemaField{}, fmt.Errorf("unsupported complex type: %v", typeMap["type"])
+		}
+	} else {
+		return types.SchemaField{}, fmt.Errorf("field 'type' is not a string or map")
+	}
+
+	// requiredを取得
+	required := false
+	if requiredInterface, ok := fieldMap["required"]; ok {
+		if req, ok := requiredInterface.(bool); ok {
+			required = req
+		}
+	}
+
+	return types.SchemaField{
+		Name:     &name,
+		Type:     &fieldType,
+		Required: required,
+	}, nil
+}
+
 // extractBucketNameFromArn extracts the bucket name from a Table Bucket ARN
 // Table Bucket ARNからバケット名を抽出
 // 形式: arn:aws:s3tables:region:account-id:bucket/bucket-name
@@ -106,6 +209,194 @@ func extractBucketNameFromArn(arn string) (string, error) {
 		return "", fmt.Errorf("invalid Table Bucket ARN format: %s", arn)
 	}
 	return matches[1], nil
+}
+
+// getOrCreateTable gets an existing table or creates a new one
+// テーブルが存在する場合は取得、存在しない場合は作成
+func (e *s3TablesExporter) getOrCreateTable(ctx context.Context, namespace, tableName string, schema map[string]interface{}) (*TableInfo, error) {
+	// キャッシュキーを生成
+	cacheKey := fmt.Sprintf("%s.%s", namespace, tableName)
+
+	// キャッシュをチェック
+	if cachedInfo, ok := e.tableCache[cacheKey]; ok {
+		e.logger.Debug("Using cached table information",
+			"namespace", namespace,
+			"table", tableName)
+		return cachedInfo, nil
+	}
+
+	// テーブルの取得を試みる
+	tableInfo, err := e.getTable(ctx, namespace, tableName)
+	if err == nil {
+		// テーブルが存在する場合はキャッシュに保存
+		e.tableCache[cacheKey] = tableInfo
+		return tableInfo, nil
+	}
+
+	// テーブルが存在しない場合は、まずNamespaceを作成
+	if err := e.createNamespaceIfNotExists(ctx, namespace); err != nil {
+		return nil, fmt.Errorf("failed to create namespace: %w", err)
+	}
+
+	// テーブルを作成
+	tableInfo, err = e.createTable(ctx, namespace, tableName, schema)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create table: %w", err)
+	}
+
+	// キャッシュに保存
+	e.tableCache[cacheKey] = tableInfo
+
+	return tableInfo, nil
+}
+
+// getTable retrieves table information using S3 Tables API
+// S3 Tables APIを使用してテーブル情報を取得
+func (e *s3TablesExporter) getTable(ctx context.Context, namespace, tableName string) (*TableInfo, error) {
+	// コンテキストキャンセルのチェック
+	select {
+	case <-ctx.Done():
+		return nil, fmt.Errorf("table retrieval cancelled: %w", ctx.Err())
+	default:
+	}
+
+	// テーブル情報を取得
+	getInput := &s3tables.GetTableInput{
+		TableBucketARN: &e.config.TableBucketArn,
+		Namespace:      &namespace,
+		Name:           &tableName,
+	}
+
+	output, err := e.s3TablesClient.GetTable(ctx, getInput)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get table %s.%s: %w", namespace, tableName, err)
+	}
+
+	// TableInfoを構築
+	tableInfo := &TableInfo{
+		TableARN:          *output.TableARN,
+		WarehouseLocation: *output.WarehouseLocation,
+		VersionToken:      *output.VersionToken,
+	}
+
+	e.logger.Debug("Retrieved table information",
+		"namespace", namespace,
+		"table", tableName,
+		"table_arn", tableInfo.TableARN,
+		"warehouse_location", tableInfo.WarehouseLocation)
+
+	return tableInfo, nil
+}
+
+// createTable creates a new table using S3 Tables API
+// S3 Tables APIを使用してテーブルを作成
+func (e *s3TablesExporter) createTable(ctx context.Context, namespace, tableName string, schema map[string]interface{}) (*TableInfo, error) {
+	// コンテキストキャンセルのチェック
+	select {
+	case <-ctx.Done():
+		return nil, fmt.Errorf("table creation cancelled: %w", ctx.Err())
+	default:
+	}
+
+	// スキーマをIcebergSchema形式に変換
+	icebergSchema, err := convertToIcebergSchema(schema)
+	if err != nil {
+		return nil, fmt.Errorf("failed to convert schema to Iceberg format: %w", err)
+	}
+
+	// IcebergMetadataを作成
+	icebergMetadata := &types.IcebergMetadata{
+		Schema: icebergSchema,
+	}
+
+	// テーブル作成
+	createInput := &s3tables.CreateTableInput{
+		TableBucketARN: &e.config.TableBucketArn,
+		Namespace:      &namespace,
+		Name:           &tableName,
+		Format:         types.OpenTableFormatIceberg,
+		Metadata:       &types.TableMetadataMemberIceberg{Value: *icebergMetadata},
+	}
+
+	output, err := e.s3TablesClient.CreateTable(ctx, createInput)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create table %s.%s: %w", namespace, tableName, err)
+	}
+
+	// GetTableを呼び出してwarehouse locationを取得
+	getOutput, err := e.s3TablesClient.GetTable(ctx, &s3tables.GetTableInput{
+		TableBucketARN: &e.config.TableBucketArn,
+		Namespace:      &namespace,
+		Name:           &tableName,
+	})
+	if err != nil {
+		return nil, fmt.Errorf("failed to get table after creation %s.%s: %w", namespace, tableName, err)
+	}
+
+	// TableInfoを構築
+	tableInfo := &TableInfo{
+		TableARN:          *output.TableARN,
+		WarehouseLocation: *getOutput.WarehouseLocation,
+		VersionToken:      *output.VersionToken,
+	}
+
+	e.logger.Info("Created table",
+		"namespace", namespace,
+		"table", tableName,
+		"table_arn", tableInfo.TableARN,
+		"warehouse_location", tableInfo.WarehouseLocation)
+
+	return tableInfo, nil
+}
+
+// createNamespaceIfNotExists creates a namespace if it doesn't exist
+// Namespaceが存在しない場合は作成する
+func (e *s3TablesExporter) createNamespaceIfNotExists(ctx context.Context, namespace string) error {
+	// コンテキストキャンセルのチェック
+	select {
+	case <-ctx.Done():
+		return fmt.Errorf("namespace creation cancelled: %w", ctx.Err())
+	default:
+	}
+
+	// Table Bucket ARNからバケット名を抽出
+	bucketName, err := extractBucketNameFromArn(e.config.TableBucketArn)
+	if err != nil {
+		return fmt.Errorf("failed to extract bucket name from ARN: %w", err)
+	}
+
+	// Namespaceの存在確認
+	getInput := &s3tables.GetNamespaceInput{
+		TableBucketARN: &e.config.TableBucketArn,
+		Namespace:      &namespace,
+	}
+
+	_, err = e.s3TablesClient.GetNamespace(ctx, getInput)
+	if err == nil {
+		// Namespaceが既に存在する
+		e.logger.Debug("Namespace already exists",
+			"namespace", namespace,
+			"bucket", bucketName)
+		return nil
+	}
+
+	// Namespaceが存在しない場合は作成
+	// Namespaceは階層構造をサポートするため配列形式
+	createInput := &s3tables.CreateNamespaceInput{
+		TableBucketARN: &e.config.TableBucketArn,
+		Namespace:      []string{namespace},
+	}
+
+	_, err = e.s3TablesClient.CreateNamespace(ctx, createInput)
+	if err != nil {
+		return fmt.Errorf("failed to create namespace %s: %w", namespace, err)
+	}
+
+	e.logger.Info("Created namespace",
+		"namespace", namespace,
+		"bucket", bucketName)
+
+	return nil
 }
 
 // uploadToS3Tables uploads the Parquet data to S3 Tables.
