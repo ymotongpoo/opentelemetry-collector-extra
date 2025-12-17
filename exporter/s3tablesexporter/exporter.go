@@ -478,6 +478,45 @@ func (e *s3TablesExporter) createNamespaceIfNotExists(ctx context.Context, names
 	return nil
 }
 
+// updateTableMetadata updates the table metadata after uploading data files
+// データファイルアップロード後にテーブルメタデータを更新
+func (e *s3TablesExporter) updateTableMetadata(ctx context.Context, tableInfo *TableInfo, dataFilePath string) error {
+	// コンテキストキャンセルのチェック
+	select {
+	case <-ctx.Done():
+		return fmt.Errorf("metadata update cancelled: %w", ctx.Err())
+	default:
+	}
+
+	// AWS S3 Tablesの動作について:
+	// S3 Tablesは自動的にwarehouse location内のデータファイルを認識し、
+	// メタデータを管理します。データファイルをアップロードすると、
+	// S3 Tablesは自動的にファイル圧縮とスナップショット管理を行います。
+	//
+	// UpdateTableMetadataLocation APIは、カスタムメタデータファイルを
+	// 使用する場合にのみ必要です。現在の実装では、S3 Tablesの
+	// 自動メタデータ管理機能を使用するため、明示的なメタデータ更新は
+	// 不要です。
+	//
+	// 将来的に、カスタムメタデータ管理が必要になった場合は、
+	// 以下のようにUpdateTableMetadataLocation APIを使用できます:
+	//
+	// updateInput := &s3tables.UpdateTableMetadataLocationInput{
+	//     TableBucketARN:   &e.config.TableBucketArn,
+	//     Namespace:        aws.String(namespace),
+	//     Name:             aws.String(tableName),
+	//     MetadataLocation: aws.String(metadataLocation),
+	//     VersionToken:     &tableInfo.VersionToken,
+	// }
+	// _, err := e.s3TablesClient.UpdateTableMetadataLocation(ctx, updateInput)
+
+	e.logger.Debug("Data file uploaded to warehouse location, S3 Tables will automatically manage metadata",
+		"table_arn", tableInfo.TableARN,
+		"data_file_path", dataFilePath)
+
+	return nil
+}
+
 // uploadToS3Tables uploads the Parquet data to S3 Tables.
 func (e *s3TablesExporter) uploadToS3Tables(ctx context.Context, data []byte, dataType string) error {
 	// コンテキストキャンセルのチェック
@@ -499,13 +538,17 @@ func (e *s3TablesExporter) uploadToS3Tables(ctx context.Context, data []byte, da
 	// アップロード開始のログ出力
 	// データタイプに応じたテーブル名を取得
 	var tableName string
+	var schema map[string]interface{}
 	switch dataType {
 	case "metrics":
 		tableName = e.config.Tables.Metrics
+		schema = createMetricsSchema()
 	case "traces":
 		tableName = e.config.Tables.Traces
+		schema = createTracesSchema()
 	case "logs":
 		tableName = e.config.Tables.Logs
+		schema = createLogsSchema()
 	default:
 		return fmt.Errorf("unknown data type: %s", dataType)
 	}
@@ -524,15 +567,39 @@ func (e *s3TablesExporter) uploadToS3Tables(ctx context.Context, data []byte, da
 		"data_type", dataType,
 		"size", len(data))
 
-	// TODO: S3 Tables APIを使用した実装
-	// 1. S3 Tables APIを使用してテーブルを作成・取得
-	// 2. Warehouse locationを取得
-	// 3. Warehouse locationにParquetファイルをアップロード
-	// 4. テーブルメタデータを更新
+	// 1. テーブルを取得または作成
+	tableInfo, err := e.getOrCreateTable(ctx, e.config.Namespace, tableName, schema)
+	if err != nil {
+		e.logger.Error("Failed to get or create table",
+			"namespace", e.config.Namespace,
+			"table", tableName,
+			"error", err)
+		return fmt.Errorf("failed to get or create table: %w", err)
+	}
+
+	// 2. Warehouse locationにParquetファイルをアップロード
+	dataFilePath, err := e.uploadToWarehouseLocation(ctx, tableInfo.WarehouseLocation, data, dataType)
+	if err != nil {
+		e.logger.Error("Failed to upload to warehouse location",
+			"warehouse_location", tableInfo.WarehouseLocation,
+			"error", err)
+		return fmt.Errorf("failed to upload to warehouse location: %w", err)
+	}
+
+	// 3. テーブルメタデータを更新
+	if err := e.updateTableMetadata(ctx, tableInfo, dataFilePath); err != nil {
+		e.logger.Error("Failed to update table metadata",
+			"table_arn", tableInfo.TableARN,
+			"data_file_path", dataFilePath,
+			"error", err)
+		return fmt.Errorf("failed to update table metadata: %w", err)
+	}
 
 	// 成功のログ出力
 	e.logger.Info("Successfully uploaded data to S3 Tables",
 		"table", tableName,
+		"warehouse_location", tableInfo.WarehouseLocation,
+		"data_file_path", dataFilePath,
 		"size", len(data))
 
 	return nil

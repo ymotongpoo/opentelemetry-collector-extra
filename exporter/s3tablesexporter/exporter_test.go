@@ -1676,3 +1676,135 @@ func TestProperty_ObjectKeyUniqueness(t *testing.T) {
 		}
 	})
 }
+
+// TestUpdateTableMetadata tests the updateTableMetadata function
+// Requirements: 1.4
+func TestUpdateTableMetadata(t *testing.T) {
+	cfg := &Config{
+		TableBucketArn: "arn:aws:s3tables:us-east-1:123456789012:bucket/test-bucket",
+		Region:         "us-east-1",
+		Namespace:      "test-namespace",
+		Tables: TableNamesConfig{
+			Traces:  "otel_traces",
+			Metrics: "otel_metrics",
+			Logs:    "otel_logs",
+		},
+	}
+	set := exportertest.NewNopSettings(component.MustNewType("s3tables"))
+	exporter, err := newS3TablesExporter(cfg, set)
+	if err != nil {
+		t.Fatalf("newS3TablesExporter() failed: %v", err)
+	}
+
+	// テーブル情報を作成
+	tableInfo := &TableInfo{
+		TableARN:          "arn:aws:s3tables:us-east-1:123456789012:bucket/test-bucket/table/test-table-id",
+		WarehouseLocation: "s3://test-warehouse-bucket",
+		VersionToken:      "test-version-token",
+	}
+
+	// メタデータ更新を実行
+	err = exporter.updateTableMetadata(context.Background(), tableInfo, "s3://test-warehouse-bucket/data/test-file.parquet")
+	if err != nil {
+		t.Errorf("updateTableMetadata() failed: %v", err)
+	}
+}
+
+// TestUpdateTableMetadata_ContextCancellation tests context cancellation handling
+// Requirements: 2.6, 5.4
+func TestUpdateTableMetadata_ContextCancellation(t *testing.T) {
+	cfg := &Config{
+		TableBucketArn: "arn:aws:s3tables:us-east-1:123456789012:bucket/test-bucket",
+		Region:         "us-east-1",
+		Namespace:      "test-namespace",
+		Tables: TableNamesConfig{
+			Traces:  "otel_traces",
+			Metrics: "otel_metrics",
+			Logs:    "otel_logs",
+		},
+	}
+	set := exportertest.NewNopSettings(component.MustNewType("s3tables"))
+	exporter, err := newS3TablesExporter(cfg, set)
+	if err != nil {
+		t.Fatalf("newS3TablesExporter() failed: %v", err)
+	}
+
+	// テーブル情報を作成
+	tableInfo := &TableInfo{
+		TableARN:          "arn:aws:s3tables:us-east-1:123456789012:bucket/test-bucket/table/test-table-id",
+		WarehouseLocation: "s3://test-warehouse-bucket",
+		VersionToken:      "test-version-token",
+	}
+
+	// キャンセル済みのコンテキストを作成
+	ctx, cancel := context.WithCancel(context.Background())
+	cancel()
+
+	// メタデータ更新を試行
+	err = exporter.updateTableMetadata(ctx, tableInfo, "s3://test-warehouse-bucket/data/test-file.parquet")
+	if err == nil {
+		t.Error("expected error when context is cancelled")
+	}
+
+	// エラーメッセージにコンテキストキャンセルが含まれることを確認
+	expectedMsg := "metadata update cancelled"
+	if len(err.Error()) < len(expectedMsg) || err.Error()[:len(expectedMsg)] != expectedMsg {
+		t.Errorf("expected error message to start with '%s', got '%s'", expectedMsg, err.Error())
+	}
+}
+
+// TestUpdateTableMetadata_LogsDebugMessage tests that debug logs are output
+// Requirements: 1.4
+func TestUpdateTableMetadata_LogsDebugMessage(t *testing.T) {
+	cfg := &Config{
+		TableBucketArn: "arn:aws:s3tables:us-east-1:123456789012:bucket/test-bucket",
+		Region:         "us-east-1",
+		Namespace:      "test-namespace",
+		Tables: TableNamesConfig{
+			Traces:  "otel_traces",
+			Metrics: "otel_metrics",
+			Logs:    "otel_logs",
+		},
+	}
+	set := exportertest.NewNopSettings(component.MustNewType("s3tables"))
+	exporter, err := newS3TablesExporter(cfg, set)
+	if err != nil {
+		t.Fatalf("newS3TablesExporter() failed: %v", err)
+	}
+
+	// カスタムロガーを設定してログメッセージをキャプチャ
+	capture := &logCapture{}
+	exporter.logger = slog.New(capture)
+
+	// テーブル情報を作成
+	tableInfo := &TableInfo{
+		TableARN:          "arn:aws:s3tables:us-east-1:123456789012:bucket/test-bucket/table/test-table-id",
+		WarehouseLocation: "s3://test-warehouse-bucket",
+		VersionToken:      "test-version-token",
+	}
+
+	// メタデータ更新を実行
+	err = exporter.updateTableMetadata(context.Background(), tableInfo, "s3://test-warehouse-bucket/data/test-file.parquet")
+	if err != nil {
+		t.Errorf("updateTableMetadata() failed: %v", err)
+	}
+
+	// デバッグログが出力されたことを確認
+	found := false
+	for _, msg := range capture.messages {
+		if msg.level == slog.LevelDebug && msg.message == "Data file uploaded to warehouse location, S3 Tables will automatically manage metadata" {
+			found = true
+			// 必要な属性が含まれることを確認
+			if msg.attrs["table_arn"] != tableInfo.TableARN {
+				t.Errorf("expected table_arn '%s', got '%v'", tableInfo.TableARN, msg.attrs["table_arn"])
+			}
+			if msg.attrs["data_file_path"] != "s3://test-warehouse-bucket/data/test-file.parquet" {
+				t.Errorf("expected data_file_path 's3://test-warehouse-bucket/data/test-file.parquet', got '%v'", msg.attrs["data_file_path"])
+			}
+			break
+		}
+	}
+	if !found {
+		t.Error("expected debug log message about S3 Tables automatic metadata management")
+	}
+}
