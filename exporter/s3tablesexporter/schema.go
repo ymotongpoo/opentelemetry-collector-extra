@@ -24,8 +24,61 @@ package s3tablesexporter
 //   - value (double) - メトリクス値
 //   - attributes (map<string, string>) - メトリクス属性
 func createMetricsSchema() map[string]interface{} {
-	// TODO: Iceberg形式のスキーマJSONを実装
-	return map[string]interface{}{}
+	return map[string]interface{}{
+		"type": "struct",
+		"fields": []map[string]interface{}{
+			{
+				"id":       1,
+				"name":     "timestamp",
+				"required": true,
+				"type":     "timestamptz",
+			},
+			{
+				"id":       2,
+				"name":     "resource_attributes",
+				"required": false,
+				"type": map[string]interface{}{
+					"type":      "map",
+					"key-id":    3,
+					"key":       "string",
+					"value-id":  4,
+					"value":     "string",
+					"value-required": false,
+				},
+			},
+			{
+				"id":       5,
+				"name":     "metric_name",
+				"required": true,
+				"type":     "string",
+			},
+			{
+				"id":       6,
+				"name":     "metric_type",
+				"required": true,
+				"type":     "string",
+			},
+			{
+				"id":       7,
+				"name":     "value",
+				"required": true,
+				"type":     "double",
+			},
+			{
+				"id":       8,
+				"name":     "attributes",
+				"required": false,
+				"type": map[string]interface{}{
+					"type":      "map",
+					"key-id":    9,
+					"key":       "string",
+					"value-id":  10,
+					"value":     "string",
+					"value-required": false,
+				},
+			},
+		},
+	}
 }
 
 // createTracesSchema creates an Iceberg schema JSON for traces data
@@ -40,8 +93,73 @@ func createMetricsSchema() map[string]interface{} {
 //   - attributes (map<string, string>) - スパン属性
 //   - resource_attributes (map<string, string>) - リソース属性
 func createTracesSchema() map[string]interface{} {
-	// TODO: Iceberg形式のスキーマJSONを実装
-	return map[string]interface{}{}
+	return map[string]interface{}{
+		"type": "struct",
+		"fields": []map[string]interface{}{
+			{
+				"id":       1,
+				"name":     "trace_id",
+				"required": true,
+				"type":     "binary",
+			},
+			{
+				"id":       2,
+				"name":     "span_id",
+				"required": true,
+				"type":     "binary",
+			},
+			{
+				"id":       3,
+				"name":     "parent_span_id",
+				"required": false,
+				"type":     "binary",
+			},
+			{
+				"id":       4,
+				"name":     "name",
+				"required": true,
+				"type":     "string",
+			},
+			{
+				"id":       5,
+				"name":     "start_time",
+				"required": true,
+				"type":     "timestamptz",
+			},
+			{
+				"id":       6,
+				"name":     "end_time",
+				"required": true,
+				"type":     "timestamptz",
+			},
+			{
+				"id":       7,
+				"name":     "attributes",
+				"required": false,
+				"type": map[string]interface{}{
+					"type":      "map",
+					"key-id":    8,
+					"key":       "string",
+					"value-id":  9,
+					"value":     "string",
+					"value-required": false,
+				},
+			},
+			{
+				"id":       10,
+				"name":     "resource_attributes",
+				"required": false,
+				"type": map[string]interface{}{
+					"type":      "map",
+					"key-id":    11,
+					"key":       "string",
+					"value-id":  12,
+					"value":     "string",
+					"value-required": false,
+				},
+			},
+		},
+	}
 }
 
 // createLogsSchema creates an Iceberg schema JSON for logs data
@@ -53,6 +171,53 @@ func createTracesSchema() map[string]interface{} {
 //   - attributes (map<string, string>) - ログ属性
 //   - resource_attributes (map<string, string>) - リソース属性
 func createLogsSchema() map[string]interface{} {
-	// TODO: Iceberg形式のスキーマJSONを実装
-	return map[string]interface{}{}
+	return map[string]interface{}{
+		"type": "struct",
+		"fields": []map[string]interface{}{
+			{
+				"id":       1,
+				"name":     "timestamp",
+				"required": true,
+				"type":     "timestamptz",
+			},
+			{
+				"id":       2,
+				"name":     "severity",
+				"required": false,
+				"type":     "string",
+			},
+			{
+				"id":       3,
+				"name":     "body",
+				"required": true,
+				"type":     "string",
+			},
+			{
+				"id":       4,
+				"name":     "attributes",
+				"required": false,
+				"type": map[string]interface{}{
+					"type":      "map",
+					"key-id":    5,
+					"key":       "string",
+					"value-id":  6,
+					"value":     "string",
+					"value-required": false,
+				},
+			},
+			{
+				"id":       7,
+				"name":     "resource_attributes",
+				"required": false,
+				"type": map[string]interface{}{
+					"type":      "map",
+					"key-id":    8,
+					"key":       "string",
+					"value-id":  9,
+					"value":     "string",
+					"value-required": false,
+				},
+			},
+		},
+	}
 }
