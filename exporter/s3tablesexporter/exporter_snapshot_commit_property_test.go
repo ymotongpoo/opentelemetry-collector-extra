@@ -61,7 +61,7 @@ func TestProperty_SnapshotCreationAndCommit(t *testing.T) {
 		existingMetadata := IcebergMetadata{
 			FormatVersion:      2,
 			TableUUID:          "test-uuid",
-			Location:   "s3://test-bucket/test-table",
+			Location:           "s3://test-bucket/test-table",
 			LastSequenceNumber: 0,
 			LastUpdatedMS:      1234567890000,
 			LastColumnID:       1,
@@ -76,7 +76,7 @@ func TestProperty_SnapshotCreationAndCommit(t *testing.T) {
 			CurrentSchemaID: 0,
 			PartitionSpecs: []IcebergPartitionSpec{
 				{
-SpecID: 0,
+					SpecID: 0,
 					Fields: []IcebergPartitionField{},
 				},
 			},
@@ -145,7 +145,7 @@ SpecID: 0,
 		dataFilePaths := []string{"s3://test-bucket/data/file1.parquet"}
 
 		// スナップショットをコミット
-		err = exporter.commitSnapshot(context.Background(), "test-namespace", "test-table", tableInfo, dataFilePaths)
+		err = exporter.commitSnapshot(context.Background(), "test-namespace", "test-table", tableInfo, dataFilePaths, int64(len(dataFilePaths)*1024))
 		if err != nil {
 			t.Fatalf("commitSnapshot() failed: %v", err)
 		}
@@ -183,7 +183,7 @@ SpecID: 0,
 				// スナップショットが追加されたことを確認
 				if len(newMetadata.Snapshots) != 1 {
 					t.Errorf("expected 1 snapshot, got %d", len(newMetadata.Snapshots))
-	}
+				}
 
 				foundMetadata = true
 				break
@@ -272,7 +272,7 @@ SpecID: 0,
 					data, _ := io.ReadAll(params.Body)
 					uploadedMetadata[*params.Key] = data
 					return &s3.PutObjectOutput{}, nil
-		},
+				},
 			}
 			exporter.s3Client = mockS3Client
 
@@ -284,7 +284,7 @@ SpecID: 0,
 			}
 
 			// スナップショットをコミット
-			err = exporter.commitSnapshot(context.Background(), "test-namespace", "test-table", tableInfo, dataFilePaths)
+			err = exporter.commitSnapshot(context.Background(), "test-namespace", "test-table", tableInfo, dataFilePaths, int64(len(dataFilePaths)*1024))
 			if err != nil {
 				t.Fatalf("iteration %d: commitSnapshot() failed: %v", i, err)
 			}
@@ -429,7 +429,7 @@ SpecID: 0,
 			dataFilePaths := []string{fmt.Sprintf("s3://test-bucket/data/file%d.parquet", i)}
 
 			// スナップショットをコミット
-			err = exporter.commitSnapshot(context.Background(), "test-namespace", "test-table", tableInfo, dataFilePaths)
+			err = exporter.commitSnapshot(context.Background(), "test-namespace", "test-table", tableInfo, dataFilePaths, int64(len(dataFilePaths)*1024))
 			if err != nil {
 				t.Fatalf("iteration %d: commitSnapshot() failed: %v", i, err)
 			}
@@ -471,4 +471,3 @@ SpecID: 0,
 		}
 	})
 }
-

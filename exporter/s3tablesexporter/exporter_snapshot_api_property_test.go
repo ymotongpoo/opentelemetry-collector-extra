@@ -117,7 +117,7 @@ func TestProperty_UpdateTableMetadataLocationAPIParameters(t *testing.T) {
 			dataFilePaths := []string{fmt.Sprintf("s3://test-bucket-%d/data/file%d.parquet", i, i)}
 
 			// スナップショットをコミット
-			err = exporter.commitSnapshot(context.Background(), cfg.Namespace, tableName, tableInfo, dataFilePaths)
+			err = exporter.commitSnapshot(context.Background(), cfg.Namespace, tableName, tableInfo, dataFilePaths, int64(len(dataFilePaths)*1024))
 			if err != nil {
 				t.Fatalf("iteration %d: commitSnapshot() failed: %v", i, err)
 			}
@@ -239,7 +239,7 @@ func TestProperty_UpdateTableMetadataLocationAPIParameters(t *testing.T) {
 			dataFilePaths := []string{fmt.Sprintf("s3://test-bucket/data/file%d.parquet", i)}
 
 			// スナップショットをコミット
-			err = exporter.commitSnapshot(context.Background(), "test-namespace", "test-table", tableInfo, dataFilePaths)
+			err = exporter.commitSnapshot(context.Background(), "test-namespace", "test-table", tableInfo, dataFilePaths, int64(len(dataFilePaths)*1024))
 			if err != nil {
 				t.Fatalf("iteration %d: commitSnapshot() failed: %v", i, err)
 			}
@@ -358,7 +358,7 @@ func TestProperty_UpdateTableMetadataLocationAPIParameters(t *testing.T) {
 			dataFilePaths := []string{"s3://test-bucket/data/file.parquet"}
 
 			// スナップショットをコミット
-			err = exporter.commitSnapshot(context.Background(), tc.namespace, tc.tableName, tableInfo, dataFilePaths)
+			err = exporter.commitSnapshot(context.Background(), tc.namespace, tc.tableName, tableInfo, dataFilePaths, int64(len(dataFilePaths)*1024))
 			if err != nil {
 				t.Fatalf("test case %d: commitSnapshot() failed: %v", i, err)
 			}
@@ -435,7 +435,7 @@ func TestProperty_VersionTokenConsistency(t *testing.T) {
 				getTableMetadataLocationFunc: func(ctx context.Context, params *s3tables.GetTableMetadataLocationInput, optFns ...func(*s3tables.Options)) (*s3tables.GetTableMetadataLocationOutput, error) {
 					capturedGetParams = params
 					return &s3tables.GetTableMetadataLocationOutput{
-	MetadataLocation: &metadataLocation,
+						MetadataLocation: &metadataLocation,
 						VersionToken:     &versionToken,
 					}, nil
 				},
@@ -472,7 +472,7 @@ func TestProperty_VersionTokenConsistency(t *testing.T) {
 			dataFilePaths := []string{fmt.Sprintf("s3://test-bucket/data/file%d.parquet", i)}
 
 			// スナップショットをコミット
-			err = exporter.commitSnapshot(context.Background(), "test-namespace", "test-table", tableInfo, dataFilePaths)
+			err = exporter.commitSnapshot(context.Background(), "test-namespace", "test-table", tableInfo, dataFilePaths, int64(len(dataFilePaths)*1024))
 			if err != nil {
 				t.Fatalf("iteration %d: commitSnapshot() failed: %v", i, err)
 			}
@@ -520,7 +520,7 @@ func TestProperty_VersionTokenConsistency(t *testing.T) {
 			}
 			set := exportertest.NewNopSettings(component.MustNewType("s3tables"))
 			exporter, err := newS3TablesExporter(cfg, set)
-if err != nil {
+			if err != nil {
 				t.Fatalf("iteration %d: newS3TablesExporter() failed: %v", i, err)
 			}
 
@@ -590,7 +590,7 @@ if err != nil {
 				dataFilePaths := []string{fmt.Sprintf("s3://test-bucket/data/file%d-%d.parquet", i, j)}
 
 				// スナップショットをコミット
-				err = exporter.commitSnapshot(context.Background(), "test-namespace", "test-table", tableInfo, dataFilePaths)
+				err = exporter.commitSnapshot(context.Background(), "test-namespace", "test-table", tableInfo, dataFilePaths, int64(len(dataFilePaths)*1024))
 				if err != nil {
 					t.Fatalf("iteration %d, commit %d: commitSnapshot() failed: %v", i, j, err)
 				}
@@ -685,7 +685,7 @@ if err != nil {
 		dataFilePaths := []string{"s3://test-bucket/data/file.parquet"}
 
 		// スナップショットをコミット（エラーが発生するはず）
-		err = exporter.commitSnapshot(context.Background(), "test-namespace", "test-table", tableInfo, dataFilePaths)
+		err = exporter.commitSnapshot(context.Background(), "test-namespace", "test-table", tableInfo, dataFilePaths, int64(len(dataFilePaths)*1024))
 		if err == nil {
 			t.Error("expected error from commitSnapshot due to version token conflict")
 		}
@@ -785,7 +785,7 @@ if err != nil {
 			dataFilePaths := []string{"s3://test-bucket/data/file.parquet"}
 
 			// スナップショットをコミット
-			err = exporter.commitSnapshot(context.Background(), "test-namespace", "test-table", tableInfo, dataFilePaths)
+			err = exporter.commitSnapshot(context.Background(), "test-namespace", "test-table", tableInfo, dataFilePaths, int64(len(dataFilePaths)*1024))
 			if err != nil {
 				t.Fatalf("test case %d (%s): commitSnapshot() failed: %v", i, tc.name, err)
 			}

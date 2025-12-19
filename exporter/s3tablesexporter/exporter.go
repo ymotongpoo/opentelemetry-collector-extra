@@ -507,6 +507,7 @@ func (e *s3TablesExporter) commitSnapshot(
 	tableName string,
 	tableInfo *TableInfo,
 	dataFilePaths []string,
+	totalDataSize int64,
 ) error {
 	// コンテキストキャンセルのチェック
 	select {
@@ -514,6 +515,8 @@ func (e *s3TablesExporter) commitSnapshot(
 		e.logger.Warn("Snapshot commit cancelled",
 			"namespace", namespace,
 			"table", tableName,
+			"data_files_count", len(dataFilePaths),
+			"total_data_size", totalDataSize,
 			"error", ctx.Err())
 		return fmt.Errorf("snapshot commit cancelled: %w", ctx.Err())
 	default:
@@ -522,7 +525,8 @@ func (e *s3TablesExporter) commitSnapshot(
 	e.logger.Info("Starting snapshot commit",
 		"namespace", namespace,
 		"table", tableName,
-		"data_files_count", len(dataFilePaths))
+		"data_files_count", len(dataFilePaths),
+		"total_data_size", totalDataSize)
 
 	// 1. 既存メタデータの取得
 	existingMetadata, err := e.getTableMetadata(ctx, namespace, tableName, tableInfo)
@@ -530,6 +534,8 @@ func (e *s3TablesExporter) commitSnapshot(
 		e.logger.Error("Failed to get table metadata",
 			"namespace", namespace,
 			"table", tableName,
+			"data_files_count", len(dataFilePaths),
+			"total_data_size", totalDataSize,
 			"error", err)
 		return fmt.Errorf("failed to get table metadata: %w", err)
 	}
@@ -567,6 +573,8 @@ func (e *s3TablesExporter) commitSnapshot(
 		e.logger.Error("Failed to generate manifest",
 			"namespace", namespace,
 			"table", tableName,
+			"data_files_count", len(dataFilePaths),
+			"total_data_size", totalDataSize,
 			"error", err)
 		return fmt.Errorf("failed to generate manifest: %w", err)
 	}
@@ -589,6 +597,8 @@ func (e *s3TablesExporter) commitSnapshot(
 		e.logger.Error("Failed to generate snapshot",
 			"namespace", namespace,
 			"table", tableName,
+			"data_files_count", len(dataFilePaths),
+			"total_data_size", totalDataSize,
 			"error", err)
 		return fmt.Errorf("failed to generate snapshot: %w", err)
 	}
@@ -619,6 +629,8 @@ func (e *s3TablesExporter) commitSnapshot(
 		e.logger.Error("Failed to upload metadata",
 			"namespace", namespace,
 			"table", tableName,
+			"data_files_count", len(dataFilePaths),
+			"total_data_size", totalDataSize,
 			"error", err)
 		return fmt.Errorf("failed to upload metadata: %w", err)
 	}
@@ -642,6 +654,8 @@ func (e *s3TablesExporter) commitSnapshot(
 			"table", tableName,
 			"metadata_location", metadataPath,
 			"version_token", tableInfo.VersionToken,
+			"data_files_count", len(dataFilePaths),
+			"total_data_size", totalDataSize,
 			"error", err)
 		return fmt.Errorf("failed to update table metadata location: %w", err)
 	}
@@ -653,6 +667,8 @@ func (e *s3TablesExporter) commitSnapshot(
 		"namespace", namespace,
 		"table", tableName,
 		"snapshot_id", newSnapshot.SnapshotID,
+		"data_files_count", len(dataFilePaths),
+		"total_data_size", totalDataSize,
 		"metadata_location", metadataPath,
 		"manifest_location", manifestPath,
 		"new_version_token", tableInfo.VersionToken)
@@ -973,11 +989,12 @@ func (e *s3TablesExporter) uploadBatchToS3Tables(ctx context.Context, dataList [
 	}
 
 	// 3. すべてのデータファイルを単一のスナップショットにコミット
-	if err := e.commitSnapshot(ctx, e.config.Namespace, tableName, tableInfo, dataFilePaths); err != nil {
+	if err := e.commitSnapshot(ctx, e.config.Namespace, tableName, tableInfo, dataFilePaths, int64(totalSize)); err != nil {
 		e.logger.Error("Failed to commit batch snapshot",
 			"namespace", e.config.Namespace,
 			"table", tableName,
-			"data_file_count", len(dataFilePaths),
+			"data_files_count", len(dataFilePaths),
+			"total_data_size", totalSize,
 			"error", err)
 		return fmt.Errorf("failed to commit batch snapshot: %w", err)
 	}
@@ -1064,12 +1081,14 @@ func (e *s3TablesExporter) uploadToS3Tables(ctx context.Context, data []byte, da
 	// 3. スナップショットをコミット（バッチコミット対応）
 	// 単一のデータファイルを含むスライスを作成
 	dataFilePaths := []string{dataFilePath}
+	totalDataSize := int64(len(data))
 
-	if err := e.commitSnapshot(ctx, e.config.Namespace, tableName, tableInfo, dataFilePaths); err != nil {
+	if err := e.commitSnapshot(ctx, e.config.Namespace, tableName, tableInfo, dataFilePaths, totalDataSize); err != nil {
 		e.logger.Error("Failed to commit snapshot",
 			"namespace", e.config.Namespace,
 			"table", tableName,
-			"data_file_paths", dataFilePaths,
+			"data_files_count", len(dataFilePaths),
+			"total_data_size", totalDataSize,
 			"error", err)
 		return fmt.Errorf("failed to commit snapshot: %w", err)
 	}

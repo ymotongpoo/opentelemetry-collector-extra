@@ -15,8 +15,11 @@
 package s3tablesexporter
 
 import (
+	"bytes"
 	"context"
+	"encoding/json"
 	"fmt"
+	"io"
 	"testing"
 
 	"github.com/aws/aws-sdk-go-v2/service/s3"
@@ -56,23 +59,47 @@ func TestUploadToS3Tables_Integration_EmptyData(t *testing.T) {
 // キャッシュされたテーブル情報が再利用されることを検証
 // Requirements: 2.2
 func TestUploadToS3Tables_Integration_WithCachedTable(t *testing.T) {
+	// 既存のメタデータを作成
+	existingMetadata := generateRandomMetadata(0)
+	existingMetadata.CurrentSnapshotID = -1
+	metadataJSON, _ := json.Marshal(existingMetadata)
+
 	// モックS3 Tablesクライアントを作成
 	getTableCallCount := 0
+	metadataLocation := "s3://test-warehouse-bucket/metadata/00000-initial.metadata.json"
+	versionToken := "test-version-token"
+	newVersionToken := "test-version-token-new"
+
 	mockS3TablesClient := &mockS3TablesClient{
 		getTableFunc: func(ctx context.Context, params *s3tables.GetTableInput, optFns ...func(*s3tables.Options)) (*s3tables.GetTableOutput, error) {
 			getTableCallCount++
 			tableARN := "arn:aws:s3tables:us-east-1:123456789012:bucket/test-bucket/table/test-table-id"
 			warehouseLocation := "s3://test-warehouse-bucket"
-			versionToken := "test-version-token"
 			return &s3tables.GetTableOutput{
 				TableARN:          &tableARN,
 				WarehouseLocation: &warehouseLocation,
 				VersionToken:      &versionToken,
 			}, nil
 		},
+		getTableMetadataLocationFunc: func(ctx context.Context, params *s3tables.GetTableMetadataLocationInput, optFns ...func(*s3tables.Options)) (*s3tables.GetTableMetadataLocationOutput, error) {
+			return &s3tables.GetTableMetadataLocationOutput{
+				MetadataLocation: &metadataLocation,
+				VersionToken:     &versionToken,
+			}, nil
+		},
+		updateTableMetadataLocationFunc: func(ctx context.Context, params *s3tables.UpdateTableMetadataLocationInput, optFns ...func(*s3tables.Options)) (*s3tables.UpdateTableMetadataLocationOutput, error) {
+			return &s3tables.UpdateTableMetadataLocationOutput{
+				VersionToken: &newVersionToken,
+			}, nil
+		},
 	}
 
 	mockS3Client := &mockS3Client{
+		getObjectFunc: func(ctx context.Context, params *s3.GetObjectInput, optFns ...func(*s3.Options)) (*s3.GetObjectOutput, error) {
+			return &s3.GetObjectOutput{
+				Body: io.NopCloser(bytes.NewReader(metadataJSON)),
+			}, nil
+		},
 		putObjectFunc: func(ctx context.Context, params *s3.PutObjectInput, optFns ...func(*s3.Options)) (*s3.PutObjectOutput, error) {
 			return &s3.PutObjectOutput{}, nil
 		},
@@ -170,6 +197,15 @@ func TestUploadToS3Tables_Integration_TableCreation(t *testing.T) {
 	createNamespaceCalled := false
 	createTableCalled := false
 
+	// 既存のメタデータを作成
+	existingMetadata := generateRandomMetadata(0)
+	existingMetadata.CurrentSnapshotID = -1
+	metadataJSON, _ := json.Marshal(existingMetadata)
+
+	metadataLocation := "s3://test-warehouse-bucket/metadata/00000-initial.metadata.json"
+	versionToken := "test-version-token"
+	newVersionToken := "test-version-token-new"
+
 	mockS3TablesClient := &mockS3TablesClient{
 		getTableFunc: func(ctx context.Context, params *s3tables.GetTableInput, optFns ...func(*s3tables.Options)) (*s3tables.GetTableOutput, error) {
 			getTableCalled = true
@@ -180,7 +216,6 @@ func TestUploadToS3Tables_Integration_TableCreation(t *testing.T) {
 			// CreateTable後の呼び出しではテーブル情報を返す
 			tableARN := "arn:aws:s3tables:us-east-1:123456789012:bucket/test-bucket/table/test-table-id"
 			warehouseLocation := "s3://test-warehouse-bucket"
-			versionToken := "test-version-token"
 			return &s3tables.GetTableOutput{
 				TableARN:          &tableARN,
 				WarehouseLocation: &warehouseLocation,
@@ -198,15 +233,30 @@ func TestUploadToS3Tables_Integration_TableCreation(t *testing.T) {
 		createTableFunc: func(ctx context.Context, params *s3tables.CreateTableInput, optFns ...func(*s3tables.Options)) (*s3tables.CreateTableOutput, error) {
 			createTableCalled = true
 			tableARN := "arn:aws:s3tables:us-east-1:123456789012:bucket/test-bucket/table/test-table-id"
-			versionToken := "test-version-token"
 			return &s3tables.CreateTableOutput{
 				TableARN:     &tableARN,
 				VersionToken: &versionToken,
 			}, nil
 		},
+		getTableMetadataLocationFunc: func(ctx context.Context, params *s3tables.GetTableMetadataLocationInput, optFns ...func(*s3tables.Options)) (*s3tables.GetTableMetadataLocationOutput, error) {
+			return &s3tables.GetTableMetadataLocationOutput{
+				MetadataLocation: &metadataLocation,
+				VersionToken:     &versionToken,
+			}, nil
+		},
+		updateTableMetadataLocationFunc: func(ctx context.Context, params *s3tables.UpdateTableMetadataLocationInput, optFns ...func(*s3tables.Options)) (*s3tables.UpdateTableMetadataLocationOutput, error) {
+			return &s3tables.UpdateTableMetadataLocationOutput{
+				VersionToken: &newVersionToken,
+			}, nil
+		},
 	}
 
 	mockS3Client := &mockS3Client{
+		getObjectFunc: func(ctx context.Context, params *s3.GetObjectInput, optFns ...func(*s3.Options)) (*s3.GetObjectOutput, error) {
+			return &s3.GetObjectOutput{
+				Body: io.NopCloser(bytes.NewReader(metadataJSON)),
+			}, nil
+		},
 		putObjectFunc: func(ctx context.Context, params *s3.PutObjectInput, optFns ...func(*s3.Options)) (*s3.PutObjectOutput, error) {
 			return &s3.PutObjectOutput{}, nil
 		},
@@ -259,21 +309,45 @@ func TestUploadToS3Tables_Integration_MultipleDataTypes(t *testing.T) {
 
 	for _, dataType := range dataTypes {
 		t.Run(dataType, func(t *testing.T) {
+			// 既存のメタデータを作成
+			existingMetadata := generateRandomMetadata(0)
+			existingMetadata.CurrentSnapshotID = -1
+			metadataJSON, _ := json.Marshal(existingMetadata)
+
 			// モックS3 Tablesクライアントを作成
+			metadataLocation := "s3://test-warehouse-bucket/metadata/00000-initial.metadata.json"
+			versionToken := "test-version-token"
+			newVersionToken := "test-version-token-new"
+
 			mockS3TablesClient := &mockS3TablesClient{
 				getTableFunc: func(ctx context.Context, params *s3tables.GetTableInput, optFns ...func(*s3tables.Options)) (*s3tables.GetTableOutput, error) {
 					tableARN := "arn:aws:s3tables:us-east-1:123456789012:bucket/test-bucket/table/test-table-id"
 					warehouseLocation := "s3://test-warehouse-bucket"
-					versionToken := "test-version-token"
 					return &s3tables.GetTableOutput{
 						TableARN:          &tableARN,
 						WarehouseLocation: &warehouseLocation,
 						VersionToken:      &versionToken,
 					}, nil
 				},
+				getTableMetadataLocationFunc: func(ctx context.Context, params *s3tables.GetTableMetadataLocationInput, optFns ...func(*s3tables.Options)) (*s3tables.GetTableMetadataLocationOutput, error) {
+					return &s3tables.GetTableMetadataLocationOutput{
+						MetadataLocation: &metadataLocation,
+						VersionToken:     &versionToken,
+					}, nil
+				},
+				updateTableMetadataLocationFunc: func(ctx context.Context, params *s3tables.UpdateTableMetadataLocationInput, optFns ...func(*s3tables.Options)) (*s3tables.UpdateTableMetadataLocationOutput, error) {
+					return &s3tables.UpdateTableMetadataLocationOutput{
+						VersionToken: &newVersionToken,
+					}, nil
+				},
 			}
 
 			mockS3Client := &mockS3Client{
+				getObjectFunc: func(ctx context.Context, params *s3.GetObjectInput, optFns ...func(*s3.Options)) (*s3.GetObjectOutput, error) {
+					return &s3.GetObjectOutput{
+						Body: io.NopCloser(bytes.NewReader(metadataJSON)),
+					}, nil
+				},
 				putObjectFunc: func(ctx context.Context, params *s3.PutObjectInput, optFns ...func(*s3.Options)) (*s3.PutObjectOutput, error) {
 					return &s3.PutObjectOutput{}, nil
 				},

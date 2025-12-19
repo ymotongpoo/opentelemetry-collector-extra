@@ -150,7 +150,7 @@ func TestProperty_BatchCommitCompleteness(t *testing.T) {
 			}
 
 			// バッチコミットを実行
-			err = exporter.commitSnapshot(context.Background(), "test-namespace", "test-table", tableInfo, dataFilePaths)
+			err = exporter.commitSnapshot(context.Background(), "test-namespace", "test-table", tableInfo, dataFilePaths, int64(len(dataFilePaths)*1024))
 			if err != nil {
 				t.Fatalf("iteration %d: commitSnapshot() failed: %v", i, err)
 			}
@@ -333,7 +333,7 @@ func TestProperty_BatchCommitCompleteness(t *testing.T) {
 				}
 
 				// バッチコミットを実行
-				err = exporter.commitSnapshot(context.Background(), "test-namespace", "test-table", tableInfo, dataFilePaths)
+				err = exporter.commitSnapshot(context.Background(), "test-namespace", "test-table", tableInfo, dataFilePaths, int64(len(dataFilePaths)*1024))
 				if err != nil {
 					t.Fatalf("commitSnapshot() failed: %v", err)
 				}
@@ -394,7 +394,7 @@ func TestProperty_BatchCommitCompleteness(t *testing.T) {
 				t.Fatalf("iteration %d: newS3TablesExporter() failed: %v", i, err)
 			}
 
-				// 既存のスナップショットを持つメタデータを作成
+			// 既存のスナップショットを持つメタデータを作成
 			existingMetadata := IcebergMetadata{
 				FormatVersion:      2,
 				TableUUID:          fmt.Sprintf("test-uuid-existing-%d", i),
@@ -495,7 +495,7 @@ func TestProperty_BatchCommitCompleteness(t *testing.T) {
 			}
 
 			// バッチコミットを実行
-			err = exporter.commitSnapshot(context.Background(), "test-namespace", "test-table", tableInfo, dataFilePaths)
+			err = exporter.commitSnapshot(context.Background(), "test-namespace", "test-table", tableInfo, dataFilePaths, int64(len(dataFilePaths)*1024))
 			if err != nil {
 				t.Fatalf("iteration %d: commitSnapshot() failed: %v", i, err)
 			}
