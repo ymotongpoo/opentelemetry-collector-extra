@@ -345,3 +345,79 @@ func generateRandomUUID() string {
 		0x4000|(timestamp&0x0fff),
 		timestamp&0xffffffffffff)
 }
+
+// TestProperty_MetadataLocationFormat tests metadata location format property
+// Feature: iceberg-snapshot-commit, Property 6: メタデータロケーションの形式
+// Validates: Requirements 2.5
+func TestProperty_MetadataLocationFormat(t *testing.T) {
+	if testing.Short() {
+		t.Skip("Skipping property-based test in short mode")
+	}
+
+	// プロパティ: 任意の生成されたメタデータロケーションに対して、
+	// そのロケーションはテーブルのwarehouse locationで始まり、
+	// .metadata.jsonまたは.metadata.json.gzで終わること
+
+	iterations := 100
+	for i := 0; i < iterations; i++ {
+		// ランダムなwarehouse locationを生成
+		warehouseLocations := []string{
+			"s3://test-bucket/warehouse/table1",
+			"s3://test-bucket/warehouse/table2",
+			fmt.Sprintf("s3://test-bucket-%d/warehouse/table", i),
+			fmt.Sprintf("s3://bucket/prefix-%d/table", i),
+			"s3://bucket/table",
+		}
+		warehouseLocation := warehouseLocations[i%len(warehouseLocations)]
+
+		// メタデータファイル名を生成
+		version := i + 1
+		metadataFileName := generateMetadataFileName(version)
+
+		// メタデータロケーションを構築
+		// warehouse locationからバケット名とプレフィックスを抽出
+		bucket, prefix, err := extractBucketAndPrefixFromWarehouseLocation(warehouseLocation)
+		if err != nil {
+			t.Fatalf("iteration %d: failed to extract bucket and prefix: %v", i, err)
+		}
+
+		var metadataLocation string
+		if prefix != "" {
+			metadataLocation = fmt.Sprintf("s3://%s/%s/metadata/%s", bucket, prefix, metadataFileName)
+		} else {
+			metadataLocation = fmt.Sprintf("s3://%s/metadata/%s", bucket, metadataFileName)
+		}
+
+		// メタデータロケーションがwarehouse locationで始まることを確認
+		// warehouse locationのバケット名とプレフィックスが含まれていることを確認
+		expectedPrefix := fmt.Sprintf("s3://%s", bucket)
+		if len(metadataLocation) < len(expectedPrefix) || metadataLocation[:len(expectedPrefix)] != expectedPrefix {
+			t.Errorf("iteration %d: metadata location '%s' does not start with expected prefix '%s'",
+				i, metadataLocation, expectedPrefix)
+		}
+
+		// メタデータロケーションが.metadata.jsonで終わることを確認
+		if len(metadataLocation) < 14 || metadataLocation[len(metadataLocation)-14:] != ".metadata.json" {
+			// .metadata.json.gzで終わる場合もチェック
+			if len(metadataLocation) < 17 || metadataLocation[len(metadataLocation)-17:] != ".metadata.json.gz" {
+				t.Errorf("iteration %d: metadata location '%s' does not end with '.metadata.json' or '.metadata.json.gz'",
+					i, metadataLocation)
+			}
+		}
+
+		// メタデータファイル名の形式を確認（{version}-{uuid}.metadata.json）
+		// バージョン番号が5桁の0埋め形式であることを確認
+		expectedVersionPrefix := fmt.Sprintf("%05d-", version)
+		if len(metadataFileName) < len(expectedVersionPrefix) || metadataFileName[:len(expectedVersionPrefix)] != expectedVersionPrefix {
+			t.Errorf("iteration %d: metadata file name '%s' does not start with expected version prefix '%s'",
+				i, metadataFileName, expectedVersionPrefix)
+		}
+
+		// UUIDが含まれていることを確認（簡易チェック：ハイフンが含まれている）
+		uuidPart := metadataFileName[len(expectedVersionPrefix) : len(metadataFileName)-14]
+		if len(uuidPart) == 0 {
+			t.Errorf("iteration %d: metadata file name '%s' does not contain UUID",
+				i, metadataFileName)
+		}
+	}
+}

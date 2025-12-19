@@ -320,3 +320,155 @@ func TestIcebergSnapshotJSONMarshalling(t *testing.T) {
 		}
 	}
 }
+
+// TestExtractBucketAndPrefixFromWarehouseLocation tests extracting bucket and prefix from warehouse location
+// Warehouse locationからバケット名とプレフィックスを抽出するテスト
+func TestExtractBucketAndPrefixFromWarehouseLocation(t *testing.T) {
+	tests := []struct {
+		name              string
+		warehouseLocation string
+		wantBucket        string
+		wantPrefix        string
+		wantErr           bool
+	}{
+		{
+			name:              "bucket only",
+			warehouseLocation: "s3://test-bucket",
+			wantBucket:        "test-bucket",
+			wantPrefix:        "",
+			wantErr:           false,
+		},
+		{
+			name:              "bucket with prefix",
+			warehouseLocation: "s3://test-bucket/warehouse/table1",
+			wantBucket:        "test-bucket",
+			wantPrefix:        "warehouse/table1",
+			wantErr:           false,
+		},
+		{
+			name:              "bucket with single level prefix",
+			warehouseLocation: "s3://test-bucket/table",
+			wantBucket:        "test-bucket",
+			wantPrefix:        "table",
+			wantErr:           false,
+		},
+		{
+			name:              "invalid format - no s3 prefix",
+			warehouseLocation: "test-bucket/table",
+			wantBucket:        "",
+			wantPrefix:        "",
+			wantErr:           true,
+		},
+		{
+			name:              "invalid format - empty",
+			warehouseLocation: "",
+			wantBucket:        "",
+			wantPrefix:        "",
+			wantErr:           true,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			bucket, prefix, err := extractBucketAndPrefixFromWarehouseLocation(tt.warehouseLocation)
+			if (err != nil) != tt.wantErr {
+				t.Errorf("extractBucketAndPrefixFromWarehouseLocation() error = %v, wantErr %v", err, tt.wantErr)
+				return
+			}
+			if bucket != tt.wantBucket {
+				t.Errorf("extractBucketAndPrefixFromWarehouseLocation() bucket = %v, want %v", bucket, tt.wantBucket)
+			}
+			if prefix != tt.wantPrefix {
+				t.Errorf("extractBucketAndPrefixFromWarehouseLocation() prefix = %v, want %v", prefix, tt.wantPrefix)
+			}
+		})
+	}
+}
+
+// TestGenerateMetadataFileName tests metadata file name generation
+// メタデータファイル名生成のテスト
+func TestGenerateMetadataFileName(t *testing.T) {
+	tests := []struct {
+		name    string
+		version int
+	}{
+		{
+			name:    "version 1",
+			version: 1,
+		},
+		{
+			name:    "version 10",
+			version: 10,
+		},
+		{
+			name:    "version 100",
+			version: 100,
+		},
+		{
+			name:    "version 12345",
+			version: 12345,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			fileName := generateMetadataFileName(tt.version)
+
+			// ファイル名が.metadata.jsonで終わることを確認
+			if len(fileName) < 14 || fileName[len(fileName)-14:] != ".metadata.json" {
+				t.Errorf("generateMetadataFileName() = %v, does not end with .metadata.json", fileName)
+			}
+
+			// 簡易チェック: 5桁の数字で始まることを確認
+			if len(fileName) < 6 || fileName[5] != '-' {
+				t.Errorf("generateMetadataFileName() = %v, does not have expected format {version}-{uuid}.metadata.json", fileName)
+			}
+		})
+	}
+}
+
+// TestGenerateManifestFileName tests manifest file name generation
+// マニフェストファイル名生成のテスト
+func TestGenerateManifestFileName(t *testing.T) {
+	tests := []struct {
+		name       string
+		snapshotID int64
+	}{
+		{
+			name:       "snapshot 1",
+			snapshotID: 1,
+		},
+		{
+			name:       "snapshot 12345",
+			snapshotID: 12345,
+		},
+		{
+			name:       "snapshot with timestamp",
+			snapshotID: 1234567890000,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			fileName := generateManifestFileName(tt.snapshotID)
+
+			// ファイル名が.manifest.jsonで終わることを確認
+			if len(fileName) < 14 || fileName[len(fileName)-14:] != ".manifest.json" {
+				t.Errorf("generateManifestFileName() = %v, does not end with .manifest.json", fileName)
+			}
+
+			// スナップショットIDで始まることを確認（簡易チェック）
+			// UUIDの前にハイフンがあることを確認
+			hasHyphen := false
+			for i := 0; i < len(fileName); i++ {
+				if fileName[i] == '-' {
+					hasHyphen = true
+					break
+				}
+			}
+			if !hasHyphen {
+				t.Errorf("generateManifestFileName() = %v, does not have expected format {snapshot-id}-{uuid}.manifest.json", fileName)
+			}
+		})
+	}
+}

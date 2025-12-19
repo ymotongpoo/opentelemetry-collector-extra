@@ -14,6 +14,18 @@
 
 package s3tablesexporter
 
+import (
+	"bytes"
+	"context"
+	"encoding/json"
+	"fmt"
+	"regexp"
+
+	"github.com/aws/aws-sdk-go-v2/aws"
+	"github.com/aws/aws-sdk-go-v2/service/s3"
+	"github.com/google/uuid"
+)
+
 // IcebergMetadata represents the structure of an Iceberg metadata file
 // Icebergメタデータファイルの構造を表現
 type IcebergMetadata struct {
@@ -171,4 +183,134 @@ func generateNewMetadata(
 	}
 
 	return newMetadata
+}
+
+// extractBucketAndPrefixFromWarehouseLocation extracts the bucket name and prefix from a warehouse location
+// Warehouse locationからバケット名とプレフィックスを抽出
+// 形式: s3://bucket-name/prefix
+func extractBucketAndPrefixFromWarehouseLocation(warehouseLocation string) (bucket, prefix string, err error) {
+	// s3://形式の検証
+	s3Pattern := regexp.MustCompile(`^s3://([^/]+)(?:/(.*))?$`)
+	matches := s3Pattern.FindStringSubmatch(warehouseLocation)
+	if len(matches) < 2 {
+		return "", "", fmt.Errorf("invalid warehouse location format: %s (expected s3://bucket-name or s3://bucket-name/prefix)", warehouseLocation)
+	}
+	bucket = matches[1]
+	if len(matches) > 2 {
+		prefix = matches[2]
+	}
+	return bucket, prefix, nil
+}
+
+// generateMetadataFileName generates a metadata file name in Iceberg format
+// Iceberg形式のメタデータファイル名を生成
+// 形式: {version}-{uuid}.metadata.json
+func generateMetadataFileName(version int) string {
+	// UUIDを生成
+	id := uuid.New().String()
+	// ファイル名を生成
+	return fmt.Sprintf("%05d-%s.metadata.json", version, id)
+}
+
+// generateManifestFileName generates a manifest file name in Iceberg format
+// Iceberg形式のマニフェストファイル名を生成
+// 形式: {snapshot-id}-{uuid}.manifest.json
+func generateManifestFileName(snapshotID int64) string {
+	// UUIDを生成
+	id := uuid.New().String()
+	// ファイル名を生成
+	return fmt.Sprintf("%d-%s.manifest.json", snapshotID, id)
+}
+
+// uploadMetadata uploads metadata and manifest files to warehouse location
+// メタデータファイルとマニフェストファイルをwarehouse locationにアップロード
+//
+// この関数は以下の処理を行います：
+// 1. メタデータファイルをJSON形式でシリアライズ
+// 2. warehouse location内のmetadataディレクトリにアップロード
+// 3. ファイル名は{version}-{uuid}.metadata.json形式
+// 4. マニフェストファイルも同様にアップロード
+// 5. S3 PutObject APIを使用
+func uploadMetadata(
+	ctx context.Context,
+	s3Client s3ClientInterface,
+	warehouseLocation string,
+	metadata *IcebergMetadata,
+	manifest *IcebergManifest,
+	version int,
+) (metadataPath string, manifestPath string, err error) {
+	// コンテキストキャンセルのチェック
+	select {
+	case <-ctx.Done():
+		return "", "", fmt.Errorf("metadata upload cancelled: %w", ctx.Err())
+	default:
+	}
+
+	// Warehouse locationからバケット名とプレフィックスを抽出
+	bucket, prefix, err := extractBucketAndPrefixFromWarehouseLocation(warehouseLocation)
+	if err != nil {
+		return "", "", fmt.Errorf("failed to extract bucket and prefix from warehouse location: %w", err)
+	}
+
+	// メタデータファイル名を生成
+	metadataFileName := generateMetadataFileName(version)
+	var metadataKey string
+	if prefix != "" {
+		metadataKey = fmt.Sprintf("%s/metadata/%s", prefix, metadataFileName)
+	} else {
+		metadataKey = fmt.Sprintf("metadata/%s", metadataFileName)
+	}
+
+	// メタデータをJSON形式でシリアライズ
+	metadataJSON, err := json.Marshal(metadata)
+	if err != nil {
+		return "", "", fmt.Errorf("failed to marshal metadata to JSON: %w", err)
+	}
+
+	// メタデータファイルをS3にアップロード
+	putMetadataInput := &s3.PutObjectInput{
+		Bucket: aws.String(bucket),
+		Key:    aws.String(metadataKey),
+		Body:   bytes.NewReader(metadataJSON),
+	}
+
+	_, err = s3Client.PutObject(ctx, putMetadataInput)
+	if err != nil {
+		return "", "", fmt.Errorf("failed to upload metadata file to S3: %w", err)
+	}
+
+	// メタデータファイルのS3パスを生成
+	metadataPath = fmt.Sprintf("s3://%s/%s", bucket, metadataKey)
+
+	// マニフェストファイル名を生成
+	manifestFileName := generateManifestFileName(metadata.CurrentSnapshotID)
+	var manifestKey string
+	if prefix != "" {
+		manifestKey = fmt.Sprintf("%s/metadata/%s", prefix, manifestFileName)
+	} else {
+		manifestKey = fmt.Sprintf("metadata/%s", manifestFileName)
+	}
+
+	// マニフェストをJSON形式でシリアライズ
+	manifestJSON, err := json.Marshal(manifest)
+	if err != nil {
+		return "", "", fmt.Errorf("failed to marshal manifest to JSON: %w", err)
+	}
+
+	// マニフェストファイルをS3にアップロード
+	putManifestInput := &s3.PutObjectInput{
+		Bucket: aws.String(bucket),
+		Key:    aws.String(manifestKey),
+		Body:   bytes.NewReader(manifestJSON),
+	}
+
+	_, err = s3Client.PutObject(ctx, putManifestInput)
+	if err != nil {
+		return "", "", fmt.Errorf("failed to upload manifest file to S3: %w", err)
+	}
+
+	// マニフェストファイルのS3パスを生成
+	manifestPath = fmt.Sprintf("s3://%s/%s", bucket, manifestKey)
+
+	return metadataPath, manifestPath, nil
 }
