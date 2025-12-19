@@ -876,6 +876,122 @@ func generateManifest(dataFilePaths []string, snapshotID int64, sequenceNumber i
 	return manifest, nil
 }
 
+// uploadBatchToS3Tables uploads multiple Parquet data files to S3 Tables in a single snapshot.
+// バッチコミット機能: 複数のデータファイルを単一のスナップショットにまとめる
+func (e *s3TablesExporter) uploadBatchToS3Tables(ctx context.Context, dataList [][]byte, dataType string) error {
+	// コンテキストキャンセルのチェック
+	select {
+	case <-ctx.Done():
+		e.logger.Warn("Batch upload cancelled before starting",
+			"data_type", dataType,
+			"error", ctx.Err())
+		return fmt.Errorf("batch upload cancelled: %w", ctx.Err())
+	default:
+	}
+
+	// 空データのハンドリング
+	if len(dataList) == 0 {
+		e.logger.Debug("Skipping batch upload: no data to upload", "data_type", dataType)
+		return nil
+	}
+
+	// データタイプに応じたテーブル名を取得
+	var tableName string
+	var schema map[string]interface{}
+	switch dataType {
+	case "metrics":
+		tableName = e.config.Tables.Metrics
+		schema = createMetricsSchema()
+	case "traces":
+		tableName = e.config.Tables.Traces
+		schema = createTracesSchema()
+	case "logs":
+		tableName = e.config.Tables.Logs
+		schema = createLogsSchema()
+	default:
+		return fmt.Errorf("unknown data type: %s", dataType)
+	}
+
+	// テーブル名が設定されていない場合はスキップ
+	if tableName == "" {
+		e.logger.Debug("Skipping batch upload: table name not configured",
+			"data_type", dataType)
+		return nil
+	}
+
+	// 合計データサイズを計算
+	totalSize := 0
+	for _, data := range dataList {
+		totalSize += len(data)
+	}
+
+	e.logger.Info("Starting batch upload to S3 Tables",
+		"table_bucket_arn", e.config.TableBucketArn,
+		"namespace", e.config.Namespace,
+		"table", tableName,
+		"data_type", dataType,
+		"file_count", len(dataList),
+		"total_size", totalSize)
+
+	// 1. テーブルを取得または作成
+	tableInfo, err := e.getOrCreateTable(ctx, e.config.Namespace, tableName, schema)
+	if err != nil {
+		e.logger.Error("Failed to get or create table",
+			"namespace", e.config.Namespace,
+			"table", tableName,
+			"error", err)
+		return fmt.Errorf("failed to get or create table: %w", err)
+	}
+
+	// 2. すべてのParquetファイルをWarehouse locationにアップロード
+	dataFilePaths := make([]string, 0, len(dataList))
+	for i, data := range dataList {
+		// 空データはスキップ
+		if len(data) == 0 {
+			e.logger.Debug("Skipping empty data file in batch",
+				"index", i,
+				"data_type", dataType)
+			continue
+		}
+
+		dataFilePath, err := e.uploadToWarehouseLocation(ctx, tableInfo.WarehouseLocation, data, dataType)
+		if err != nil {
+			e.logger.Error("Failed to upload data file in batch",
+				"index", i,
+				"warehouse_location", tableInfo.WarehouseLocation,
+				"error", err)
+			return fmt.Errorf("failed to upload data file %d to warehouse location: %w", i, err)
+		}
+		dataFilePaths = append(dataFilePaths, dataFilePath)
+	}
+
+	// アップロードされたファイルがない場合はスキップ
+	if len(dataFilePaths) == 0 {
+		e.logger.Debug("No files uploaded in batch, skipping snapshot commit",
+			"data_type", dataType)
+		return nil
+	}
+
+	// 3. すべてのデータファイルを単一のスナップショットにコミット
+	if err := e.commitSnapshot(ctx, e.config.Namespace, tableName, tableInfo, dataFilePaths); err != nil {
+		e.logger.Error("Failed to commit batch snapshot",
+			"namespace", e.config.Namespace,
+			"table", tableName,
+			"data_file_count", len(dataFilePaths),
+			"error", err)
+		return fmt.Errorf("failed to commit batch snapshot: %w", err)
+	}
+
+	// 成功のログ出力
+	e.logger.Info("Successfully uploaded batch data to S3 Tables",
+		"table", tableName,
+		"warehouse_location", tableInfo.WarehouseLocation,
+		"file_count", len(dataFilePaths),
+		"total_size", totalSize)
+
+	return nil
+}
+
 // uploadToS3Tables uploads the Parquet data to S3 Tables.
 func (e *s3TablesExporter) uploadToS3Tables(ctx context.Context, data []byte, dataType string) error {
 	// コンテキストキャンセルのチェック
@@ -945,13 +1061,17 @@ func (e *s3TablesExporter) uploadToS3Tables(ctx context.Context, data []byte, da
 		return fmt.Errorf("failed to upload to warehouse location: %w", err)
 	}
 
-	// 3. テーブルメタデータを更新
-	if err := e.updateTableMetadata(ctx, tableInfo, dataFilePath); err != nil {
-		e.logger.Error("Failed to update table metadata",
-			"table_arn", tableInfo.TableARN,
-			"data_file_path", dataFilePath,
+	// 3. スナップショットをコミット（バッチコミット対応）
+	// 単一のデータファイルを含むスライスを作成
+	dataFilePaths := []string{dataFilePath}
+
+	if err := e.commitSnapshot(ctx, e.config.Namespace, tableName, tableInfo, dataFilePaths); err != nil {
+		e.logger.Error("Failed to commit snapshot",
+			"namespace", e.config.Namespace,
+			"table", tableName,
+			"data_file_paths", dataFilePaths,
 			"error", err)
-		return fmt.Errorf("failed to update table metadata: %w", err)
+		return fmt.Errorf("failed to commit snapshot: %w", err)
 	}
 
 	// 成功のログ出力
