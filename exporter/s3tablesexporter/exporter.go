@@ -629,6 +629,40 @@ func parseS3URI(uri string) (bucket, key string, err error) {
 	return matches[1], matches[2], nil
 }
 
+// generateSnapshot generates a new Iceberg snapshot
+// 新しいIcebergスナップショットを生成
+func generateSnapshot(manifestListPath string, sequenceNumber int64, addedFiles int, addedRecords int64, totalFiles int, totalRecords int64) (*IcebergSnapshot, error) {
+	// マニフェストリストパスが空の場合はエラー
+	if manifestListPath == "" {
+		return nil, fmt.Errorf("manifestListPath cannot be empty")
+	}
+
+	// タイムスタンプベースのスナップショットIDを生成
+	// ミリ秒単位のUnixタイムスタンプを使用
+	timestampMS := time.Now().UnixMilli()
+	snapshotID := timestampMS
+
+	// サマリー情報を作成
+	summary := map[string]string{
+		"operation":     "append",
+		"added-files":   fmt.Sprintf("%d", addedFiles),
+		"added-records": fmt.Sprintf("%d", addedRecords),
+		"total-files":   fmt.Sprintf("%d", totalFiles),
+		"total-records": fmt.Sprintf("%d", totalRecords),
+	}
+
+	// スナップショットを作成
+	snapshot := &IcebergSnapshot{
+		SnapshotID:     snapshotID,
+		TimestampMS:    timestampMS,
+		SequenceNumber: sequenceNumber,
+		Summary:        summary,
+		ManifestList:   manifestListPath,
+	}
+
+	return snapshot, nil
+}
+
 // generateManifest generates a manifest file for data files
 // データファイル用のマニフェストファイルを生成
 func generateManifest(dataFilePaths []string, snapshotID int64, sequenceNumber int64) (*IcebergManifest, error) {
