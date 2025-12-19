@@ -47,6 +47,7 @@ type TableInfo struct {
 // テスト用のS3クライアントインターフェース
 type s3ClientInterface interface {
 	PutObject(ctx context.Context, params *s3.PutObjectInput, optFns ...func(*s3.Options)) (*s3.PutObjectOutput, error)
+	GetObject(ctx context.Context, params *s3.GetObjectInput, optFns ...func(*s3.Options)) (*s3.GetObjectOutput, error)
 }
 
 // s3TablesClientInterface defines the S3 Tables client interface for testing
@@ -56,6 +57,7 @@ type s3TablesClientInterface interface {
 	CreateTable(ctx context.Context, params *s3tables.CreateTableInput, optFns ...func(*s3tables.Options)) (*s3tables.CreateTableOutput, error)
 	GetNamespace(ctx context.Context, params *s3tables.GetNamespaceInput, optFns ...func(*s3tables.Options)) (*s3tables.GetNamespaceOutput, error)
 	CreateNamespace(ctx context.Context, params *s3tables.CreateNamespaceInput, optFns ...func(*s3tables.Options)) (*s3tables.CreateNamespaceOutput, error)
+	GetTableMetadataLocation(ctx context.Context, params *s3tables.GetTableMetadataLocationInput, optFns ...func(*s3tables.Options)) (*s3tables.GetTableMetadataLocationOutput, error)
 }
 
 // s3TablesExporter implements the S3 Tables exporter.
@@ -524,6 +526,107 @@ func (e *s3TablesExporter) updateTableMetadata(ctx context.Context, tableInfo *T
 		"data_file_path", dataFilePath)
 
 	return nil
+}
+
+// getTableMetadata retrieves the current table metadata
+// 現在のテーブルメタデータを取得
+func (e *s3TablesExporter) getTableMetadata(ctx context.Context, namespace, tableName string, tableInfo *TableInfo) (*IcebergMetadata, error) {
+	// コンテキストキャンセルのチェック
+	select {
+	case <-ctx.Done():
+		return nil, fmt.Errorf("metadata retrieval cancelled: %w", ctx.Err())
+	default:
+	}
+
+	e.logger.Debug("Retrieving table metadata",
+		"namespace", namespace,
+		"table", tableName,
+		"table_arn", tableInfo.TableARN)
+
+	// GetTableMetadataLocation APIを使用してメタデータロケーションとバージョントークンを取得
+	getMetadataInput := &s3tables.GetTableMetadataLocationInput{
+		TableBucketARN: &e.config.TableBucketArn,
+		Namespace:      &namespace,
+		Name:           &tableName,
+	}
+
+	metadataLocationOutput, err := e.s3TablesClient.GetTableMetadataLocation(ctx, getMetadataInput)
+	if err != nil {
+		e.logger.Error("Failed to get table metadata location",
+			"namespace", namespace,
+			"table", tableName,
+			"error", err)
+		return nil, fmt.Errorf("failed to get table metadata location for %s.%s: %w", namespace, tableName, err)
+	}
+
+	// メタデータロケーションとバージョントークンを取得
+	metadataLocation := *metadataLocationOutput.MetadataLocation
+	versionToken := *metadataLocationOutput.VersionToken
+
+	e.logger.Debug("Retrieved metadata location",
+		"namespace", namespace,
+		"table", tableName,
+		"metadata_location", metadataLocation,
+		"version_token", versionToken)
+
+	// TableInfoのVersionTokenを更新
+	tableInfo.VersionToken = versionToken
+
+	// S3 GetObject APIを使用してメタデータファイルをダウンロード
+	// メタデータロケーションからバケット名とキーを抽出
+	bucket, key, err := parseS3URI(metadataLocation)
+	if err != nil {
+		e.logger.Error("Failed to parse metadata location",
+			"metadata_location", metadataLocation,
+			"error", err)
+		return nil, fmt.Errorf("failed to parse metadata location %s: %w", metadataLocation, err)
+	}
+
+	getObjectInput := &s3.GetObjectInput{
+		Bucket: &bucket,
+		Key:    &key,
+	}
+
+	getObjectOutput, err := e.s3Client.GetObject(ctx, getObjectInput)
+	if err != nil {
+		e.logger.Error("Failed to download metadata file",
+			"bucket", bucket,
+			"key", key,
+			"error", err)
+		return nil, fmt.Errorf("failed to download metadata file from %s: %w", metadataLocation, err)
+	}
+	defer getObjectOutput.Body.Close()
+
+	// メタデータファイルをIcebergMetadata構造体に解析
+	var metadata IcebergMetadata
+	decoder := json.NewDecoder(getObjectOutput.Body)
+	if err := decoder.Decode(&metadata); err != nil {
+		e.logger.Error("Failed to parse metadata file",
+			"metadata_location", metadataLocation,
+			"error", err)
+		return nil, fmt.Errorf("failed to parse metadata file from %s: %w", metadataLocation, err)
+	}
+
+	e.logger.Info("Successfully retrieved and parsed table metadata",
+		"namespace", namespace,
+		"table", tableName,
+		"format_version", metadata.FormatVersion,
+		"current_snapshot_id", metadata.CurrentSnapshotID,
+		"snapshots_count", len(metadata.Snapshots))
+
+	return &metadata, nil
+}
+
+// parseS3URI parses an S3 URI and returns the bucket name and key
+// S3 URIを解析してバケット名とキーを返す
+// 形式: s3://bucket-name/key
+func parseS3URI(uri string) (bucket, key string, err error) {
+	s3Pattern := regexp.MustCompile(`^s3://([^/]+)/(.+)$`)
+	matches := s3Pattern.FindStringSubmatch(uri)
+	if len(matches) != 3 {
+		return "", "", fmt.Errorf("invalid S3 URI format: %s (expected s3://bucket-name/key)", uri)
+	}
+	return matches[1], matches[2], nil
 }
 
 // uploadToS3Tables uploads the Parquet data to S3 Tables.

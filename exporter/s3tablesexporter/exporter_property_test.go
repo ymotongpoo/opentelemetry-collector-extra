@@ -15,8 +15,11 @@
 package s3tablesexporter
 
 import (
+	"bytes"
 	"context"
+	"encoding/json"
 	"fmt"
+	"io"
 	"log/slog"
 	"testing"
 
@@ -28,10 +31,11 @@ import (
 
 // mockS3TablesClient is a mock implementation of S3 Tables client for testing
 type mockS3TablesClient struct {
-	getTableFunc        func(ctx context.Context, params *s3tables.GetTableInput, optFns ...func(*s3tables.Options)) (*s3tables.GetTableOutput, error)
-	createTableFunc     func(ctx context.Context, params *s3tables.CreateTableInput, optFns ...func(*s3tables.Options)) (*s3tables.CreateTableOutput, error)
-	getNamespaceFunc    func(ctx context.Context, params *s3tables.GetNamespaceInput, optFns ...func(*s3tables.Options)) (*s3tables.GetNamespaceOutput, error)
-	createNamespaceFunc func(ctx context.Context, params *s3tables.CreateNamespaceInput, optFns ...func(*s3tables.Options)) (*s3tables.CreateNamespaceOutput, error)
+	getTableFunc                 func(ctx context.Context, params *s3tables.GetTableInput, optFns ...func(*s3tables.Options)) (*s3tables.GetTableOutput, error)
+	createTableFunc              func(ctx context.Context, params *s3tables.CreateTableInput, optFns ...func(*s3tables.Options)) (*s3tables.CreateTableOutput, error)
+	getNamespaceFunc             func(ctx context.Context, params *s3tables.GetNamespaceInput, optFns ...func(*s3tables.Options)) (*s3tables.GetNamespaceOutput, error)
+	createNamespaceFunc          func(ctx context.Context, params *s3tables.CreateNamespaceInput, optFns ...func(*s3tables.Options)) (*s3tables.CreateNamespaceOutput, error)
+	getTableMetadataLocationFunc func(ctx context.Context, params *s3tables.GetTableMetadataLocationInput, optFns ...func(*s3tables.Options)) (*s3tables.GetTableMetadataLocationOutput, error)
 }
 
 func (m *mockS3TablesClient) GetTable(ctx context.Context, params *s3tables.GetTableInput, optFns ...func(*s3tables.Options)) (*s3tables.GetTableOutput, error) {
@@ -62,9 +66,17 @@ func (m *mockS3TablesClient) CreateNamespace(ctx context.Context, params *s3tabl
 	return nil, fmt.Errorf("CreateNamespace not implemented")
 }
 
+func (m *mockS3TablesClient) GetTableMetadataLocation(ctx context.Context, params *s3tables.GetTableMetadataLocationInput, optFns ...func(*s3tables.Options)) (*s3tables.GetTableMetadataLocationOutput, error) {
+	if m.getTableMetadataLocationFunc != nil {
+		return m.getTableMetadataLocationFunc(ctx, params, optFns...)
+	}
+	return nil, fmt.Errorf("GetTableMetadataLocation not implemented")
+}
+
 // mockS3Client is a mock implementation of S3 client for testing
 type mockS3Client struct {
 	putObjectFunc func(ctx context.Context, params *s3.PutObjectInput, optFns ...func(*s3.Options)) (*s3.PutObjectOutput, error)
+	getObjectFunc func(ctx context.Context, params *s3.GetObjectInput, optFns ...func(*s3.Options)) (*s3.GetObjectOutput, error)
 }
 
 func (m *mockS3Client) PutObject(ctx context.Context, params *s3.PutObjectInput, optFns ...func(*s3.Options)) (*s3.PutObjectOutput, error) {
@@ -72,6 +84,13 @@ func (m *mockS3Client) PutObject(ctx context.Context, params *s3.PutObjectInput,
 		return m.putObjectFunc(ctx, params, optFns...)
 	}
 	return &s3.PutObjectOutput{}, nil
+}
+
+func (m *mockS3Client) GetObject(ctx context.Context, params *s3.GetObjectInput, optFns ...func(*s3.Options)) (*s3.GetObjectOutput, error) {
+	if m.getObjectFunc != nil {
+		return m.getObjectFunc(ctx, params, optFns...)
+	}
+	return nil, fmt.Errorf("GetObject not implemented")
 }
 
 // TestUploadToWarehouseLocation tests uploading data to warehouse location
@@ -1168,4 +1187,610 @@ func TestProperty_ContextCancellation(t *testing.T) {
 			}
 		}
 	})
+}
+
+// TestProperty_MetadataRetrievalConsistency tests metadata retrieval and update consistency
+// Feature: iceberg-snapshot-commit, Property 10: メタデータ取得と更新の一貫性
+// Validates: Requirements 9.1, 9.2
+func TestProperty_MetadataRetrievalConsistency(t *testing.T) {
+	if testing.Short() {
+		t.Skip("Skipping property-based test in short mode")
+	}
+
+	// プロパティ: 任意のテーブルに対して、GetTableMetadataLocation APIを使用して
+	// メタデータロケーションとバージョントークンを取得し、S3 GetObject APIを使用して
+	// メタデータファイルをダウンロードし、IcebergMetadata構造体に正しく解析できるべきである
+
+	// テストケース1: 有効なメタデータファイルの取得と解析
+	t.Run("valid_metadata_retrieval_and_parsing", func(t *testing.T) {
+		// 様々なメタデータ構造をテスト
+		testCases := []struct {
+			name     string
+			metadata IcebergMetadata
+		}{
+			{
+				name: "basic_metadata",
+				metadata: IcebergMetadata{
+					FormatVersion:      2,
+					TableUUID:          "test-uuid-1",
+					Location:           "s3://test-bucket/test-table",
+					LastSequenceNumber: 0,
+					LastUpdatedMS:      1234567890000,
+					LastColumnID:       1,
+					Schemas: []IcebergSchema{
+						{
+							SchemaID: 0,
+							Fields: []IcebergSchemaField{
+								{ID: 1, Name: "field1", Required: true, Type: "string"},
+							},
+						},
+					},
+					CurrentSchemaID: 0,
+					PartitionSpecs: []IcebergPartitionSpec{
+						{
+							SpecID: 0,
+							Fields: []IcebergPartitionField{},
+						},
+					},
+					DefaultSpecID:     0,
+					LastPartitionID:   0,
+					Properties:        map[string]string{},
+					CurrentSnapshotID: -1,
+					Snapshots:         []IcebergSnapshot{},
+					SnapshotLog:       []IcebergSnapshotLog{},
+					MetadataLog:       []IcebergMetadataLog{},
+				},
+			},
+			{
+				name: "metadata_with_snapshot",
+				metadata: IcebergMetadata{
+					FormatVersion:      2,
+					TableUUID:          "test-uuid-2",
+					Location:           "s3://test-bucket/test-table-2",
+					LastSequenceNumber: 1,
+					LastUpdatedMS:      1234567890000,
+					LastColumnID:       2,
+					Schemas: []IcebergSchema{
+						{
+							SchemaID: 0,
+							Fields: []IcebergSchemaField{
+								{ID: 1, Name: "field1", Required: true, Type: "string"},
+								{ID: 2, Name: "field2", Required: false, Type: "long"},
+							},
+						},
+					},
+					CurrentSchemaID: 0,
+					PartitionSpecs: []IcebergPartitionSpec{
+						{
+							SpecID: 0,
+							Fields: []IcebergPartitionField{},
+						},
+					},
+					DefaultSpecID:   0,
+					LastPartitionID: 0,
+					Properties:      map[string]string{"key1": "value1"},
+					CurrentSnapshotID: 1234567890000,
+					Snapshots: []IcebergSnapshot{
+						{
+							SnapshotID:     1234567890000,
+							TimestampMS:    1234567890000,
+							SequenceNumber: 1,
+							Summary: map[string]string{
+								"operation":      "append",
+								"added-files":    "1",
+								"added-records":  "100",
+								"total-files":    "1",
+								"total-records":  "100",
+							},
+							ManifestList: "s3://test-bucket/test-table-2/metadata/snap-1234567890000-1-manifest-list.avro",
+						},
+					},
+					SnapshotLog: []IcebergSnapshotLog{
+						{
+							TimestampMS: 1234567890000,
+							SnapshotID:  1234567890000,
+						},
+					},
+					MetadataLog: []IcebergMetadataLog{
+						{
+							TimestampMS:  1234567890000,
+							MetadataFile: "s3://test-bucket/test-table-2/metadata/00001-test-uuid.metadata.json",
+						},
+					},
+				},
+			},
+			{
+				name: "metadata_with_multiple_snapshots",
+				metadata: IcebergMetadata{
+					FormatVersion:      2,
+					TableUUID:          "test-uuid-3",
+					Location:           "s3://test-bucket/test-table-3",
+					LastSequenceNumber: 3,
+					LastUpdatedMS:      1234567890000,
+					LastColumnID:       3,
+					Schemas: []IcebergSchema{
+						{
+							SchemaID: 0,
+							Fields: []IcebergSchemaField{
+								{ID: 1, Name: "field1", Required: true, Type: "string"},
+								{ID: 2, Name: "field2", Required: false, Type: "long"},
+								{ID: 3, Name: "field3", Required: false, Type: "double"},
+							},
+						},
+					},
+					CurrentSchemaID: 0,
+					PartitionSpecs: []IcebergPartitionSpec{
+						{
+							SpecID: 0,
+							Fields: []IcebergPartitionField{},
+						},
+					},
+					DefaultSpecID:   0,
+					LastPartitionID: 0,
+					Properties:      map[string]string{"key1": "value1", "key2": "value2"},
+					CurrentSnapshotID: 1234567892000,
+					Snapshots: []IcebergSnapshot{
+						{
+							SnapshotID:     1234567890000,
+							TimestampMS:    1234567890000,
+							SequenceNumber: 1,
+							Summary: map[string]string{
+								"operation":      "append",
+								"added-files":    "1",
+								"added-records":  "100",
+							},
+							ManifestList: "s3://test-bucket/test-table-3/metadata/snap-1234567890000-1-manifest-list.avro",
+						},
+						{
+							SnapshotID:     1234567891000,
+							TimestampMS:    1234567891000,
+							SequenceNumber: 2,
+							Summary: map[string]string{
+								"operation":      "append",
+								"added-files":    "1",
+								"added-records":  "200",
+							},
+							ManifestList: "s3://test-bucket/test-table-3/metadata/snap-1234567891000-2-manifest-list.avro",
+						},
+						{
+							SnapshotID:     1234567892000,
+							TimestampMS:    1234567892000,
+							SequenceNumber: 3,
+							Summary: map[string]string{
+								"operation":      "append",
+								"added-files":    "1",
+								"added-records":  "300",
+							},
+							ManifestList: "s3://test-bucket/test-table-3/metadata/snap-1234567892000-3-manifest-list.avro",
+						},
+					},
+					SnapshotLog: []IcebergSnapshotLog{
+						{TimestampMS: 1234567890000, SnapshotID: 1234567890000},
+						{TimestampMS: 1234567891000, SnapshotID: 1234567891000},
+						{TimestampMS: 1234567892000, SnapshotID: 1234567892000},
+					},
+					MetadataLog: []IcebergMetadataLog{
+						{
+							TimestampMS:  1234567890000,
+							MetadataFile: "s3://test-bucket/test-table-3/metadata/00001-test-uuid.metadata.json",
+						},
+						{
+							TimestampMS:  1234567891000,
+							MetadataFile: "s3://test-bucket/test-table-3/metadata/00002-test-uuid.metadata.json",
+						},
+						{
+							TimestampMS:  1234567892000,
+							MetadataFile: "s3://test-bucket/test-table-3/metadata/00003-test-uuid.metadata.json",
+						},
+					},
+				},
+			},
+		}
+
+		for _, tc := range testCases {
+			t.Run(tc.name, func(t *testing.T) {
+				cfg := &Config{
+					TableBucketArn: "arn:aws:s3tables:us-east-1:123456789012:bucket/test-bucket",
+					Region:         "us-east-1",
+					Namespace:      "test-namespace",
+					Tables: TableNamesConfig{
+						Traces:  "otel_traces",
+						Metrics: "otel_metrics",
+						Logs:    "otel_logs",
+					},
+				}
+				set := exportertest.NewNopSettings(component.MustNewType("s3tables"))
+				exporter, err := newS3TablesExporter(cfg, set)
+				if err != nil {
+					t.Fatalf("newS3TablesExporter() failed: %v", err)
+				}
+
+				// メタデータをJSONにシリアライズ
+				metadataJSON, err := json.Marshal(tc.metadata)
+				if err != nil {
+					t.Fatalf("failed to marshal metadata: %v", err)
+				}
+
+				// モックS3 Tablesクライアントを設定
+				metadataLocation := "s3://test-bucket/metadata/00001-test-uuid.metadata.json"
+				versionToken := "test-version-token"
+				mockS3TablesClient := &mockS3TablesClient{
+					getTableMetadataLocationFunc: func(ctx context.Context, params *s3tables.GetTableMetadataLocationInput, optFns ...func(*s3tables.Options)) (*s3tables.GetTableMetadataLocationOutput, error) {
+						return &s3tables.GetTableMetadataLocationOutput{
+							MetadataLocation: &metadataLocation,
+							VersionToken:     &versionToken,
+						}, nil
+					},
+				}
+				exporter.s3TablesClient = mockS3TablesClient
+
+				// モックS3クライアントを設定
+				mockS3Client := &mockS3Client{
+					getObjectFunc: func(ctx context.Context, params *s3.GetObjectInput, optFns ...func(*s3.Options)) (*s3.GetObjectOutput, error) {
+						// バケット名とキーを検証
+						if *params.Bucket != "test-bucket" {
+							t.Errorf("expected bucket 'test-bucket', got '%s'", *params.Bucket)
+						}
+						if *params.Key != "metadata/00001-test-uuid.metadata.json" {
+							t.Errorf("expected key 'metadata/00001-test-uuid.metadata.json', got '%s'", *params.Key)
+						}
+
+						// メタデータJSONを返す
+						return &s3.GetObjectOutput{
+							Body: io.NopCloser(bytes.NewReader(metadataJSON)),
+						}, nil
+					},
+				}
+				exporter.s3Client = mockS3Client
+
+				// テーブル情報を作成
+				tableInfo := &TableInfo{
+					TableARN:          "arn:aws:s3tables:us-east-1:123456789012:bucket/test-bucket/table/test-table-id",
+					WarehouseLocation: "s3://test-bucket",
+					VersionToken:      "old-version-token",
+				}
+
+				// メタデータを取得
+				retrievedMetadata, err := exporter.getTableMetadata(context.Background(), "test-namespace", "test-table", tableInfo)
+				if err != nil {
+					t.Fatalf("getTableMetadata() failed: %v", err)
+				}
+
+				// 取得したメタデータが元のメタデータと一致することを確認
+				if retrievedMetadata.FormatVersion != tc.metadata.FormatVersion {
+					t.Errorf("expected FormatVersion %d, got %d", tc.metadata.FormatVersion, retrievedMetadata.FormatVersion)
+				}
+				if retrievedMetadata.TableUUID != tc.metadata.TableUUID {
+					t.Errorf("expected TableUUID '%s', got '%s'", tc.metadata.TableUUID, retrievedMetadata.TableUUID)
+				}
+				if retrievedMetadata.Location != tc.metadata.Location {
+					t.Errorf("expected Location '%s', got '%s'", tc.metadata.Location, retrievedMetadata.Location)
+				}
+				if retrievedMetadata.CurrentSnapshotID != tc.metadata.CurrentSnapshotID {
+					t.Errorf("expected CurrentSnapshotID %d, got %d", tc.metadata.CurrentSnapshotID, retrievedMetadata.CurrentSnapshotID)
+				}
+				if len(retrievedMetadata.Snapshots) != len(tc.metadata.Snapshots) {
+					t.Errorf("expected %d snapshots, got %d", len(tc.metadata.Snapshots), len(retrievedMetadata.Snapshots))
+				}
+
+				// バージョントークンが更新されたことを確認
+				if tableInfo.VersionToken != versionToken {
+					t.Errorf("expected VersionToken to be updated to '%s', got '%s'", versionToken, tableInfo.VersionToken)
+				}
+			})
+		}
+	})
+
+	// テストケース2: ランダムなメタデータ構造での取得と解析
+	t.Run("random_metadata_structures", func(t *testing.T) {
+		iterations := 100
+		for i := 0; i < iterations; i++ {
+			// ランダムなメタデータを生成
+			metadata := generateRandomMetadata(i)
+
+			cfg := &Config{
+				TableBucketArn: "arn:aws:s3tables:us-east-1:123456789012:bucket/test-bucket",
+				Region:         "us-east-1",
+				Namespace:      "test-namespace",
+				Tables: TableNamesConfig{
+					Traces:  "otel_traces",
+					Metrics: "otel_metrics",
+					Logs:    "otel_logs",
+				},
+			}
+			set := exportertest.NewNopSettings(component.MustNewType("s3tables"))
+			exporter, err := newS3TablesExporter(cfg, set)
+			if err != nil {
+				t.Fatalf("iteration %d: newS3TablesExporter() failed: %v", i, err)
+			}
+
+			// メタデータをJSONにシリアライズ
+			metadataJSON, err := json.Marshal(metadata)
+			if err != nil {
+				t.Fatalf("iteration %d: failed to marshal metadata: %v", i, err)
+			}
+
+			// モックS3 Tablesクライアントを設定
+			metadataLocation := fmt.Sprintf("s3://test-bucket/metadata/%05d-test-uuid.metadata.json", i)
+			versionToken := fmt.Sprintf("version-token-%d", i)
+			mockS3TablesClient := &mockS3TablesClient{
+				getTableMetadataLocationFunc: func(ctx context.Context, params *s3tables.GetTableMetadataLocationInput, optFns ...func(*s3tables.Options)) (*s3tables.GetTableMetadataLocationOutput, error) {
+					return &s3tables.GetTableMetadataLocationOutput{
+						MetadataLocation: &metadataLocation,
+						VersionToken:     &versionToken,
+					}, nil
+				},
+			}
+			exporter.s3TablesClient = mockS3TablesClient
+
+			// モックS3クライアントを設定
+			mockS3Client := &mockS3Client{
+				getObjectFunc: func(ctx context.Context, params *s3.GetObjectInput, optFns ...func(*s3.Options)) (*s3.GetObjectOutput, error) {
+					return &s3.GetObjectOutput{
+						Body: io.NopCloser(bytes.NewReader(metadataJSON)),
+					}, nil
+				},
+			}
+			exporter.s3Client = mockS3Client
+
+			// テーブル情報を作成
+			tableInfo := &TableInfo{
+				TableARN:          "arn:aws:s3tables:us-east-1:123456789012:bucket/test-bucket/table/test-table-id",
+				WarehouseLocation: "s3://test-bucket",
+				VersionToken:      "old-version-token",
+			}
+
+			// メタデータを取得
+			retrievedMetadata, err := exporter.getTableMetadata(context.Background(), "test-namespace", "test-table", tableInfo)
+			if err != nil {
+				t.Fatalf("iteration %d: getTableMetadata() failed: %v", i, err)
+			}
+
+			// 取得したメタデータが元のメタデータと一致することを確認
+			if retrievedMetadata.FormatVersion != metadata.FormatVersion {
+				t.Errorf("iteration %d: expected FormatVersion %d, got %d", i, metadata.FormatVersion, retrievedMetadata.FormatVersion)
+			}
+			if retrievedMetadata.TableUUID != metadata.TableUUID {
+				t.Errorf("iteration %d: expected TableUUID '%s', got '%s'", i, metadata.TableUUID, retrievedMetadata.TableUUID)
+			}
+			if retrievedMetadata.CurrentSnapshotID != metadata.CurrentSnapshotID {
+				t.Errorf("iteration %d: expected CurrentSnapshotID %d, got %d", i, metadata.CurrentSnapshotID, retrievedMetadata.CurrentSnapshotID)
+			}
+
+			// バージョントークンが更新されたことを確認
+			if tableInfo.VersionToken != versionToken {
+				t.Errorf("iteration %d: expected VersionToken to be updated to '%s', got '%s'", i, versionToken, tableInfo.VersionToken)
+			}
+		}
+	})
+
+	// テストケース3: エラーケースのテスト
+	t.Run("error_cases", func(t *testing.T) {
+		// GetTableMetadataLocation APIエラー
+		t.Run("GetTableMetadataLocation_error", func(t *testing.T) {
+			cfg := &Config{
+				TableBucketArn: "arn:aws:s3tables:us-east-1:123456789012:bucket/test-bucket",
+				Region:         "us-east-1",
+				Namespace:      "test-namespace",
+				Tables: TableNamesConfig{
+					Traces:  "otel_traces",
+					Metrics: "otel_metrics",
+					Logs:    "otel_logs",
+				},
+			}
+			set := exportertest.NewNopSettings(component.MustNewType("s3tables"))
+			exporter, err := newS3TablesExporter(cfg, set)
+			if err != nil {
+				t.Fatalf("newS3TablesExporter() failed: %v", err)
+			}
+
+			// モックS3 Tablesクライアントを設定してエラーを返す
+			mockS3TablesClient := &mockS3TablesClient{
+				getTableMetadataLocationFunc: func(ctx context.Context, params *s3tables.GetTableMetadataLocationInput, optFns ...func(*s3tables.Options)) (*s3tables.GetTableMetadataLocationOutput, error) {
+					return nil, fmt.Errorf("GetTableMetadataLocation failed")
+				},
+			}
+			exporter.s3TablesClient = mockS3TablesClient
+
+			// テーブル情報を作成
+			tableInfo := &TableInfo{
+				TableARN:          "arn:aws:s3tables:us-east-1:123456789012:bucket/test-bucket/table/test-table-id",
+				WarehouseLocation: "s3://test-bucket",
+				VersionToken:      "test-version-token",
+			}
+
+			// メタデータ取得を試行
+			_, err = exporter.getTableMetadata(context.Background(), "test-namespace", "test-table", tableInfo)
+			if err == nil {
+				t.Error("expected error from getTableMetadata")
+			}
+		})
+
+		// S3 GetObject APIエラー
+		t.Run("S3_GetObject_error", func(t *testing.T) {
+			cfg := &Config{
+				TableBucketArn: "arn:aws:s3tables:us-east-1:123456789012:bucket/test-bucket",
+				Region:         "us-east-1",
+				Namespace:      "test-namespace",
+				Tables: TableNamesConfig{
+					Traces:  "otel_traces",
+					Metrics: "otel_metrics",
+					Logs:    "otel_logs",
+				},
+			}
+			set := exportertest.NewNopSettings(component.MustNewType("s3tables"))
+			exporter, err := newS3TablesExporter(cfg, set)
+			if err != nil {
+				t.Fatalf("newS3TablesExporter() failed: %v", err)
+			}
+
+			// モックS3 Tablesクライアントを設定
+			metadataLocation := "s3://test-bucket/metadata/00001-test-uuid.metadata.json"
+			versionToken := "test-version-token"
+			mockS3TablesClient := &mockS3TablesClient{
+				getTableMetadataLocationFunc: func(ctx context.Context, params *s3tables.GetTableMetadataLocationInput, optFns ...func(*s3tables.Options)) (*s3tables.GetTableMetadataLocationOutput, error) {
+					return &s3tables.GetTableMetadataLocationOutput{
+						MetadataLocation: &metadataLocation,
+						VersionToken:     &versionToken,
+					}, nil
+				},
+			}
+			exporter.s3TablesClient = mockS3TablesClient
+
+			// モックS3クライアントを設定してエラーを返す
+			mockS3Client := &mockS3Client{
+				getObjectFunc: func(ctx context.Context, params *s3.GetObjectInput, optFns ...func(*s3.Options)) (*s3.GetObjectOutput, error) {
+					return nil, fmt.Errorf("S3 GetObject failed")
+				},
+			}
+			exporter.s3Client = mockS3Client
+
+			// テーブル情報を作成
+			tableInfo := &TableInfo{
+				TableARN:          "arn:aws:s3tables:us-east-1:123456789012:bucket/test-bucket/table/test-table-id",
+				WarehouseLocation: "s3://test-bucket",
+				VersionToken:      "old-version-token",
+			}
+
+			// メタデータ取得を試行
+			_, err = exporter.getTableMetadata(context.Background(), "test-namespace", "test-table", tableInfo)
+			if err == nil {
+				t.Error("expected error from getTableMetadata")
+			}
+		})
+
+		// 不正なメタデータJSON
+		t.Run("invalid_metadata_json", func(t *testing.T) {
+			cfg := &Config{
+				TableBucketArn: "arn:aws:s3tables:us-east-1:123456789012:bucket/test-bucket",
+				Region:         "us-east-1",
+				Namespace:      "test-namespace",
+				Tables: TableNamesConfig{
+					Traces:  "otel_traces",
+					Metrics: "otel_metrics",
+					Logs:    "otel_logs",
+				},
+			}
+			set := exportertest.NewNopSettings(component.MustNewType("s3tables"))
+			exporter, err := newS3TablesExporter(cfg, set)
+			if err != nil {
+				t.Fatalf("newS3TablesExporter() failed: %v", err)
+			}
+
+			// モックS3 Tablesクライアントを設定
+			metadataLocation := "s3://test-bucket/metadata/00001-test-uuid.metadata.json"
+			versionToken := "test-version-token"
+			mockS3TablesClient := &mockS3TablesClient{
+				getTableMetadataLocationFunc: func(ctx context.Context, params *s3tables.GetTableMetadataLocationInput, optFns ...func(*s3tables.Options)) (*s3tables.GetTableMetadataLocationOutput, error) {
+					return &s3tables.GetTableMetadataLocationOutput{
+						MetadataLocation: &metadataLocation,
+						VersionToken:     &versionToken,
+					}, nil
+				},
+			}
+			exporter.s3TablesClient = mockS3TablesClient
+
+			// モックS3クライアントを設定して不正なJSONを返す
+			invalidJSON := []byte("{invalid json")
+			mockS3Client := &mockS3Client{
+				getObjectFunc: func(ctx context.Context, params *s3.GetObjectInput, optFns ...func(*s3.Options)) (*s3.GetObjectOutput, error) {
+					return &s3.GetObjectOutput{
+						Body: io.NopCloser(bytes.NewReader(invalidJSON)),
+					}, nil
+				},
+			}
+			exporter.s3Client = mockS3Client
+
+			// テーブル情報を作成
+			tableInfo := &TableInfo{
+				TableARN:          "arn:aws:s3tables:us-east-1:123456789012:bucket/test-bucket/table/test-table-id",
+				WarehouseLocation: "s3://test-bucket",
+				VersionToken:      "old-version-token",
+			}
+
+			// メタデータ取得を試行
+			_, err = exporter.getTableMetadata(context.Background(), "test-namespace", "test-table", tableInfo)
+			if err == nil {
+				t.Error("expected error from getTableMetadata for invalid JSON")
+			}
+		})
+	})
+}
+
+// generateRandomMetadata generates random metadata for testing
+// テスト用のランダムなメタデータを生成
+func generateRandomMetadata(seed int) IcebergMetadata {
+	// シード値を使用して決定的なランダムデータを生成
+	numSnapshots := seed % 5 // 0-4個のスナップショット
+	numFields := 1 + (seed % 5) // 1-5個のフィールド
+
+	// スキーマフィールドを生成
+	fields := make([]IcebergSchemaField, numFields)
+	for i := 0; i < numFields; i++ {
+		fields[i] = IcebergSchemaField{
+			ID:       i + 1,
+			Name:     fmt.Sprintf("field%d", i+1),
+			Required: i == 0, // 最初のフィールドのみ必須
+			Type:     []string{"string", "long", "double", "boolean"}[i%4],
+		}
+	}
+
+	// スナップショットを生成
+	snapshots := make([]IcebergSnapshot, numSnapshots)
+	snapshotLog := make([]IcebergSnapshotLog, numSnapshots)
+	metadataLog := make([]IcebergMetadataLog, numSnapshots)
+	var currentSnapshotID int64 = -1
+
+	for i := 0; i < numSnapshots; i++ {
+		snapshotID := int64(1234567890000 + i*1000)
+		snapshots[i] = IcebergSnapshot{
+			SnapshotID:     snapshotID,
+			TimestampMS:    snapshotID,
+			SequenceNumber: int64(i + 1),
+			Summary: map[string]string{
+				"operation":     "append",
+				"added-files":   fmt.Sprintf("%d", i+1),
+				"added-records": fmt.Sprintf("%d", (i+1)*100),
+			},
+			ManifestList: fmt.Sprintf("s3://test-bucket/metadata/snap-%d-%d-manifest-list.avro", snapshotID, i+1),
+		}
+		snapshotLog[i] = IcebergSnapshotLog{
+			TimestampMS: snapshotID,
+			SnapshotID:  snapshotID,
+		}
+		metadataLog[i] = IcebergMetadataLog{
+			TimestampMS:  snapshotID,
+			MetadataFile: fmt.Sprintf("s3://test-bucket/metadata/%05d-test-uuid.metadata.json", i+1),
+		}
+		currentSnapshotID = snapshotID
+	}
+
+	return IcebergMetadata{
+		FormatVersion:      2,
+		TableUUID:          fmt.Sprintf("test-uuid-%d", seed),
+		Location:           fmt.Sprintf("s3://test-bucket/test-table-%d", seed),
+		LastSequenceNumber: int64(numSnapshots),
+		LastUpdatedMS:      1234567890000 + int64(seed*1000),
+		LastColumnID:       numFields,
+		Schemas: []IcebergSchema{
+			{
+				SchemaID: 0,
+				Fields:   fields,
+			},
+		},
+		CurrentSchemaID: 0,
+		PartitionSpecs: []IcebergPartitionSpec{
+			{
+				SpecID: 0,
+				Fields: []IcebergPartitionField{},
+			},
+		},
+		DefaultSpecID:     0,
+		LastPartitionID:   0,
+		Properties:        map[string]string{"seed": fmt.Sprintf("%d", seed)},
+		CurrentSnapshotID: currentSnapshotID,
+		Snapshots:         snapshots,
+		SnapshotLog:       snapshotLog,
+		MetadataLog:       metadataLog,
+	}
 }
