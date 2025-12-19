@@ -24,7 +24,7 @@ import (
 
 const (
 	// typeStr is the type string for the S3 Tables exporter.
-	typeStr   = "s3tables"
+	typeStr = "s3tables"
 	// stability defines the stability level of this exporter.
 	stability = component.StabilityLevelDevelopment
 )

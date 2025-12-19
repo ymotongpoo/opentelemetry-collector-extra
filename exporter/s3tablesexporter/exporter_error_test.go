@@ -298,7 +298,7 @@ func TestUploadToS3Tables_UnconfiguredTable(t *testing.T) {
 		Region:         "us-east-1",
 		Namespace:      "test-namespace",
 		Tables: TableNamesConfig{
-			Traces:  "",  // トレースは未設定
+			Traces:  "", // トレースは未設定
 			Metrics: "otel_metrics",
 			Logs:    "otel_logs",
 		},

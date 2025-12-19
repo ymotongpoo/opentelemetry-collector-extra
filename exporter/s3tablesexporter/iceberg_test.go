@@ -274,11 +274,11 @@ func TestIcebergSnapshotJSONMarshalling(t *testing.T) {
 		TimestampMS:    1234567890000,
 		SequenceNumber: 1,
 		Summary: map[string]string{
-			"operation":      "append",
-			"added-files":    "1",
-			"added-records":  "100",
-			"total-files":    "1",
-			"total-records":  "100",
+			"operation":     "append",
+			"added-files":   "1",
+			"added-records": "100",
+			"total-files":   "1",
+			"total-records": "100",
 		},
 		ManifestList: "s3://bucket/metadata/snap-12345.avro",
 	}

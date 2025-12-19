@@ -26,57 +26,57 @@ import (
 
 // MetricRecord represents a metric data point in Parquet format.
 type MetricRecord struct {
-	Timestamp   int64             `parquet:"timestamp"`
-	Name        string            `parquet:"name"`
-	Type        string            `parquet:"type"`
-	Value       float64           `parquet:"value"`
-	Unit        string            `parquet:"unit"`
-	Attributes  string `parquet:"attributes"`
-	ResourceID  string            `parquet:"resource_id"`
+	Timestamp  int64   `parquet:"timestamp"`
+	Name       string  `parquet:"name"`
+	Type       string  `parquet:"type"`
+	Value      float64 `parquet:"value"`
+	Unit       string  `parquet:"unit"`
+	Attributes string  `parquet:"attributes"`
+	ResourceID string  `parquet:"resource_id"`
 }
 
 // TraceRecord represents a trace span in Parquet format.
 type TraceRecord struct {
-	TraceID     string            `parquet:"trace_id"`
-	SpanID      string            `parquet:"span_id"`
-	ParentID    string            `parquet:"parent_id"`
-	Name        string            `parquet:"name"`
-	StartTime   int64             `parquet:"start_time"`
-	EndTime     int64             `parquet:"end_time"`
-	Duration    int64             `parquet:"duration"`
-	Status      string            `parquet:"status"`
-	Attributes  string `parquet:"attributes"`
-	ResourceID  string            `parquet:"resource_id"`
+	TraceID    string `parquet:"trace_id"`
+	SpanID     string `parquet:"span_id"`
+	ParentID   string `parquet:"parent_id"`
+	Name       string `parquet:"name"`
+	StartTime  int64  `parquet:"start_time"`
+	EndTime    int64  `parquet:"end_time"`
+	Duration   int64  `parquet:"duration"`
+	Status     string `parquet:"status"`
+	Attributes string `parquet:"attributes"`
+	ResourceID string `parquet:"resource_id"`
 }
 
 // LogRecord represents a log entry in Parquet format.
 type LogRecord struct {
-	Timestamp   int64             `parquet:"timestamp"`
-	Severity    string            `parquet:"severity"`
-	Body        string            `parquet:"body"`
-	TraceID     string            `parquet:"trace_id"`
-	SpanID      string            `parquet:"span_id"`
-	Attributes  string `parquet:"attributes"`
-	ResourceID  string            `parquet:"resource_id"`
+	Timestamp  int64  `parquet:"timestamp"`
+	Severity   string `parquet:"severity"`
+	Body       string `parquet:"body"`
+	TraceID    string `parquet:"trace_id"`
+	SpanID     string `parquet:"span_id"`
+	Attributes string `parquet:"attributes"`
+	ResourceID string `parquet:"resource_id"`
 }
 
 // convertMetricsToParquet converts OpenTelemetry metrics to Parquet format.
 func convertMetricsToParquet(md pmetric.Metrics) ([]byte, error) {
 	var records []MetricRecord
-	
+
 	for i := 0; i < md.ResourceMetrics().Len(); i++ {
 		rm := md.ResourceMetrics().At(i)
 		resourceID := "unknown"
 		if svcName, ok := rm.Resource().Attributes().AsRaw()["service.name"]; ok {
 			resourceID = svcName.(string)
 		}
-		
+
 		for j := 0; j < rm.ScopeMetrics().Len(); j++ {
 			sm := rm.ScopeMetrics().At(j)
-			
+
 			for k := 0; k < sm.Metrics().Len(); k++ {
 				metric := sm.Metrics().At(k)
-				
+
 				switch metric.Type() {
 				case pmetric.MetricTypeGauge:
 					for l := 0; l < metric.Gauge().DataPoints().Len(); l++ {
@@ -108,27 +108,27 @@ func convertMetricsToParquet(md pmetric.Metrics) ([]byte, error) {
 			}
 		}
 	}
-	
+
 	return writeParquet(records)
 }
 
 // convertTracesToParquet converts OpenTelemetry traces to Parquet format.
 func convertTracesToParquet(td ptrace.Traces) ([]byte, error) {
 	var records []TraceRecord
-	
+
 	for i := 0; i < td.ResourceSpans().Len(); i++ {
 		rs := td.ResourceSpans().At(i)
 		resourceID := "unknown"
 		if svcName, ok := rs.Resource().Attributes().AsRaw()["service.name"]; ok {
 			resourceID = svcName.(string)
 		}
-		
+
 		for j := 0; j < rs.ScopeSpans().Len(); j++ {
 			ss := rs.ScopeSpans().At(j)
-			
+
 			for k := 0; k < ss.Spans().Len(); k++ {
 				span := ss.Spans().At(k)
-				
+
 				records = append(records, TraceRecord{
 					TraceID:    span.TraceID().String(),
 					SpanID:     span.SpanID().String(),
@@ -144,27 +144,27 @@ func convertTracesToParquet(td ptrace.Traces) ([]byte, error) {
 			}
 		}
 	}
-	
+
 	return writeParquet(records)
 }
 
 // convertLogsToParquet converts OpenTelemetry logs to Parquet format.
 func convertLogsToParquet(ld plog.Logs) ([]byte, error) {
 	var records []LogRecord
-	
+
 	for i := 0; i < ld.ResourceLogs().Len(); i++ {
 		rl := ld.ResourceLogs().At(i)
 		resourceID := "unknown"
 		if svcName, ok := rl.Resource().Attributes().AsRaw()["service.name"]; ok {
 			resourceID = svcName.(string)
 		}
-		
+
 		for j := 0; j < rl.ScopeLogs().Len(); j++ {
 			sl := rl.ScopeLogs().At(j)
-			
+
 			for k := 0; k < sl.LogRecords().Len(); k++ {
 				log := sl.LogRecords().At(k)
-				
+
 				records = append(records, LogRecord{
 					Timestamp:  log.Timestamp().AsTime().UnixNano(),
 					Severity:   log.SeverityText(),
@@ -177,7 +177,7 @@ func convertLogsToParquet(ld plog.Logs) ([]byte, error) {
 			}
 		}
 	}
-	
+
 	return writeParquet(records)
 }
 
@@ -194,19 +194,19 @@ func writeParquet[T any](records []T) ([]byte, error) {
 	if len(records) == 0 {
 		return []byte{}, nil
 	}
-	
+
 	var buf bytes.Buffer
 	writer := parquet.NewWriter(&buf)
-	
+
 	for _, record := range records {
 		if err := writer.Write(record); err != nil {
 			return nil, err
 		}
 	}
-	
+
 	if err := writer.Close(); err != nil {
 		return nil, err
 	}
-	
+
 	return buf.Bytes(), nil
 }

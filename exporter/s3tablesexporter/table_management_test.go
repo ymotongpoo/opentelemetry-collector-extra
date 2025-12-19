@@ -239,10 +239,10 @@ func TestCreateTable_ContextCancellation(t *testing.T) {
 // Requirements: 2.2
 func TestGetOrCreateTable_CacheKey(t *testing.T) {
 	tests := []struct {
-		name         string
-		namespace    string
-		tableName    string
-		expectedKey  string
+		name        string
+		namespace   string
+		tableName   string
+		expectedKey string
 	}{
 		{
 			name:        "simple names",
@@ -392,12 +392,12 @@ func TestConvertToIcebergSchema_MissingFields(t *testing.T) {
 // Requirements: 2.3
 func TestConvertToSchemaField(t *testing.T) {
 	tests := []struct {
-		name          string
-		fieldMap      map[string]interface{}
-		expectedName  string
-		expectedType  string
-		expectedReq   bool
-		expectError   bool
+		name         string
+		fieldMap     map[string]interface{}
+		expectedName string
+		expectedType string
+		expectedReq  bool
+		expectError  bool
 	}{
 		{
 			name: "simple string field",

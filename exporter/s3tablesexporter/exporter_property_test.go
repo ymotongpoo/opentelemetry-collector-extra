@@ -1266,9 +1266,9 @@ func TestProperty_MetadataRetrievalConsistency(t *testing.T) {
 							Fields: []IcebergPartitionField{},
 						},
 					},
-					DefaultSpecID:   0,
-					LastPartitionID: 0,
-					Properties:      map[string]string{"key1": "value1"},
+					DefaultSpecID:     0,
+					LastPartitionID:   0,
+					Properties:        map[string]string{"key1": "value1"},
 					CurrentSnapshotID: 1234567890000,
 					Snapshots: []IcebergSnapshot{
 						{
@@ -1276,11 +1276,11 @@ func TestProperty_MetadataRetrievalConsistency(t *testing.T) {
 							TimestampMS:    1234567890000,
 							SequenceNumber: 1,
 							Summary: map[string]string{
-								"operation":      "append",
-								"added-files":    "1",
-								"added-records":  "100",
-								"total-files":    "1",
-								"total-records":  "100",
+								"operation":     "append",
+								"added-files":   "1",
+								"added-records": "100",
+								"total-files":   "1",
+								"total-records": "100",
 							},
 							ManifestList: "s3://test-bucket/test-table-2/metadata/snap-1234567890000-1-manifest-list.avro",
 						},
@@ -1325,9 +1325,9 @@ func TestProperty_MetadataRetrievalConsistency(t *testing.T) {
 							Fields: []IcebergPartitionField{},
 						},
 					},
-					DefaultSpecID:   0,
-					LastPartitionID: 0,
-					Properties:      map[string]string{"key1": "value1", "key2": "value2"},
+					DefaultSpecID:     0,
+					LastPartitionID:   0,
+					Properties:        map[string]string{"key1": "value1", "key2": "value2"},
 					CurrentSnapshotID: 1234567892000,
 					Snapshots: []IcebergSnapshot{
 						{
@@ -1335,9 +1335,9 @@ func TestProperty_MetadataRetrievalConsistency(t *testing.T) {
 							TimestampMS:    1234567890000,
 							SequenceNumber: 1,
 							Summary: map[string]string{
-								"operation":      "append",
-								"added-files":    "1",
-								"added-records":  "100",
+								"operation":     "append",
+								"added-files":   "1",
+								"added-records": "100",
 							},
 							ManifestList: "s3://test-bucket/test-table-3/metadata/snap-1234567890000-1-manifest-list.avro",
 						},
@@ -1346,9 +1346,9 @@ func TestProperty_MetadataRetrievalConsistency(t *testing.T) {
 							TimestampMS:    1234567891000,
 							SequenceNumber: 2,
 							Summary: map[string]string{
-								"operation":      "append",
-								"added-files":    "1",
-								"added-records":  "200",
+								"operation":     "append",
+								"added-files":   "1",
+								"added-records": "200",
 							},
 							ManifestList: "s3://test-bucket/test-table-3/metadata/snap-1234567891000-2-manifest-list.avro",
 						},
@@ -1357,9 +1357,9 @@ func TestProperty_MetadataRetrievalConsistency(t *testing.T) {
 							TimestampMS:    1234567892000,
 							SequenceNumber: 3,
 							Summary: map[string]string{
-								"operation":      "append",
-								"added-files":    "1",
-								"added-records":  "300",
+								"operation":     "append",
+								"added-files":   "1",
+								"added-records": "300",
 							},
 							ManifestList: "s3://test-bucket/test-table-3/metadata/snap-1234567892000-3-manifest-list.avro",
 						},
@@ -1721,7 +1721,7 @@ func TestProperty_MetadataRetrievalConsistency(t *testing.T) {
 // テスト用のランダムなメタデータを生成
 func generateRandomMetadata(seed int) IcebergMetadata {
 	// シード値を使用して決定的なランダムデータを生成
-	numSnapshots := seed % 5 // 0-4個のスナップショット
+	numSnapshots := seed % 5    // 0-4個のスナップショット
 	numFields := 1 + (seed % 5) // 1-5個のフィールド
 
 	// スキーマフィールドを生成

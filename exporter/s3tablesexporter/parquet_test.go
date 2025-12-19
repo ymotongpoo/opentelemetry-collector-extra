@@ -28,12 +28,12 @@ func TestConvertMetricsToParquet(t *testing.T) {
 	md := pmetric.NewMetrics()
 	rm := md.ResourceMetrics().AppendEmpty()
 	rm.Resource().Attributes().PutStr("service.name", "test-service")
-	
+
 	sm := rm.ScopeMetrics().AppendEmpty()
 	metric := sm.Metrics().AppendEmpty()
 	metric.SetName("test-metric")
 	metric.SetUnit("bytes")
-	
+
 	gauge := metric.SetEmptyGauge()
 	dp := gauge.DataPoints().AppendEmpty()
 	dp.SetTimestamp(pcommon.NewTimestampFromTime(time.Now()))
@@ -53,7 +53,7 @@ func TestConvertTracesToParquet(t *testing.T) {
 	td := ptrace.NewTraces()
 	rs := td.ResourceSpans().AppendEmpty()
 	rs.Resource().Attributes().PutStr("service.name", "test-service")
-	
+
 	ss := rs.ScopeSpans().AppendEmpty()
 	span := ss.Spans().AppendEmpty()
 	span.SetName("test-span")
@@ -74,7 +74,7 @@ func TestConvertLogsToParquet(t *testing.T) {
 	ld := plog.NewLogs()
 	rl := ld.ResourceLogs().AppendEmpty()
 	rl.Resource().Attributes().PutStr("service.name", "test-service")
-	
+
 	sl := rl.ScopeLogs().AppendEmpty()
 	log := sl.LogRecords().AppendEmpty()
 	log.SetTimestamp(pcommon.NewTimestampFromTime(time.Now()))
