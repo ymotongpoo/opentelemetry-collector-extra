@@ -501,6 +501,7 @@ func (e *s3TablesExporter) createNamespaceIfNotExists(ctx context.Context, names
 // 5. メタデータファイルとマニフェストファイルのアップロード
 // 6. UpdateTableMetadataLocation APIの呼び出し
 // 7. バージョントークンを使用した楽観的並行性制御
+// 8. ConflictException発生時のリトライ（最大3回）
 func (e *s3TablesExporter) commitSnapshot(
 	ctx context.Context,
 	namespace string,
@@ -509,12 +510,88 @@ func (e *s3TablesExporter) commitSnapshot(
 	dataFilePaths []string,
 	totalDataSize int64,
 ) error {
+	// リトライロジック: ConflictException発生時に最大3回リトライ
+	const maxRetries = 3
+	var lastErr error
+
+	for attempt := 1; attempt <= maxRetries; attempt++ {
+		err := e.commitSnapshotAttempt(ctx, namespace, tableName, tableInfo, dataFilePaths, totalDataSize, attempt)
+		if err == nil {
+			// 成功
+			return nil
+		}
+
+		lastErr = err
+
+		// ConflictExceptionかどうかを確認
+		// AWS SDK v2では、エラーメッセージに"ConflictException"が含まれているかチェック
+		isConflict := false
+		if err != nil {
+			errMsg := err.Error()
+			if len(errMsg) > 0 && (
+				// AWS SDK v2のエラーメッセージパターン
+				regexp.MustCompile(`ConflictException`).MatchString(errMsg) ||
+				regexp.MustCompile(`conflict`).MatchString(errMsg) ||
+				regexp.MustCompile(`version token`).MatchString(errMsg)) {
+				isConflict = true
+			}
+		}
+
+		if !isConflict {
+			// ConflictException以外のエラーの場合はリトライしない
+			e.logger.Error("Snapshot commit failed with non-retryable error",
+				"namespace", namespace,
+				"table", tableName,
+				"attempt", attempt,
+				"error", err)
+			return err
+		}
+
+		// ConflictExceptionの場合
+		if attempt < maxRetries {
+			e.logger.Warn("Snapshot commit failed due to version conflict, retrying",
+				"namespace", namespace,
+				"table", tableName,
+				"attempt", attempt,
+				"max_retries", maxRetries,
+				"error", err)
+
+			// 最新のメタデータを再取得するため、次のリトライで新しいバージョントークンを使用
+			// TableInfoのVersionTokenは次のgetTableMetadata呼び出しで更新される
+		} else {
+			// 最大リトライ回数に達した
+			e.logger.Error("Snapshot commit failed after maximum retries",
+				"namespace", namespace,
+				"table", tableName,
+				"attempts", maxRetries,
+				"data_files_count", len(dataFilePaths),
+				"total_data_size", totalDataSize,
+				"error", err)
+		}
+	}
+
+	// すべてのリトライが失敗した場合
+	return fmt.Errorf("failed to commit snapshot after %d attempts: %w", maxRetries, lastErr)
+}
+
+// commitSnapshotAttempt performs a single attempt to commit a snapshot
+// スナップショットコミットの1回の試行を実行
+func (e *s3TablesExporter) commitSnapshotAttempt(
+	ctx context.Context,
+	namespace string,
+	tableName string,
+	tableInfo *TableInfo,
+	dataFilePaths []string,
+	totalDataSize int64,
+	attempt int,
+) error {
 	// コンテキストキャンセルのチェック
 	select {
 	case <-ctx.Done():
 		e.logger.Warn("Snapshot commit cancelled",
 			"namespace", namespace,
 			"table", tableName,
+			"attempt", attempt,
 			"data_files_count", len(dataFilePaths),
 			"total_data_size", totalDataSize,
 			"error", ctx.Err())
@@ -525,6 +602,7 @@ func (e *s3TablesExporter) commitSnapshot(
 	e.logger.Info("Starting snapshot commit",
 		"namespace", namespace,
 		"table", tableName,
+		"attempt", attempt,
 		"data_files_count", len(dataFilePaths),
 		"total_data_size", totalDataSize)
 
@@ -534,6 +612,7 @@ func (e *s3TablesExporter) commitSnapshot(
 		e.logger.Error("Failed to get table metadata",
 			"namespace", namespace,
 			"table", tableName,
+			"attempt", attempt,
 			"data_files_count", len(dataFilePaths),
 			"total_data_size", totalDataSize,
 			"error", err)
@@ -573,6 +652,7 @@ func (e *s3TablesExporter) commitSnapshot(
 		e.logger.Error("Failed to generate manifest",
 			"namespace", namespace,
 			"table", tableName,
+			"attempt", attempt,
 			"data_files_count", len(dataFilePaths),
 			"total_data_size", totalDataSize,
 			"error", err)
@@ -597,6 +677,7 @@ func (e *s3TablesExporter) commitSnapshot(
 		e.logger.Error("Failed to generate snapshot",
 			"namespace", namespace,
 			"table", tableName,
+			"attempt", attempt,
 			"data_files_count", len(dataFilePaths),
 			"total_data_size", totalDataSize,
 			"error", err)
@@ -629,6 +710,7 @@ func (e *s3TablesExporter) commitSnapshot(
 		e.logger.Error("Failed to upload metadata",
 			"namespace", namespace,
 			"table", tableName,
+			"attempt", attempt,
 			"data_files_count", len(dataFilePaths),
 			"total_data_size", totalDataSize,
 			"error", err)
@@ -652,6 +734,7 @@ func (e *s3TablesExporter) commitSnapshot(
 		e.logger.Error("Failed to update table metadata location",
 			"namespace", namespace,
 			"table", tableName,
+			"attempt", attempt,
 			"metadata_location", metadataPath,
 			"version_token", tableInfo.VersionToken,
 			"data_files_count", len(dataFilePaths),
@@ -666,6 +749,7 @@ func (e *s3TablesExporter) commitSnapshot(
 	e.logger.Info("Successfully committed snapshot",
 		"namespace", namespace,
 		"table", tableName,
+		"attempt", attempt,
 		"snapshot_id", newSnapshot.SnapshotID,
 		"data_files_count", len(dataFilePaths),
 		"total_data_size", totalDataSize,
