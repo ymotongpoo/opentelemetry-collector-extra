@@ -121,3 +121,54 @@ type IcebergDataFile struct {
 	LowerBounds     map[int][]byte `json:"lower-bounds,omitempty"`
 	UpperBounds     map[int][]byte `json:"upper-bounds,omitempty"`
 }
+
+// generateNewMetadata generates a new metadata file with a new snapshot
+// 新しいスナップショットを含む新しいメタデータファイルを生成
+//
+// この関数は既存のメタデータに新しいスナップショットを追加し、
+// 既存のスキーマ、パーティション仕様、ソート順序を保持します。
+func generateNewMetadata(
+	existingMetadata *IcebergMetadata,
+	newSnapshot IcebergSnapshot,
+	newMetadataPath string,
+) *IcebergMetadata {
+	// 既存のメタデータをコピー
+	newMetadata := &IcebergMetadata{
+		FormatVersion:      existingMetadata.FormatVersion,
+		TableUUID:          existingMetadata.TableUUID,
+		Location:           existingMetadata.Location,
+		LastSequenceNumber: newSnapshot.SequenceNumber,
+		LastUpdatedMS:      newSnapshot.TimestampMS,
+		LastColumnID:       existingMetadata.LastColumnID,
+		Schemas:            existingMetadata.Schemas,
+		CurrentSchemaID:    existingMetadata.CurrentSchemaID,
+		PartitionSpecs:     existingMetadata.PartitionSpecs,
+		DefaultSpecID:      existingMetadata.DefaultSpecID,
+		LastPartitionID:    existingMetadata.LastPartitionID,
+		Properties:         existingMetadata.Properties,
+		CurrentSnapshotID:  newSnapshot.SnapshotID,
+	}
+
+	// 新しいスナップショットを追加
+	newMetadata.Snapshots = make([]IcebergSnapshot, len(existingMetadata.Snapshots)+1)
+	copy(newMetadata.Snapshots, existingMetadata.Snapshots)
+	newMetadata.Snapshots[len(existingMetadata.Snapshots)] = newSnapshot
+
+	// スナップショットログを更新
+	newMetadata.SnapshotLog = make([]IcebergSnapshotLog, len(existingMetadata.SnapshotLog)+1)
+	copy(newMetadata.SnapshotLog, existingMetadata.SnapshotLog)
+	newMetadata.SnapshotLog[len(existingMetadata.SnapshotLog)] = IcebergSnapshotLog{
+		TimestampMS: newSnapshot.TimestampMS,
+		SnapshotID:  newSnapshot.SnapshotID,
+	}
+
+	// メタデータログを更新
+	newMetadata.MetadataLog = make([]IcebergMetadataLog, len(existingMetadata.MetadataLog)+1)
+	copy(newMetadata.MetadataLog, existingMetadata.MetadataLog)
+	newMetadata.MetadataLog[len(existingMetadata.MetadataLog)] = IcebergMetadataLog{
+		TimestampMS:  newSnapshot.TimestampMS,
+		MetadataFile: newMetadataPath,
+	}
+
+	return newMetadata
+}
