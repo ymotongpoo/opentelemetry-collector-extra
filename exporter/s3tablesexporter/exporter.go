@@ -58,6 +58,7 @@ type s3TablesClientInterface interface {
 	GetNamespace(ctx context.Context, params *s3tables.GetNamespaceInput, optFns ...func(*s3tables.Options)) (*s3tables.GetNamespaceOutput, error)
 	CreateNamespace(ctx context.Context, params *s3tables.CreateNamespaceInput, optFns ...func(*s3tables.Options)) (*s3tables.CreateNamespaceOutput, error)
 	GetTableMetadataLocation(ctx context.Context, params *s3tables.GetTableMetadataLocationInput, optFns ...func(*s3tables.Options)) (*s3tables.GetTableMetadataLocationOutput, error)
+	UpdateTableMetadataLocation(ctx context.Context, params *s3tables.UpdateTableMetadataLocationInput, optFns ...func(*s3tables.Options)) (*s3tables.UpdateTableMetadataLocationOutput, error)
 }
 
 // s3TablesExporter implements the S3 Tables exporter.
@@ -485,6 +486,176 @@ func (e *s3TablesExporter) createNamespaceIfNotExists(ctx context.Context, names
 	e.logger.Info("Created namespace",
 		"namespace", namespace,
 		"bucket", bucketName)
+
+	return nil
+}
+
+// commitSnapshot commits a new snapshot to the Iceberg table
+// 新しいスナップショットをIcebergテーブルにコミット
+//
+// この関数は以下の処理を行います：
+// 1. 既存メタデータの取得
+// 2. マニフェストファイルの生成
+// 3. 新しいスナップショットの作成
+// 4. 新しいメタデータファイルの生成
+// 5. メタデータファイルとマニフェストファイルのアップロード
+// 6. UpdateTableMetadataLocation APIの呼び出し
+// 7. バージョントークンを使用した楽観的並行性制御
+func (e *s3TablesExporter) commitSnapshot(
+	ctx context.Context,
+	namespace string,
+	tableName string,
+	tableInfo *TableInfo,
+	dataFilePaths []string,
+) error {
+	// コンテキストキャンセルのチェック
+	select {
+	case <-ctx.Done():
+		e.logger.Warn("Snapshot commit cancelled",
+			"namespace", namespace,
+			"table", tableName,
+			"error", ctx.Err())
+		return fmt.Errorf("snapshot commit cancelled: %w", ctx.Err())
+	default:
+	}
+
+	e.logger.Info("Starting snapshot commit",
+		"namespace", namespace,
+		"table", tableName,
+		"data_files_count", len(dataFilePaths))
+
+	// 1. 既存メタデータの取得
+	existingMetadata, err := e.getTableMetadata(ctx, namespace, tableName, tableInfo)
+	if err != nil {
+		e.logger.Error("Failed to get table metadata",
+			"namespace", namespace,
+			"table", tableName,
+			"error", err)
+		return fmt.Errorf("failed to get table metadata: %w", err)
+	}
+
+	// 2. 新しいシーケンス番号を計算
+	newSequenceNumber := existingMetadata.LastSequenceNumber + 1
+
+	// 3. 新しいスナップショットIDを生成
+	snapshotID := time.Now().UnixMilli()
+
+	// 4. バージョン番号を計算（既存のスナップショット数 + 1）
+	version := len(existingMetadata.Snapshots) + 1
+
+	// 5. マニフェストファイル名を生成（アップロード前に決定）
+	manifestFileName := generateManifestFileName(snapshotID)
+	var manifestKey string
+	// Warehouse locationからバケット名とプレフィックスを抽出
+	bucket, prefix, err := extractBucketAndPrefixFromWarehouseLocation(tableInfo.WarehouseLocation)
+	if err != nil {
+		e.logger.Error("Failed to extract bucket and prefix from warehouse location",
+			"warehouse_location", tableInfo.WarehouseLocation,
+			"error", err)
+		return fmt.Errorf("failed to extract bucket and prefix: %w", err)
+	}
+	if prefix != "" {
+		manifestKey = fmt.Sprintf("%s/metadata/%s", prefix, manifestFileName)
+	} else {
+		manifestKey = fmt.Sprintf("metadata/%s", manifestFileName)
+	}
+	manifestPath := fmt.Sprintf("s3://%s/%s", bucket, manifestKey)
+
+	// 6. マニフェストファイルの生成
+	manifest, err := generateManifest(dataFilePaths, snapshotID, newSequenceNumber)
+	if err != nil {
+		e.logger.Error("Failed to generate manifest",
+			"namespace", namespace,
+			"table", tableName,
+			"error", err)
+		return fmt.Errorf("failed to generate manifest: %w", err)
+	}
+
+	// 7. 新しいスナップショットの作成
+	addedFiles := len(dataFilePaths)
+	addedRecords := int64(0) // TODO: 実際のレコード数を計算
+	totalFiles := len(existingMetadata.Snapshots) + addedFiles
+	totalRecords := int64(0) // TODO: 実際の合計レコード数を計算
+
+	newSnapshot, err := generateSnapshot(
+		manifestPath,
+		newSequenceNumber,
+		addedFiles,
+		addedRecords,
+		totalFiles,
+		totalRecords,
+	)
+	if err != nil {
+		e.logger.Error("Failed to generate snapshot",
+			"namespace", namespace,
+			"table", tableName,
+			"error", err)
+		return fmt.Errorf("failed to generate snapshot: %w", err)
+	}
+
+	// 8. メタデータファイル名を生成（アップロード前に決定）
+	metadataFileName := generateMetadataFileName(version)
+	var metadataKey string
+	if prefix != "" {
+		metadataKey = fmt.Sprintf("%s/metadata/%s", prefix, metadataFileName)
+	} else {
+		metadataKey = fmt.Sprintf("metadata/%s", metadataFileName)
+	}
+	metadataPath := fmt.Sprintf("s3://%s/%s", bucket, metadataKey)
+
+	// 9. 新しいメタデータファイルの生成
+	newMetadata := generateNewMetadata(existingMetadata, *newSnapshot, metadataPath)
+
+	// 10. メタデータファイルとマニフェストファイルをアップロード（1回のみ）
+	metadataPath, manifestPath, err = uploadMetadata(
+		ctx,
+		e.s3Client,
+		tableInfo.WarehouseLocation,
+		newMetadata,
+		manifest,
+		version,
+	)
+	if err != nil {
+		e.logger.Error("Failed to upload metadata",
+			"namespace", namespace,
+			"table", tableName,
+			"error", err)
+		return fmt.Errorf("failed to upload metadata: %w", err)
+	}
+
+	// 11. UpdateTableMetadataLocation APIの呼び出し
+	// バージョントークンを使用した楽観的並行性制御
+	// 注: VersionTokenは値をコピーする必要がある（ポインタを直接使用すると後で値が変更される）
+	currentVersionToken := tableInfo.VersionToken
+	updateInput := &s3tables.UpdateTableMetadataLocationInput{
+		TableBucketARN:   &e.config.TableBucketArn,
+		Namespace:        &namespace,
+		Name:             &tableName,
+		MetadataLocation: &metadataPath,
+		VersionToken:     &currentVersionToken,
+	}
+
+	updateOutput, err := e.s3TablesClient.UpdateTableMetadataLocation(ctx, updateInput)
+	if err != nil {
+		e.logger.Error("Failed to update table metadata location",
+			"namespace", namespace,
+			"table", tableName,
+			"metadata_location", metadataPath,
+			"version_token", tableInfo.VersionToken,
+			"error", err)
+		return fmt.Errorf("failed to update table metadata location: %w", err)
+	}
+
+	// バージョントークンを更新
+	tableInfo.VersionToken = *updateOutput.VersionToken
+
+	e.logger.Info("Successfully committed snapshot",
+		"namespace", namespace,
+		"table", tableName,
+		"snapshot_id", newSnapshot.SnapshotID,
+		"metadata_location", metadataPath,
+		"manifest_location", manifestPath,
+		"new_version_token", tableInfo.VersionToken)
 
 	return nil
 }
