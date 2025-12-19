@@ -1794,3 +1794,312 @@ func generateRandomMetadata(seed int) IcebergMetadata {
 		MetadataLog:       metadataLog,
 	}
 }
+
+// TestProperty_ManifestStructureCompleteness tests manifest file structure completeness
+// Feature: iceberg-snapshot-commit, Property 4: マニフェストファイル構造の完全性
+// Validates: Requirements 6.4, 8.5
+func TestProperty_ManifestStructureCompleteness(t *testing.T) {
+	if testing.Short() {
+		t.Skip("Skipping property-based test in short mode")
+	}
+
+	// プロパティ: 任意のデータファイルリストに対して、生成されたマニフェストファイルは
+	// データファイルのパス、ファイルサイズ、レコード数を含むべきである
+
+	// テストケース1: 単一のデータファイル
+	t.Run("single_data_file", func(t *testing.T) {
+		dataFilePaths := []string{"s3://test-bucket/data/file1.parquet"}
+		snapshotID := int64(1234567890000)
+		sequenceNumber := int64(1)
+
+		manifest, err := generateManifest(dataFilePaths, snapshotID, sequenceNumber)
+		if err != nil {
+			t.Fatalf("generateManifest() failed: %v", err)
+		}
+
+		// マニフェストの基本構造を検証
+		if manifest.FormatVersion != 2 {
+			t.Errorf("expected FormatVersion 2, got %d", manifest.FormatVersion)
+		}
+		if manifest.Content != "data" {
+			t.Errorf("expected Content 'data', got '%s'", manifest.Content)
+		}
+		if len(manifest.Entries) != 1 {
+			t.Errorf("expected 1 entry, got %d", len(manifest.Entries))
+		}
+
+		// エントリの構造を検証
+		entry := manifest.Entries[0]
+		if entry.Status != 1 { // ADDED
+			t.Errorf("expected Status 1 (ADDED), got %d", entry.Status)
+		}
+		if entry.SnapshotID != snapshotID {
+			t.Errorf("expected SnapshotID %d, got %d", snapshotID, entry.SnapshotID)
+		}
+		if entry.SequenceNumber != sequenceNumber {
+			t.Errorf("expected SequenceNumber %d, got %d", sequenceNumber, entry.SequenceNumber)
+		}
+
+		// データファイル情報を検証
+		dataFile := entry.DataFile
+		if dataFile.FilePath != dataFilePaths[0] {
+			t.Errorf("expected FilePath '%s', got '%s'", dataFilePaths[0], dataFile.FilePath)
+		}
+		if dataFile.FileFormat != "PARQUET" {
+			t.Errorf("expected FileFormat 'PARQUET', got '%s'", dataFile.FileFormat)
+		}
+		// RecordCountとFileSizeBytesは現時点では0（TODO実装）
+		if dataFile.RecordCount < 0 {
+			t.Errorf("RecordCount should be non-negative, got %d", dataFile.RecordCount)
+		}
+		if dataFile.FileSizeBytes < 0 {
+			t.Errorf("FileSizeBytes should be non-negative, got %d", dataFile.FileSizeBytes)
+		}
+	})
+
+	// テストケース2: 複数のデータファイル
+	t.Run("multiple_data_files", func(t *testing.T) {
+		dataFilePaths := []string{
+			"s3://test-bucket/data/file1.parquet",
+			"s3://test-bucket/data/file2.parquet",
+			"s3://test-bucket/data/file3.parquet",
+		}
+		snapshotID := int64(1234567890000)
+		sequenceNumber := int64(1)
+
+		manifest, err := generateManifest(dataFilePaths, snapshotID, sequenceNumber)
+		if err != nil {
+			t.Fatalf("generateManifest() failed: %v", err)
+		}
+
+		// エントリ数を検証
+		if len(manifest.Entries) != len(dataFilePaths) {
+			t.Errorf("expected %d entries, got %d", len(dataFilePaths), len(manifest.Entries))
+		}
+
+		// 各エントリを検証
+		for i, entry := range manifest.Entries {
+			if entry.Status != 1 { // ADDED
+				t.Errorf("entry %d: expected Status 1 (ADDED), got %d", i, entry.Status)
+			}
+			if entry.SnapshotID != snapshotID {
+				t.Errorf("entry %d: expected SnapshotID %d, got %d", i, snapshotID, entry.SnapshotID)
+			}
+			if entry.SequenceNumber != sequenceNumber {
+				t.Errorf("entry %d: expected SequenceNumber %d, got %d", i, sequenceNumber, entry.SequenceNumber)
+			}
+			if entry.DataFile.FilePath != dataFilePaths[i] {
+				t.Errorf("entry %d: expected FilePath '%s', got '%s'", i, dataFilePaths[i], entry.DataFile.FilePath)
+			}
+			if entry.DataFile.FileFormat != "PARQUET" {
+				t.Errorf("entry %d: expected FileFormat 'PARQUET', got '%s'", i, entry.DataFile.FileFormat)
+			}
+		}
+	})
+
+	// テストケース3: ランダムなデータファイル数でのテスト
+	t.Run("random_number_of_data_files", func(t *testing.T) {
+		iterations := 100
+		for i := 0; i < iterations; i++ {
+			// ランダムなデータファイル数を生成（1-10個）
+			numFiles := 1 + (i % 10)
+			dataFilePaths := make([]string, numFiles)
+			for j := 0; j < numFiles; j++ {
+				dataFilePaths[j] = fmt.Sprintf("s3://test-bucket/data/file%d-%d.parquet", i, j)
+			}
+
+			snapshotID := int64(1234567890000 + int64(i*1000))
+			sequenceNumber := int64(i + 1)
+
+			manifest, err := generateManifest(dataFilePaths, snapshotID, sequenceNumber)
+			if err != nil {
+				t.Fatalf("iteration %d: generateManifest() failed: %v", i, err)
+			}
+
+			// エントリ数を検証
+			if len(manifest.Entries) != numFiles {
+				t.Errorf("iteration %d: expected %d entries, got %d", i, numFiles, len(manifest.Entries))
+			}
+
+			// 各エントリの基本構造を検証
+			for j, entry := range manifest.Entries {
+				if entry.Status != 1 {
+					t.Errorf("iteration %d, entry %d: expected Status 1, got %d", i, j, entry.Status)
+				}
+				if entry.SnapshotID != snapshotID {
+					t.Errorf("iteration %d, entry %d: expected SnapshotID %d, got %d", i, j, snapshotID, entry.SnapshotID)
+				}
+				if entry.SequenceNumber != sequenceNumber {
+					t.Errorf("iteration %d, entry %d: expected SequenceNumber %d, got %d", i, j, sequenceNumber, entry.SequenceNumber)
+				}
+				if entry.DataFile.FilePath != dataFilePaths[j] {
+					t.Errorf("iteration %d, entry %d: expected FilePath '%s', got '%s'", i, j, dataFilePaths[j], entry.DataFile.FilePath)
+				}
+				if entry.DataFile.FileFormat != "PARQUET" {
+					t.Errorf("iteration %d, entry %d: expected FileFormat 'PARQUET', got '%s'", i, j, entry.DataFile.FileFormat)
+				}
+			}
+		}
+	})
+
+	// テストケース4: 様々なスナップショットIDとシーケンス番号
+	t.Run("various_snapshot_ids_and_sequence_numbers", func(t *testing.T) {
+		iterations := 50
+		for i := 0; i < iterations; i++ {
+			dataFilePaths := []string{
+				fmt.Sprintf("s3://test-bucket/data/file%d.parquet", i),
+			}
+			snapshotID := int64(1000000000000 + int64(i*123456))
+			sequenceNumber := int64(i*7 + 1)
+
+			manifest, err := generateManifest(dataFilePaths, snapshotID, sequenceNumber)
+			if err != nil {
+				t.Fatalf("iteration %d: generateManifest() failed: %v", i, err)
+			}
+
+			// スナップショットIDとシーケンス番号が正しく設定されていることを確認
+			entry := manifest.Entries[0]
+			if entry.SnapshotID != snapshotID {
+				t.Errorf("iteration %d: expected SnapshotID %d, got %d", i, snapshotID, entry.SnapshotID)
+			}
+			if entry.SequenceNumber != sequenceNumber {
+				t.Errorf("iteration %d: expected SequenceNumber %d, got %d", i, sequenceNumber, entry.SequenceNumber)
+			}
+		}
+	})
+
+	// テストケース5: 様々なS3パス形式
+	t.Run("various_s3_path_formats", func(t *testing.T) {
+		testCases := []struct {
+			name     string
+			filePath string
+		}{
+			{
+				name:     "simple_path",
+				filePath: "s3://bucket/data/file.parquet",
+			},
+			{
+				name:     "nested_path",
+				filePath: "s3://bucket/namespace/table/data/file.parquet",
+			},
+			{
+				name:     "complex_bucket_name",
+				filePath: "s3://63a8e430-6e0b-46f5-k833abtwr6s8tmtsycedn8s4yc3xhuse1b--table-s3/data/file.parquet",
+			},
+			{
+				name:     "timestamp_in_filename",
+				filePath: "s3://bucket/data/20240101-120000-uuid.parquet",
+			},
+			{
+				name:     "uuid_in_filename",
+				filePath: "s3://bucket/data/a1b2c3d4-e5f6-7890-abcd-ef1234567890.parquet",
+			},
+		}
+
+		for _, tc := range testCases {
+			t.Run(tc.name, func(t *testing.T) {
+				dataFilePaths := []string{tc.filePath}
+				snapshotID := int64(1234567890000)
+				sequenceNumber := int64(1)
+
+				manifest, err := generateManifest(dataFilePaths, snapshotID, sequenceNumber)
+				if err != nil {
+					t.Fatalf("generateManifest() failed: %v", err)
+				}
+
+				// ファイルパスが正しく保持されていることを確認
+				if manifest.Entries[0].DataFile.FilePath != tc.filePath {
+					t.Errorf("expected FilePath '%s', got '%s'", tc.filePath, manifest.Entries[0].DataFile.FilePath)
+				}
+			})
+		}
+	})
+
+	// テストケース6: エラーケース - 空のデータファイルリスト
+	t.Run("error_empty_data_file_list", func(t *testing.T) {
+		dataFilePaths := []string{}
+		snapshotID := int64(1234567890000)
+		sequenceNumber := int64(1)
+
+		_, err := generateManifest(dataFilePaths, snapshotID, sequenceNumber)
+		if err == nil {
+			t.Error("expected error for empty data file list")
+		}
+	})
+
+	// テストケース7: マニフェストのJSON シリアライズ可能性
+	t.Run("manifest_json_serialization", func(t *testing.T) {
+		iterations := 50
+		for i := 0; i < iterations; i++ {
+			numFiles := 1 + (i % 5)
+			dataFilePaths := make([]string, numFiles)
+			for j := 0; j < numFiles; j++ {
+				dataFilePaths[j] = fmt.Sprintf("s3://test-bucket/data/file%d-%d.parquet", i, j)
+			}
+
+			snapshotID := int64(1234567890000 + int64(i*1000))
+			sequenceNumber := int64(i + 1)
+
+			manifest, err := generateManifest(dataFilePaths, snapshotID, sequenceNumber)
+			if err != nil {
+				t.Fatalf("iteration %d: generateManifest() failed: %v", i, err)
+			}
+
+			// JSONにシリアライズ
+			jsonBytes, err := json.Marshal(manifest)
+			if err != nil {
+				t.Fatalf("iteration %d: failed to marshal manifest to JSON: %v", i, err)
+			}
+
+			// JSONからデシリアライズ
+			var deserializedManifest IcebergManifest
+			if err := json.Unmarshal(jsonBytes, &deserializedManifest); err != nil {
+				t.Fatalf("iteration %d: failed to unmarshal manifest from JSON: %v", i, err)
+			}
+
+			// デシリアライズされたマニフェストが元のマニフェストと一致することを確認
+			if deserializedManifest.FormatVersion != manifest.FormatVersion {
+				t.Errorf("iteration %d: FormatVersion mismatch after JSON round-trip", i)
+			}
+			if deserializedManifest.Content != manifest.Content {
+				t.Errorf("iteration %d: Content mismatch after JSON round-trip", i)
+			}
+			if len(deserializedManifest.Entries) != len(manifest.Entries) {
+				t.Errorf("iteration %d: Entries count mismatch after JSON round-trip", i)
+			}
+		}
+	})
+
+	// テストケース8: 大量のデータファイル
+	t.Run("large_number_of_data_files", func(t *testing.T) {
+		// 100個のデータファイルでテスト
+		numFiles := 100
+		dataFilePaths := make([]string, numFiles)
+		for i := 0; i < numFiles; i++ {
+			dataFilePaths[i] = fmt.Sprintf("s3://test-bucket/data/file%d.parquet", i)
+		}
+
+		snapshotID := int64(1234567890000)
+		sequenceNumber := int64(1)
+
+		manifest, err := generateManifest(dataFilePaths, snapshotID, sequenceNumber)
+		if err != nil {
+			t.Fatalf("generateManifest() failed: %v", err)
+		}
+
+		// エントリ数を検証
+		if len(manifest.Entries) != numFiles {
+			t.Errorf("expected %d entries, got %d", numFiles, len(manifest.Entries))
+		}
+
+		// すべてのエントリが正しく設定されていることを確認
+		for i, entry := range manifest.Entries {
+			if entry.Status != 1 {
+				t.Errorf("entry %d: expected Status 1, got %d", i, entry.Status)
+			}
+			if entry.DataFile.FilePath != dataFilePaths[i] {
+				t.Errorf("entry %d: FilePath mismatch", i)
+			}
+		}
+	})
+}

@@ -629,6 +629,48 @@ func parseS3URI(uri string) (bucket, key string, err error) {
 	return matches[1], matches[2], nil
 }
 
+// generateManifest generates a manifest file for data files
+// データファイル用のマニフェストファイルを生成
+func generateManifest(dataFilePaths []string, snapshotID int64, sequenceNumber int64) (*IcebergManifest, error) {
+	// データファイルパスが空の場合はエラー
+	if len(dataFilePaths) == 0 {
+		return nil, fmt.Errorf("dataFilePaths cannot be empty")
+	}
+
+	// マニフェストエントリを生成
+	entries := make([]IcebergManifestEntry, 0, len(dataFilePaths))
+	for _, filePath := range dataFilePaths {
+		// データファイル情報を作成
+		// 注: 実際のファイルサイズとレコード数は、Parquetファイルから取得する必要があるが、
+		// 現時点では簡略化のため、ダミー値を使用
+		dataFile := IcebergDataFile{
+			FilePath:      filePath,
+			FileFormat:    "PARQUET",
+			RecordCount:   0, // TODO: Parquetファイルから実際のレコード数を取得
+			FileSizeBytes: 0, // TODO: S3から実際のファイルサイズを取得
+		}
+
+		// マニフェストエントリを作成
+		entry := IcebergManifestEntry{
+			Status:         1, // ADDED
+			SnapshotID:     snapshotID,
+			SequenceNumber: sequenceNumber,
+			DataFile:       dataFile,
+		}
+
+		entries = append(entries, entry)
+	}
+
+	// マニフェストを作成
+	manifest := &IcebergManifest{
+		FormatVersion: 2,
+		Content:       "data",
+		Entries:       entries,
+	}
+
+	return manifest, nil
+}
+
 // uploadToS3Tables uploads the Parquet data to S3 Tables.
 func (e *s3TablesExporter) uploadToS3Tables(ctx context.Context, data []byte, dataType string) error {
 	// コンテキストキャンセルのチェック
