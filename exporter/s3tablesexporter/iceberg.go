@@ -57,10 +57,45 @@ type IcebergSchema struct {
 // IcebergSchemaField represents a field in an Iceberg schema
 // Icebergスキーマのフィールドを表現
 type IcebergSchemaField struct {
-	ID       int    `json:"id"`
-	Name     string `json:"name"`
-	Required bool   `json:"required"`
-	Type     string `json:"type"`
+	ID       int         `json:"id"`
+	Name     string      `json:"name"`
+	Required bool        `json:"required"`
+	Type     interface{} `json:"type"`
+}
+
+// IsPrimitiveType checks if the type is a primitive type (string)
+// 型がプリミティブ型（文字列）かどうかをチェック
+func (f *IcebergSchemaField) IsPrimitiveType() bool {
+	_, ok := f.Type.(string)
+	return ok
+}
+
+// IsMapType checks if the type is a map type
+// 型がmap型かどうかをチェック
+func (f *IcebergSchemaField) IsMapType() bool {
+	if m, ok := f.Type.(map[string]interface{}); ok {
+		typeVal, hasType := m["type"]
+		return hasType && typeVal == "map"
+	}
+	return false
+}
+
+// GetPrimitiveType returns the primitive type string
+// プリミティブ型の文字列を返す
+func (f *IcebergSchemaField) GetPrimitiveType() (string, error) {
+	if s, ok := f.Type.(string); ok {
+		return s, nil
+	}
+	return "", fmt.Errorf("type is not a primitive type")
+}
+
+// GetMapType returns the map type structure
+// map型の構造を返す
+func (f *IcebergSchemaField) GetMapType() (map[string]interface{}, error) {
+	if m, ok := f.Type.(map[string]interface{}); ok {
+		return m, nil
+	}
+	return nil, fmt.Errorf("type is not a map type")
 }
 
 // IcebergPartitionSpec represents an Iceberg partition specification
