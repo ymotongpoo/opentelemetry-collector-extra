@@ -141,7 +141,7 @@ func marshalSchemaToJSON(schema map[string]interface{}) (string, error) {
 
 // convertToIcebergSchema converts a schema map to IcebergSchema
 // スキーママップをIcebergSchema形式に変換
-func convertToIcebergSchema(schema map[string]interface{}) (*types.IcebergSchema, error) {
+func convertToIcebergSchema(schema map[string]interface{}) (*IcebergSchema, error) {
 	// スキーマのフィールドを抽出
 	fieldsInterface, ok := schema["fields"]
 	if !ok {
@@ -154,7 +154,7 @@ func convertToIcebergSchema(schema map[string]interface{}) (*types.IcebergSchema
 	}
 
 	// SchemaFieldsに変換
-	schemaFields := make([]types.SchemaField, 0, len(fieldsSlice))
+	schemaFields := make([]IcebergSchemaField, 0, len(fieldsSlice))
 	for _, fieldMap := range fieldsSlice {
 		field, err := convertToSchemaField(fieldMap)
 		if err != nil {
@@ -163,46 +163,58 @@ func convertToIcebergSchema(schema map[string]interface{}) (*types.IcebergSchema
 		schemaFields = append(schemaFields, field)
 	}
 
-	return &types.IcebergSchema{
-		Fields: schemaFields,
+	return &IcebergSchema{
+		SchemaID: 0, // デフォルトのスキーマID
+		Fields:   schemaFields,
 	}, nil
 }
 
-// convertToSchemaField converts a field map to SchemaField
-// フィールドマップをSchemaField形式に変換
-func convertToSchemaField(fieldMap map[string]interface{}) (types.SchemaField, error) {
+// convertToSchemaField converts a field map to IcebergSchemaField
+// フィールドマップをIcebergSchemaField形式に変換
+func convertToSchemaField(fieldMap map[string]interface{}) (IcebergSchemaField, error) {
+	// IDを取得
+	idInterface, ok := fieldMap["id"]
+	if !ok {
+		return IcebergSchemaField{}, fmt.Errorf("field missing 'id' key")
+	}
+	// IDはfloat64として解析される可能性があるため、型アサーションを試みる
+	var id int
+	switch v := idInterface.(type) {
+	case int:
+		id = v
+	case float64:
+		id = int(v)
+	default:
+		return IcebergSchemaField{}, fmt.Errorf("field 'id' is not a number")
+	}
+
 	// 名前を取得
 	nameInterface, ok := fieldMap["name"]
 	if !ok {
-		return types.SchemaField{}, fmt.Errorf("field missing 'name' key")
+		return IcebergSchemaField{}, fmt.Errorf("field missing 'name' key")
 	}
 	name, ok := nameInterface.(string)
 	if !ok {
-		return types.SchemaField{}, fmt.Errorf("field 'name' is not a string")
+		return IcebergSchemaField{}, fmt.Errorf("field 'name' is not a string")
 	}
 
 	// タイプを取得
 	typeInterface, ok := fieldMap["type"]
 	if !ok {
-		return types.SchemaField{}, fmt.Errorf("field missing 'type' key")
+		return IcebergSchemaField{}, fmt.Errorf("field missing 'type' key")
 	}
 
-	// タイプが文字列の場合（プリミティブ型）
-	var fieldType string
+	// タイプの処理
+	var fieldType interface{}
 	if typeStr, ok := typeInterface.(string); ok {
+		// プリミティブ型の場合、そのまま文字列として保持
 		fieldType = typeStr
 	} else if typeMap, ok := typeInterface.(map[string]interface{}); ok {
-		// タイプがマップの場合（複合型）
-		// map型の場合は "map<key_type, value_type>" 形式に変換
-		if typeMap["type"] == "map" {
-			keyType, _ := typeMap["key"].(string)
-			valueType, _ := typeMap["value"].(string)
-			fieldType = fmt.Sprintf("map<%s, %s>", keyType, valueType)
-		} else {
-			return types.SchemaField{}, fmt.Errorf("unsupported complex type: %v", typeMap["type"])
-		}
+		// 複合型の場合、そのままmap[string]interface{}として保持
+		fieldType = typeMap
 	} else {
-		return types.SchemaField{}, fmt.Errorf("field 'type' is not a string or map")
+		// サポートされていない型の場合はエラー
+		return IcebergSchemaField{}, fmt.Errorf("field 'type' must be string or map, got %T", typeInterface)
 	}
 
 	// requiredを取得
@@ -213,10 +225,11 @@ func convertToSchemaField(fieldMap map[string]interface{}) (types.SchemaField, e
 		}
 	}
 
-	return types.SchemaField{
-		Name:     &name,
-		Type:     &fieldType,
+	return IcebergSchemaField{
+		ID:       id,
+		Name:     name,
 		Required: required,
+		Type:     fieldType,
 	}, nil
 }
 
@@ -395,9 +408,22 @@ func (e *s3TablesExporter) createTable(ctx context.Context, namespace, tableName
 		return nil, fmt.Errorf("failed to convert schema to Iceberg format: %w", err)
 	}
 
+	// 独自のIcebergSchemaをAWS SDKのtypes.IcebergSchemaに変換
+	// 注: AWS SDKのtypes.SchemaFieldはType *stringのため、複合型はJSON文字列として表現
+	awsSchemaFields := make([]types.SchemaField, 0, len(icebergSchema.Fields))
+	for _, field := range icebergSchema.Fields {
+		awsField, err := convertIcebergSchemaFieldToAWSSchemaField(field)
+		if err != nil {
+			return nil, fmt.Errorf("failed to convert field %s: %w", field.Name, err)
+		}
+		awsSchemaFields = append(awsSchemaFields, awsField)
+	}
+
 	// IcebergMetadataを作成
 	icebergMetadata := &types.IcebergMetadata{
-		Schema: icebergSchema,
+		Schema: &types.IcebergSchema{
+			Fields: awsSchemaFields,
+		},
 	}
 
 	// テーブル作成
@@ -438,6 +464,42 @@ func (e *s3TablesExporter) createTable(ctx context.Context, namespace, tableName
 		"warehouse_location", tableInfo.WarehouseLocation)
 
 	return tableInfo, nil
+}
+
+// convertIcebergSchemaFieldToAWSSchemaField converts IcebergSchemaField to AWS SDK types.SchemaField
+// IcebergSchemaFieldをAWS SDKのtypes.SchemaFieldに変換
+//
+// 注: AWS SDKのtypes.SchemaFieldはType *stringのため、複合型はJSON文字列として表現する
+// これは一時的な回避策であり、将来的にはAWS SDKを使用せず、直接APIを呼び出す必要がある
+func convertIcebergSchemaFieldToAWSSchemaField(field IcebergSchemaField) (types.SchemaField, error) {
+	var typeStr string
+
+	if field.IsPrimitiveType() {
+		// プリミティブ型の場合、そのまま文字列として使用
+		primitiveType, _ := field.GetPrimitiveType()
+		typeStr = primitiveType
+	} else if field.IsMapType() {
+		// map型の場合、JSON文字列として表現
+		mapType, _ := field.GetMapType()
+		jsonBytes, err := json.Marshal(mapType)
+		if err != nil {
+			return types.SchemaField{}, fmt.Errorf("failed to marshal map type to JSON: %w", err)
+		}
+		typeStr = string(jsonBytes)
+	} else {
+		// その他の複合型の場合もJSON文字列として表現
+		jsonBytes, err := json.Marshal(field.Type)
+		if err != nil {
+			return types.SchemaField{}, fmt.Errorf("failed to marshal type to JSON: %w", err)
+		}
+		typeStr = string(jsonBytes)
+	}
+
+	return types.SchemaField{
+		Name:     &field.Name,
+		Type:     &typeStr,
+		Required: field.Required,
+	}, nil
 }
 
 // createNamespaceIfNotExists creates a namespace if it doesn't exist

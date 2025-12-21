@@ -310,27 +310,35 @@ func TestConvertToIcebergSchema(t *testing.T) {
 	}
 
 	// 最初のフィールドを検証
-	if *icebergSchema.Fields[0].Name != "timestamp" {
-		t.Errorf("expected field name 'timestamp', got '%s'", *icebergSchema.Fields[0].Name)
+	if icebergSchema.Fields[0].Name != "timestamp" {
+		t.Errorf("expected field name 'timestamp', got '%s'", icebergSchema.Fields[0].Name)
 	}
-	if *icebergSchema.Fields[0].Type != "timestamptz" {
-		t.Errorf("expected field type 'timestamptz', got '%s'", *icebergSchema.Fields[0].Type)
+	primitiveType, err := icebergSchema.Fields[0].GetPrimitiveType()
+	if err != nil {
+		t.Errorf("expected primitive type, got error: %v", err)
+	}
+	if primitiveType != "timestamptz" {
+		t.Errorf("expected field type 'timestamptz', got '%s'", primitiveType)
 	}
 	if !icebergSchema.Fields[0].Required {
 		t.Error("expected field to be required")
 	}
 
 	// 2番目のフィールドを検証
-	if *icebergSchema.Fields[1].Name != "metric_name" {
-		t.Errorf("expected field name 'metric_name', got '%s'", *icebergSchema.Fields[1].Name)
+	if icebergSchema.Fields[1].Name != "metric_name" {
+		t.Errorf("expected field name 'metric_name', got '%s'", icebergSchema.Fields[1].Name)
 	}
-	if *icebergSchema.Fields[1].Type != "string" {
-		t.Errorf("expected field type 'string', got '%s'", *icebergSchema.Fields[1].Type)
+	primitiveType2, err := icebergSchema.Fields[1].GetPrimitiveType()
+	if err != nil {
+		t.Errorf("expected primitive type, got error: %v", err)
+	}
+	if primitiveType2 != "string" {
+		t.Errorf("expected field type 'string', got '%s'", primitiveType2)
 	}
 }
 
 // TestConvertToIcebergSchema_WithMapType tests schema conversion with map type
-// Requirements: 2.3
+// Requirements: 3.1, 3.2, 3.3, 3.4
 func TestConvertToIcebergSchema_WithMapType(t *testing.T) {
 	schema := map[string]interface{}{
 		"type": "struct",
@@ -340,9 +348,12 @@ func TestConvertToIcebergSchema_WithMapType(t *testing.T) {
 				"name":     "attributes",
 				"required": false,
 				"type": map[string]interface{}{
-					"type":  "map",
-					"key":   "string",
-					"value": "string",
+					"type":           "map",
+					"key-id":         2,
+					"key":            "string",
+					"value-id":       3,
+					"value":          "string",
+					"value-required": false,
 				},
 			},
 		},
@@ -358,12 +369,18 @@ func TestConvertToIcebergSchema_WithMapType(t *testing.T) {
 	}
 
 	// マップ型のフィールドを検証
-	if *icebergSchema.Fields[0].Name != "attributes" {
-		t.Errorf("expected field name 'attributes', got '%s'", *icebergSchema.Fields[0].Name)
+	if icebergSchema.Fields[0].Name != "attributes" {
+		t.Errorf("expected field name 'attributes', got '%s'", icebergSchema.Fields[0].Name)
 	}
-	expectedType := "map<string, string>"
-	if *icebergSchema.Fields[0].Type != expectedType {
-		t.Errorf("expected field type '%s', got '%s'", expectedType, *icebergSchema.Fields[0].Type)
+	if !icebergSchema.Fields[0].IsMapType() {
+		t.Error("expected field to be map type")
+	}
+	mapType, err := icebergSchema.Fields[0].GetMapType()
+	if err != nil {
+		t.Errorf("failed to get map type: %v", err)
+	}
+	if mapType["type"] != "map" {
+		t.Errorf("expected map type 'map', got '%v'", mapType["type"])
 	}
 	if icebergSchema.Fields[0].Required {
 		t.Error("expected field to not be required")
@@ -389,23 +406,26 @@ func TestConvertToIcebergSchema_MissingFields(t *testing.T) {
 }
 
 // TestConvertToSchemaField tests field conversion
-// Requirements: 2.3
+// Requirements: 3.1, 3.2, 3.3, 3.4
 func TestConvertToSchemaField(t *testing.T) {
 	tests := []struct {
 		name         string
 		fieldMap     map[string]interface{}
+		expectedID   int
 		expectedName string
-		expectedType string
+		expectedType interface{}
 		expectedReq  bool
 		expectError  bool
 	}{
 		{
 			name: "simple string field",
 			fieldMap: map[string]interface{}{
+				"id":       1,
 				"name":     "test_field",
 				"type":     "string",
 				"required": true,
 			},
+			expectedID:   1,
 			expectedName: "test_field",
 			expectedType: "string",
 			expectedReq:  true,
@@ -414,18 +434,58 @@ func TestConvertToSchemaField(t *testing.T) {
 		{
 			name: "optional field",
 			fieldMap: map[string]interface{}{
+				"id":       2,
 				"name":     "optional_field",
 				"type":     "double",
 				"required": false,
 			},
+			expectedID:   2,
 			expectedName: "optional_field",
 			expectedType: "double",
 			expectedReq:  false,
 			expectError:  false,
 		},
 		{
+			name: "map type field",
+			fieldMap: map[string]interface{}{
+				"id":   3,
+				"name": "attributes",
+				"type": map[string]interface{}{
+					"type":           "map",
+					"key-id":         4,
+					"key":            "string",
+					"value-id":       5,
+					"value":          "string",
+					"value-required": false,
+				},
+				"required": false,
+			},
+			expectedID:   3,
+			expectedName: "attributes",
+			expectedType: map[string]interface{}{
+				"type":           "map",
+				"key-id":         float64(4), // JSONでは数値はfloat64になる
+				"key":            "string",
+				"value-id":       float64(5),
+				"value":          "string",
+				"value-required": false,
+			},
+			expectedReq: false,
+			expectError: false,
+		},
+		{
+			name: "missing id",
+			fieldMap: map[string]interface{}{
+				"name":     "test_field",
+				"type":     "string",
+				"required": true,
+			},
+			expectError: true,
+		},
+		{
 			name: "missing name",
 			fieldMap: map[string]interface{}{
+				"id":       1,
 				"type":     "string",
 				"required": true,
 			},
@@ -434,7 +494,18 @@ func TestConvertToSchemaField(t *testing.T) {
 		{
 			name: "missing type",
 			fieldMap: map[string]interface{}{
+				"id":       1,
 				"name":     "test_field",
+				"required": true,
+			},
+			expectError: true,
+		},
+		{
+			name: "invalid type",
+			fieldMap: map[string]interface{}{
+				"id":       1,
+				"name":     "test_field",
+				"type":     123, // 数値は無効
 				"required": true,
 			},
 			expectError: true,
@@ -456,21 +527,74 @@ func TestConvertToSchemaField(t *testing.T) {
 				return
 			}
 
-			if *field.Name != tt.expectedName {
-				t.Errorf("expected name '%s', got '%s'", tt.expectedName, *field.Name)
+			if field.ID != tt.expectedID {
+				t.Errorf("expected id %d, got %d", tt.expectedID, field.ID)
 			}
-			if *field.Type != tt.expectedType {
-				t.Errorf("expected type '%s', got '%s'", tt.expectedType, *field.Type)
+			if field.Name != tt.expectedName {
+				t.Errorf("expected name '%s', got '%s'", tt.expectedName, field.Name)
 			}
 			if field.Required != tt.expectedReq {
 				t.Errorf("expected required %v, got %v", tt.expectedReq, field.Required)
+			}
+
+			// 型のチェック
+			switch expectedType := tt.expectedType.(type) {
+			case string:
+				// プリミティブ型の場合
+				if !field.IsPrimitiveType() {
+					t.Errorf("expected primitive type, got %T", field.Type)
+					return
+				}
+				primitiveType, err := field.GetPrimitiveType()
+				if err != nil {
+					t.Errorf("failed to get primitive type: %v", err)
+					return
+				}
+				if primitiveType != expectedType {
+					t.Errorf("expected type '%s', got '%s'", expectedType, primitiveType)
+				}
+			case map[string]interface{}:
+				// 複合型の場合
+				if !field.IsMapType() {
+					t.Errorf("expected map type, got %T", field.Type)
+					return
+				}
+				mapType, err := field.GetMapType()
+				if err != nil {
+					t.Errorf("failed to get map type: %v", err)
+					return
+				}
+				// マップの各フィールドを比較
+				for key, expectedValue := range expectedType {
+					actualValue, ok := mapType[key]
+					if !ok {
+						t.Errorf("map type missing key '%s'", key)
+						continue
+					}
+					// 数値の比較（JSONでは数値はfloat64になる）
+					if expectedFloat, ok := expectedValue.(float64); ok {
+						if actualFloat, ok := actualValue.(float64); ok {
+							if actualFloat != expectedFloat {
+								t.Errorf("map type key '%s': expected %v, got %v", key, expectedFloat, actualFloat)
+							}
+						} else if actualInt, ok := actualValue.(int); ok {
+							if float64(actualInt) != expectedFloat {
+								t.Errorf("map type key '%s': expected %v, got %v", key, expectedFloat, actualInt)
+							}
+						} else {
+							t.Errorf("map type key '%s': expected float64, got %T", key, actualValue)
+						}
+					} else if actualValue != expectedValue {
+						t.Errorf("map type key '%s': expected %v, got %v", key, expectedValue, actualValue)
+					}
+				}
 			}
 		})
 	}
 }
 
 // TestConvertToIcebergSchema_WithMetricsSchema tests conversion of metrics schema
-// Requirements: 2.3
+// Requirements: 3.1, 3.2, 3.3, 3.4
 func TestConvertToIcebergSchema_WithMetricsSchema(t *testing.T) {
 	schema := createMetricsSchema()
 
@@ -490,7 +614,7 @@ func TestConvertToIcebergSchema_WithMetricsSchema(t *testing.T) {
 	for _, requiredField := range requiredFields {
 		found := false
 		for _, field := range icebergSchema.Fields {
-			if *field.Name == requiredField {
+			if field.Name == requiredField {
 				found = true
 				if !field.Required {
 					t.Errorf("field '%s' should be required", requiredField)
@@ -505,7 +629,7 @@ func TestConvertToIcebergSchema_WithMetricsSchema(t *testing.T) {
 }
 
 // TestConvertToIcebergSchema_WithTracesSchema tests conversion of traces schema
-// Requirements: 2.3
+// Requirements: 3.1, 3.2, 3.3, 3.4
 func TestConvertToIcebergSchema_WithTracesSchema(t *testing.T) {
 	schema := createTracesSchema()
 
@@ -522,7 +646,7 @@ func TestConvertToIcebergSchema_WithTracesSchema(t *testing.T) {
 }
 
 // TestConvertToIcebergSchema_WithLogsSchema tests conversion of logs schema
-// Requirements: 2.3
+// Requirements: 3.1, 3.2, 3.3, 3.4
 func TestConvertToIcebergSchema_WithLogsSchema(t *testing.T) {
 	schema := createLogsSchema()
 
