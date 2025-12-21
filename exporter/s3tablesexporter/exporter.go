@@ -408,21 +408,62 @@ func (e *s3TablesExporter) createTable(ctx context.Context, namespace, tableName
 		return nil, fmt.Errorf("failed to convert schema to Iceberg format: %w", err)
 	}
 
-	// 独自のIcebergSchemaをAWS SDKのtypes.IcebergSchemaに変換
-	// 注: AWS SDKのtypes.SchemaFieldはType *stringのため、複合型はJSON文字列として表現
-	awsSchemaFields := make([]types.SchemaField, 0, len(icebergSchema.Fields))
-	for _, field := range icebergSchema.Fields {
-		awsField, err := convertIcebergSchemaFieldToAWSSchemaField(field)
-		if err != nil {
-			return nil, fmt.Errorf("failed to convert field %s: %w", field.Name, err)
-		}
-		awsSchemaFields = append(awsSchemaFields, awsField)
+	// 独自のIcebergMetadataを作成
+	metadata := createInitialIcebergMetadata(icebergSchema)
+
+	// JSONにシリアライズ
+	metadataJSON, err := json.Marshal(metadata)
+	if err != nil {
+		e.logger.Error("Failed to marshal metadata to JSON",
+			"namespace", namespace,
+			"table", tableName,
+			"error", err)
+		return nil, fmt.Errorf("failed to marshal metadata to JSON: %w", err)
 	}
 
-	// IcebergMetadataを作成
-	icebergMetadata := &types.IcebergMetadata{
+	// デバッグログ: メタデータの内容を出力
+	e.logger.Debug("Serialized Iceberg metadata",
+		"namespace", namespace,
+		"table", tableName,
+		"metadata_json", string(metadataJSON))
+
+	// JSON文字列としてメタデータを送信
+	// 注: AWS SDKのtypes.IcebergMetadataはSchemaフィールドのみをサポート
+	// 完全なIcebergメタデータを送信するには、独自のスキーマをAWS SDKの形式に変換
+	awsSchemaFields := make([]types.SchemaField, 0, len(icebergSchema.Fields))
+	for _, field := range icebergSchema.Fields {
+		var typeStr string
+		if field.IsPrimitiveType() {
+			primitiveType, _ := field.GetPrimitiveType()
+			typeStr = primitiveType
+		} else {
+			// 複合型の場合、JSON文字列として表現
+			jsonBytes, err := json.Marshal(field.Type)
+			if err != nil {
+				e.logger.Error("Failed to marshal field type to JSON",
+					"namespace", namespace,
+					"table", tableName,
+					"field", field.Name,
+					"error", err)
+				return nil, fmt.Errorf("failed to marshal field type to JSON: %w", err)
+			}
+			typeStr = string(jsonBytes)
+		}
+		awsSchemaFields = append(awsSchemaFields, types.SchemaField{
+			Name:     &field.Name,
+			Type:     &typeStr,
+			Required: field.Required,
+		})
+	}
+
+	// AWS SDKのIcebergMetadataを作成
+	awsMetadata := types.IcebergMetadata{
 		Schema: &types.IcebergSchema{
 			Fields: awsSchemaFields,
+		},
+		Properties: map[string]string{
+			// 完全なIcebergメタデータをPropertiesに格納
+			"iceberg.metadata.json": string(metadataJSON),
 		},
 	}
 
@@ -432,11 +473,16 @@ func (e *s3TablesExporter) createTable(ctx context.Context, namespace, tableName
 		Namespace:      &namespace,
 		Name:           &tableName,
 		Format:         types.OpenTableFormatIceberg,
-		Metadata:       &types.TableMetadataMemberIceberg{Value: *icebergMetadata},
+		Metadata:       &types.TableMetadataMemberIceberg{Value: awsMetadata},
 	}
 
 	output, err := e.s3TablesClient.CreateTable(ctx, createInput)
 	if err != nil {
+		e.logger.Error("Failed to create table",
+			"namespace", namespace,
+			"table", tableName,
+			"metadata_json", string(metadataJSON),
+			"error", err)
 		return nil, fmt.Errorf("failed to create table %s.%s: %w", namespace, tableName, err)
 	}
 
