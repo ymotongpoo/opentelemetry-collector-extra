@@ -1224,3 +1224,613 @@ func TestGetLastColumnID(t *testing.T) {
 		})
 	}
 }
+
+// TestIsListType tests IcebergSchemaField.IsListType method
+// IcebergSchemaField.IsListTypeメソッドのテスト
+func TestIsListType(t *testing.T) {
+	tests := []struct {
+		name  string
+		field IcebergSchemaField
+		want  bool
+	}{
+		{
+			name: "list type",
+			field: IcebergSchemaField{
+				ID:       1,
+				Name:     "items",
+				Required: false,
+				Type: map[string]interface{}{
+					"type":             "list",
+					"element-id":       2,
+					"element":          "string",
+					"element-required": false,
+				},
+			},
+			want: true,
+		},
+		{
+			name: "primitive type",
+			field: IcebergSchemaField{
+				ID:       3,
+				Name:     "name",
+				Required: true,
+				Type:     "string",
+			},
+			want: false,
+		},
+		{
+			name: "map type",
+			field: IcebergSchemaField{
+				ID:       4,
+				Name:     "attributes",
+				Required: false,
+				Type: map[string]interface{}{
+					"type":           "map",
+					"key-id":         5,
+					"key":            "string",
+					"value-id":       6,
+					"value":          "string",
+					"value-required": false,
+				},
+			},
+			want: false,
+		},
+		{
+			name: "struct type",
+			field: IcebergSchemaField{
+				ID:       7,
+				Name:     "nested",
+				Required: false,
+				Type: map[string]interface{}{
+					"type": "struct",
+					"fields": []map[string]interface{}{
+						{
+							"id":       8,
+							"name":     "inner",
+							"required": true,
+							"type":     "string",
+						},
+					},
+				},
+			},
+			want: false,
+		},
+		{
+			name: "list without type field",
+			field: IcebergSchemaField{
+				ID:       9,
+				Name:     "invalid",
+				Required: false,
+				Type: map[string]interface{}{
+					"element": "string",
+				},
+			},
+			want: false,
+		},
+		{
+			name: "empty map",
+			field: IcebergSchemaField{
+				ID:       10,
+				Name:     "empty",
+				Required: false,
+				Type:     map[string]interface{}{},
+			},
+			want: false,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got := tt.field.IsListType()
+			if got != tt.want {
+				t.Errorf("IsListType() = %v, want %v", got, tt.want)
+			}
+		})
+	}
+}
+
+// TestIsStructType tests IcebergSchemaField.IsStructType method
+// IcebergSchemaField.IsStructTypeメソッドのテスト
+func TestIsStructType(t *testing.T) {
+	tests := []struct {
+		name  string
+		field IcebergSchemaField
+		want  bool
+	}{
+		{
+			name: "struct type",
+			field: IcebergSchemaField{
+				ID:       1,
+				Name:     "nested",
+				Required: false,
+				Type: map[string]interface{}{
+					"type": "struct",
+					"fields": []map[string]interface{}{
+						{
+							"id":       2,
+							"name":     "inner",
+							"required": true,
+							"type":     "string",
+						},
+					},
+				},
+			},
+			want: true,
+		},
+		{
+			name: "primitive type",
+			field: IcebergSchemaField{
+				ID:       3,
+				Name:     "name",
+				Required: true,
+				Type:     "string",
+			},
+			want: false,
+		},
+		{
+			name: "map type",
+			field: IcebergSchemaField{
+				ID:       4,
+				Name:     "attributes",
+				Required: false,
+				Type: map[string]interface{}{
+					"type":           "map",
+					"key-id":         5,
+					"key":            "string",
+					"value-id":       6,
+					"value":          "string",
+					"value-required": false,
+				},
+			},
+			want: false,
+		},
+		{
+			name: "list type",
+			field: IcebergSchemaField{
+				ID:       7,
+				Name:     "items",
+				Required: false,
+				Type: map[string]interface{}{
+					"type":             "list",
+					"element-id":       8,
+					"element":          "string",
+					"element-required": false,
+				},
+			},
+			want: false,
+		},
+		{
+			name: "struct without type field",
+			field: IcebergSchemaField{
+				ID:       9,
+				Name:     "invalid",
+				Required: false,
+				Type: map[string]interface{}{
+					"fields": []map[string]interface{}{},
+				},
+			},
+			want: false,
+		},
+		{
+			name: "empty map",
+			field: IcebergSchemaField{
+				ID:       10,
+				Name:     "empty",
+				Required: false,
+				Type:     map[string]interface{}{},
+			},
+			want: false,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got := tt.field.IsStructType()
+			if got != tt.want {
+				t.Errorf("IsStructType() = %v, want %v", got, tt.want)
+			}
+		})
+	}
+}
+
+// TestGetListType tests IcebergSchemaField.GetListType method
+// IcebergSchemaField.GetListTypeメソッドのテスト
+func TestGetListType(t *testing.T) {
+	tests := []struct {
+		name    string
+		field   IcebergSchemaField
+		want    map[string]interface{}
+		wantErr bool
+	}{
+		{
+			name: "list type",
+			field: IcebergSchemaField{
+				ID:       1,
+				Name:     "items",
+				Required: false,
+				Type: map[string]interface{}{
+					"type":             "list",
+					"element-id":       2,
+					"element":          "string",
+					"element-required": false,
+				},
+			},
+			want: map[string]interface{}{
+				"type":             "list",
+				"element-id":       2,
+				"element":          "string",
+				"element-required": false,
+			},
+			wantErr: false,
+		},
+		{
+			name: "struct type",
+			field: IcebergSchemaField{
+				ID:       3,
+				Name:     "nested",
+				Required: false,
+				Type: map[string]interface{}{
+					"type": "struct",
+					"fields": []map[string]interface{}{
+						{
+							"id":       4,
+							"name":     "inner",
+							"required": true,
+							"type":     "string",
+						},
+					},
+				},
+			},
+			want: map[string]interface{}{
+				"type": "struct",
+				"fields": []map[string]interface{}{
+					{
+						"id":       4,
+						"name":     "inner",
+						"required": true,
+						"type":     "string",
+					},
+				},
+			},
+			wantErr: false,
+		},
+		{
+			name: "primitive type - string",
+			field: IcebergSchemaField{
+				ID:       5,
+				Name:     "name",
+				Required: true,
+				Type:     "string",
+			},
+			want:    nil,
+			wantErr: true,
+		},
+		{
+			name: "primitive type - long",
+			field: IcebergSchemaField{
+				ID:       6,
+				Name:     "timestamp",
+				Required: true,
+				Type:     "long",
+			},
+			want:    nil,
+			wantErr: true,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got, err := tt.field.GetListType()
+			if (err != nil) != tt.wantErr {
+				t.Errorf("GetListType() error = %v, wantErr %v", err, tt.wantErr)
+				return
+			}
+			if tt.wantErr {
+				if got != nil {
+					t.Errorf("GetListType() = %v, want nil", got)
+				}
+				return
+			}
+
+			// マップの内容を検証
+			if len(got) != len(tt.want) {
+				t.Errorf("GetListType() map length = %v, want %v", len(got), len(tt.want))
+			}
+			for key, wantValue := range tt.want {
+				gotValue, ok := got[key]
+				if !ok {
+					t.Errorf("GetListType() missing key %v", key)
+					continue
+				}
+				// 複雑な型（スライス等）は深い比較をスキップ
+				if key == "fields" {
+					continue
+				}
+				if gotValue != wantValue {
+					t.Errorf("GetListType()[%v] = %v, want %v", key, gotValue, wantValue)
+				}
+			}
+		})
+	}
+}
+
+// TestGetStructType tests IcebergSchemaField.GetStructType method
+// IcebergSchemaField.GetStructTypeメソッドのテスト
+func TestGetStructType(t *testing.T) {
+	tests := []struct {
+		name    string
+		field   IcebergSchemaField
+		want    map[string]interface{}
+		wantErr bool
+	}{
+		{
+			name: "struct type",
+			field: IcebergSchemaField{
+				ID:       1,
+				Name:     "nested",
+				Required: false,
+				Type: map[string]interface{}{
+					"type": "struct",
+					"fields": []map[string]interface{}{
+						{
+							"id":       2,
+							"name":     "inner",
+							"required": true,
+							"type":     "string",
+						},
+					},
+				},
+			},
+			want: map[string]interface{}{
+				"type": "struct",
+				"fields": []map[string]interface{}{
+					{
+						"id":       2,
+						"name":     "inner",
+						"required": true,
+						"type":     "string",
+					},
+				},
+			},
+			wantErr: false,
+		},
+		{
+			name: "list type",
+			field: IcebergSchemaField{
+				ID:       3,
+				Name:     "items",
+				Required: false,
+				Type: map[string]interface{}{
+					"type":             "list",
+					"element-id":       4,
+					"element":          "string",
+					"element-required": false,
+				},
+			},
+			want: map[string]interface{}{
+				"type":             "list",
+				"element-id":       4,
+				"element":          "string",
+				"element-required": false,
+			},
+			wantErr: false,
+		},
+		{
+			name: "primitive type - string",
+			field: IcebergSchemaField{
+				ID:       5,
+				Name:     "name",
+				Required: true,
+				Type:     "string",
+			},
+			want:    nil,
+			wantErr: true,
+		},
+		{
+			name: "primitive type - long",
+			field: IcebergSchemaField{
+				ID:       6,
+				Name:     "timestamp",
+				Required: true,
+				Type:     "long",
+			},
+			want:    nil,
+			wantErr: true,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got, err := tt.field.GetStructType()
+			if (err != nil) != tt.wantErr {
+				t.Errorf("GetStructType() error = %v, wantErr %v", err, tt.wantErr)
+				return
+			}
+			if tt.wantErr {
+				if got != nil {
+					t.Errorf("GetStructType() = %v, want nil", got)
+				}
+				return
+			}
+
+			// マップの内容を検証
+			if len(got) != len(tt.want) {
+				t.Errorf("GetStructType() map length = %v, want %v", len(got), len(tt.want))
+			}
+			for key, wantValue := range tt.want {
+				gotValue, ok := got[key]
+				if !ok {
+					t.Errorf("GetStructType() missing key %v", key)
+					continue
+				}
+				// 複雑な型（スライス等）は深い比較をスキップ
+				if key == "fields" {
+					continue
+				}
+				if gotValue != wantValue {
+					t.Errorf("GetStructType()[%v] = %v, want %v", key, gotValue, wantValue)
+				}
+			}
+		})
+	}
+}
+
+// TestGetTypeSerializer tests IcebergSchemaField.GetTypeSerializer method
+// IcebergSchemaField.GetTypeSerializerメソッドのテスト
+func TestGetTypeSerializer(t *testing.T) {
+	tests := []struct {
+		name    string
+		field   IcebergSchemaField
+		wantErr bool
+	}{
+		{
+			name: "primitive type - string",
+			field: IcebergSchemaField{
+				ID:       1,
+				Name:     "name",
+				Required: true,
+				Type:     "string",
+			},
+			wantErr: false,
+		},
+		{
+			name: "primitive type - long",
+			field: IcebergSchemaField{
+				ID:       2,
+				Name:     "timestamp",
+				Required: true,
+				Type:     "long",
+			},
+			wantErr: false,
+		},
+		{
+			name: "map type",
+			field: IcebergSchemaField{
+				ID:       3,
+				Name:     "attributes",
+				Required: false,
+				Type: map[string]interface{}{
+					"type":           "map",
+					"key-id":         4,
+					"key":            "string",
+					"value-id":       5,
+					"value":          "string",
+					"value-required": false,
+				},
+			},
+			wantErr: false,
+		},
+		{
+			name: "list type",
+			field: IcebergSchemaField{
+				ID:       6,
+				Name:     "items",
+				Required: false,
+				Type: map[string]interface{}{
+					"type":             "list",
+					"element-id":       7,
+					"element":          "string",
+					"element-required": false,
+				},
+			},
+			wantErr: false,
+		},
+		{
+			name: "struct type",
+			field: IcebergSchemaField{
+				ID:       8,
+				Name:     "nested",
+				Required: false,
+				Type: map[string]interface{}{
+					"type": "struct",
+					"fields": []map[string]interface{}{
+						{
+							"id":       9,
+							"name":     "inner",
+							"required": true,
+							"type":     "string",
+						},
+					},
+				},
+			},
+			wantErr: false,
+		},
+		{
+			name: "nil type",
+			field: IcebergSchemaField{
+				ID:       10,
+				Name:     "invalid",
+				Required: false,
+				Type:     nil,
+			},
+			wantErr: true,
+		},
+		{
+			name: "invalid type - integer",
+			field: IcebergSchemaField{
+				ID:       11,
+				Name:     "invalid",
+				Required: false,
+				Type:     123,
+			},
+			wantErr: true,
+		},
+		{
+			name: "map type with invalid key-id",
+			field: IcebergSchemaField{
+				ID:       12,
+				Name:     "invalid_map",
+				Required: false,
+				Type: map[string]interface{}{
+					"type":           "map",
+					"key-id":         "invalid",
+					"key":            "string",
+					"value-id":       13,
+					"value":          "string",
+					"value-required": false,
+				},
+			},
+			wantErr: true,
+		},
+		{
+			name: "list type with invalid element-id",
+			field: IcebergSchemaField{
+				ID:       14,
+				Name:     "invalid_list",
+				Required: false,
+				Type: map[string]interface{}{
+					"type":             "list",
+					"element-id":       "invalid",
+					"element":          "string",
+					"element-required": false,
+				},
+			},
+			wantErr: true,
+		},
+		{
+			name: "struct type without fields",
+			field: IcebergSchemaField{
+				ID:       15,
+				Name:     "invalid_struct",
+				Required: false,
+				Type: map[string]interface{}{
+					"type": "struct",
+				},
+			},
+			wantErr: true,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			serializer, err := tt.field.GetTypeSerializer()
+			if (err != nil) != tt.wantErr {
+				t.Errorf("GetTypeSerializer() error = %v, wantErr %v", err, tt.wantErr)
+				return
+			}
+			if !tt.wantErr && serializer == nil {
+				t.Error("GetTypeSerializer() returned nil serializer without error")
+			}
+		})
+	}
+}
