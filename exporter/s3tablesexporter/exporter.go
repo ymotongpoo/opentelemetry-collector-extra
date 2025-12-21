@@ -512,41 +512,7 @@ func (e *s3TablesExporter) createTable(ctx context.Context, namespace, tableName
 	return tableInfo, nil
 }
 
-// convertIcebergSchemaFieldToAWSSchemaField converts IcebergSchemaField to AWS SDK types.SchemaField
-// IcebergSchemaFieldをAWS SDKのtypes.SchemaFieldに変換
-//
-// 注: AWS SDKのtypes.SchemaFieldはType *stringのため、複合型はJSON文字列として表現する
-// これは一時的な回避策であり、将来的にはAWS SDKを使用せず、直接APIを呼び出す必要がある
-func convertIcebergSchemaFieldToAWSSchemaField(field IcebergSchemaField) (types.SchemaField, error) {
-	var typeStr string
 
-	if field.IsPrimitiveType() {
-		// プリミティブ型の場合、そのまま文字列として使用
-		primitiveType, _ := field.GetPrimitiveType()
-		typeStr = primitiveType
-	} else if field.IsMapType() {
-		// map型の場合、JSON文字列として表現
-		mapType, _ := field.GetMapType()
-		jsonBytes, err := json.Marshal(mapType)
-		if err != nil {
-			return types.SchemaField{}, fmt.Errorf("failed to marshal map type to JSON: %w", err)
-		}
-		typeStr = string(jsonBytes)
-	} else {
-		// その他の複合型の場合もJSON文字列として表現
-		jsonBytes, err := json.Marshal(field.Type)
-		if err != nil {
-			return types.SchemaField{}, fmt.Errorf("failed to marshal type to JSON: %w", err)
-		}
-		typeStr = string(jsonBytes)
-	}
-
-	return types.SchemaField{
-		Name:     &field.Name,
-		Type:     &typeStr,
-		Required: field.Required,
-	}, nil
-}
 
 // createNamespaceIfNotExists creates a namespace if it doesn't exist
 // Namespaceが存在しない場合は作成する
