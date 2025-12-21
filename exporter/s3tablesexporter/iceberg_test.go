@@ -842,3 +842,385 @@ func TestGetMapType(t *testing.T) {
 		})
 	}
 }
+
+// TestCreateInitialIcebergMetadata tests createInitialIcebergMetadata function
+// createInitialIcebergMetadata関数のテスト
+// Requirements: 1.2, 2.1
+func TestCreateInitialIcebergMetadata(t *testing.T) {
+	tests := []struct {
+		name   string
+		schema *IcebergSchema
+	}{
+		{
+			name: "primitive types only",
+			schema: &IcebergSchema{
+				SchemaID: 0,
+				Fields: []IcebergSchemaField{
+					{
+						ID:       1,
+						Name:     "timestamp",
+						Required: true,
+						Type:     "timestamptz",
+					},
+					{
+						ID:       2,
+						Name:     "name",
+						Required: true,
+						Type:     "string",
+					},
+					{
+						ID:       3,
+						Name:     "value",
+						Required: false,
+						Type:     "double",
+					},
+				},
+			},
+		},
+		{
+			name: "with map type",
+			schema: &IcebergSchema{
+				SchemaID: 0,
+				Fields: []IcebergSchemaField{
+					{
+						ID:       1,
+						Name:     "timestamp",
+						Required: true,
+						Type:     "timestamptz",
+					},
+					{
+						ID:       2,
+						Name:     "attributes",
+						Required: false,
+						Type: map[string]interface{}{
+							"type":           "map",
+							"key-id":         3,
+							"key":            "string",
+							"value-id":       4,
+							"value":          "string",
+							"value-required": false,
+						},
+					},
+				},
+			},
+		},
+		{
+			name: "empty schema",
+			schema: &IcebergSchema{
+				SchemaID: 0,
+				Fields:   []IcebergSchemaField{},
+			},
+		},
+		{
+			name: "multiple map types",
+			schema: &IcebergSchema{
+				SchemaID: 0,
+				Fields: []IcebergSchemaField{
+					{
+						ID:       1,
+						Name:     "timestamp",
+						Required: true,
+						Type:     "timestamptz",
+					},
+					{
+						ID:       2,
+						Name:     "resource_attributes",
+						Required: false,
+						Type: map[string]interface{}{
+							"type":           "map",
+							"key-id":         3,
+							"key":            "string",
+							"value-id":       4,
+							"value":          "string",
+							"value-required": false,
+						},
+					},
+					{
+						ID:       5,
+						Name:     "attributes",
+						Required: false,
+						Type: map[string]interface{}{
+							"type":           "map",
+							"key-id":         6,
+							"key":            "string",
+							"value-id":       7,
+							"value":          "string",
+							"value-required": false,
+						},
+					},
+				},
+			},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			metadata := createInitialIcebergMetadata(tt.schema)
+
+			// 基本フィールドの検証
+			if metadata.FormatVersion != 2 {
+				t.Errorf("FormatVersion = %d, want 2", metadata.FormatVersion)
+			}
+			if metadata.TableUUID == "" {
+				t.Error("TableUUID should not be empty")
+			}
+			if metadata.Location != "" {
+				t.Errorf("Location = %s, want empty string", metadata.Location)
+			}
+			if metadata.LastSequenceNumber != 0 {
+				t.Errorf("LastSequenceNumber = %d, want 0", metadata.LastSequenceNumber)
+			}
+			if metadata.LastUpdatedMS != 0 {
+				t.Errorf("LastUpdatedMS = %d, want 0", metadata.LastUpdatedMS)
+			}
+			if metadata.CurrentSchemaID != 0 {
+				t.Errorf("CurrentSchemaID = %d, want 0", metadata.CurrentSchemaID)
+			}
+			if metadata.DefaultSpecID != 0 {
+				t.Errorf("DefaultSpecID = %d, want 0", metadata.DefaultSpecID)
+			}
+			if metadata.LastPartitionID != 0 {
+				t.Errorf("LastPartitionID = %d, want 0", metadata.LastPartitionID)
+			}
+			if metadata.CurrentSnapshotID != -1 {
+				t.Errorf("CurrentSnapshotID = %d, want -1", metadata.CurrentSnapshotID)
+			}
+
+			// スキーマの検証
+			if len(metadata.Schemas) != 1 {
+				t.Errorf("Schemas length = %d, want 1", len(metadata.Schemas))
+			}
+			if len(metadata.Schemas) > 0 {
+				if metadata.Schemas[0].SchemaID != tt.schema.SchemaID {
+					t.Errorf("Schema SchemaID = %d, want %d", metadata.Schemas[0].SchemaID, tt.schema.SchemaID)
+				}
+				if len(metadata.Schemas[0].Fields) != len(tt.schema.Fields) {
+					t.Errorf("Schema Fields length = %d, want %d", len(metadata.Schemas[0].Fields), len(tt.schema.Fields))
+				}
+			}
+
+			// LastColumnIDの検証
+			expectedLastColumnID := getLastColumnID(tt.schema)
+			if metadata.LastColumnID != expectedLastColumnID {
+				t.Errorf("LastColumnID = %d, want %d", metadata.LastColumnID, expectedLastColumnID)
+			}
+
+			// パーティション仕様の検証
+			if len(metadata.PartitionSpecs) != 1 {
+				t.Errorf("PartitionSpecs length = %d, want 1", len(metadata.PartitionSpecs))
+			}
+			if len(metadata.PartitionSpecs) > 0 {
+				if metadata.PartitionSpecs[0].SpecID != 0 {
+					t.Errorf("PartitionSpec SpecID = %d, want 0", metadata.PartitionSpecs[0].SpecID)
+				}
+				if len(metadata.PartitionSpecs[0].Fields) != 0 {
+					t.Errorf("PartitionSpec Fields length = %d, want 0", len(metadata.PartitionSpecs[0].Fields))
+				}
+			}
+
+			// 空のコレクションの検証
+			if metadata.Properties == nil {
+				t.Error("Properties should not be nil")
+			}
+			if len(metadata.Properties) != 0 {
+				t.Errorf("Properties length = %d, want 0", len(metadata.Properties))
+			}
+			if len(metadata.Snapshots) != 0 {
+				t.Errorf("Snapshots length = %d, want 0", len(metadata.Snapshots))
+			}
+			if len(metadata.SnapshotLog) != 0 {
+				t.Errorf("SnapshotLog length = %d, want 0", len(metadata.SnapshotLog))
+			}
+			if len(metadata.MetadataLog) != 0 {
+				t.Errorf("MetadataLog length = %d, want 0", len(metadata.MetadataLog))
+			}
+		})
+	}
+}
+
+// TestGetLastColumnID tests getLastColumnID function
+// getLastColumnID関数のテスト
+// Requirements: 1.2
+func TestGetLastColumnID(t *testing.T) {
+	tests := []struct {
+		name   string
+		schema *IcebergSchema
+		want   int
+	}{
+		{
+			name: "primitive types only",
+			schema: &IcebergSchema{
+				SchemaID: 0,
+				Fields: []IcebergSchemaField{
+					{
+						ID:       1,
+						Name:     "timestamp",
+						Required: true,
+						Type:     "timestamptz",
+					},
+					{
+						ID:       2,
+						Name:     "name",
+						Required: true,
+						Type:     "string",
+					},
+					{
+						ID:       3,
+						Name:     "value",
+						Required: false,
+						Type:     "double",
+					},
+				},
+			},
+			want: 3,
+		},
+		{
+			name: "with map type - int key-id and value-id",
+			schema: &IcebergSchema{
+				SchemaID: 0,
+				Fields: []IcebergSchemaField{
+					{
+						ID:       1,
+						Name:     "timestamp",
+						Required: true,
+						Type:     "timestamptz",
+					},
+					{
+						ID:       2,
+						Name:     "attributes",
+						Required: false,
+						Type: map[string]interface{}{
+							"type":           "map",
+							"key-id":         3,
+							"key":            "string",
+							"value-id":       4,
+							"value":          "string",
+							"value-required": false,
+						},
+					},
+				},
+			},
+			want: 4,
+		},
+		{
+			name: "with map type - float64 key-id and value-id",
+			schema: &IcebergSchema{
+				SchemaID: 0,
+				Fields: []IcebergSchemaField{
+					{
+						ID:       1,
+						Name:     "timestamp",
+						Required: true,
+						Type:     "timestamptz",
+					},
+					{
+						ID:       2,
+						Name:     "attributes",
+						Required: false,
+						Type: map[string]interface{}{
+							"type":           "map",
+							"key-id":         float64(5),
+							"key":            "string",
+							"value-id":       float64(6),
+							"value":          "string",
+							"value-required": false,
+						},
+					},
+				},
+			},
+			want: 6,
+		},
+		{
+			name: "multiple map types",
+			schema: &IcebergSchema{
+				SchemaID: 0,
+				Fields: []IcebergSchemaField{
+					{
+						ID:       1,
+						Name:     "timestamp",
+						Required: true,
+						Type:     "timestamptz",
+					},
+					{
+						ID:       2,
+						Name:     "resource_attributes",
+						Required: false,
+						Type: map[string]interface{}{
+							"type":           "map",
+							"key-id":         3,
+							"key":            "string",
+							"value-id":       4,
+							"value":          "string",
+							"value-required": false,
+						},
+					},
+					{
+						ID:       5,
+						Name:     "metric_name",
+						Required: true,
+						Type:     "string",
+					},
+					{
+						ID:       8,
+						Name:     "attributes",
+						Required: false,
+						Type: map[string]interface{}{
+							"type":           "map",
+							"key-id":         9,
+							"key":            "string",
+							"value-id":       10,
+							"value":          "string",
+							"value-required": false,
+						},
+					},
+				},
+			},
+			want: 10,
+		},
+		{
+			name: "empty schema",
+			schema: &IcebergSchema{
+				SchemaID: 0,
+				Fields:   []IcebergSchemaField{},
+			},
+			want: 0,
+		},
+		{
+			name: "map with higher IDs than field ID",
+			schema: &IcebergSchema{
+				SchemaID: 0,
+				Fields: []IcebergSchemaField{
+					{
+						ID:       1,
+						Name:     "timestamp",
+						Required: true,
+						Type:     "timestamptz",
+					},
+					{
+						ID:       2,
+						Name:     "attributes",
+						Required: false,
+						Type: map[string]interface{}{
+							"type":           "map",
+							"key-id":         100,
+							"key":            "string",
+							"value-id":       101,
+							"value":          "string",
+							"value-required": false,
+						},
+					},
+				},
+			},
+			want: 101,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got := getLastColumnID(tt.schema)
+			if got != tt.want {
+				t.Errorf("getLastColumnID() = %d, want %d", got, tt.want)
+			}
+		})
+	}
+}
