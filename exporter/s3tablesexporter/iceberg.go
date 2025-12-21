@@ -400,3 +400,142 @@ func uploadMetadata(
 
 	return metadataPath, manifestPath, nil
 }
+
+
+// GetTypeSerializer はフィールドの型に応じて適切なシリアライザーを返す
+func (f *IcebergSchemaField) GetTypeSerializer() (IcebergTypeSerializer, error) {
+	if f.IsPrimitiveType() {
+		// プリミティブ型の場合
+		primitiveType, _ := f.GetPrimitiveType()
+		return NewPrimitiveTypeSerializer(primitiveType), nil
+	}
+
+	if f.IsMapType() {
+		// map型の場合
+		mapType, _ := f.GetMapType()
+
+		// key-idを取得
+		keyID, ok := mapType["key-id"].(int)
+		if !ok {
+			if keyIDFloat, ok := mapType["key-id"].(float64); ok {
+				keyID = int(keyIDFloat)
+			} else {
+				return nil, fmt.Errorf("invalid key-id type: %T", mapType["key-id"])
+			}
+		}
+
+		// keyを取得
+		key := mapType["key"]
+
+		// value-idを取得
+		valueID, ok := mapType["value-id"].(int)
+		if !ok {
+			if valueIDFloat, ok := mapType["value-id"].(float64); ok {
+				valueID = int(valueIDFloat)
+			} else {
+				return nil, fmt.Errorf("invalid value-id type: %T", mapType["value-id"])
+			}
+		}
+
+		// valueを取得
+		value := mapType["value"]
+
+		// value-requiredを取得
+		valueRequired, ok := mapType["value-required"].(bool)
+		if !ok {
+			valueRequired = false
+		}
+
+		return NewMapTypeSerializer(keyID, key, valueID, value, valueRequired), nil
+	}
+
+	if f.IsListType() {
+		// list型の場合
+		listType, _ := f.GetListType()
+
+		// element-idを取得
+		elementID, ok := listType["element-id"].(int)
+		if !ok {
+			if elementIDFloat, ok := listType["element-id"].(float64); ok {
+				elementID = int(elementIDFloat)
+			} else {
+				return nil, fmt.Errorf("invalid element-id type: %T", listType["element-id"])
+			}
+		}
+
+		// elementを取得
+		element := listType["element"]
+
+		// element-requiredを取得
+		elementRequired, ok := listType["element-required"].(bool)
+		if !ok {
+			elementRequired = false
+		}
+
+		return NewListTypeSerializer(elementID, element, elementRequired), nil
+	}
+
+	if f.IsStructType() {
+		// struct型の場合
+		structType, _ := f.GetStructType()
+
+		// fieldsを取得
+		fieldsInterface, ok := structType["fields"]
+		if !ok {
+			return nil, fmt.Errorf("struct type missing 'fields' key")
+		}
+
+		// fieldsを[]IcebergSchemaFieldに変換
+		fieldsSlice, ok := fieldsInterface.([]map[string]interface{})
+		if !ok {
+			return nil, fmt.Errorf("struct 'fields' is not a slice of maps")
+		}
+
+		fields := make([]IcebergSchemaField, 0, len(fieldsSlice))
+		for _, fieldMap := range fieldsSlice {
+			field, err := convertToSchemaField(fieldMap)
+			if err != nil {
+				return nil, fmt.Errorf("failed to convert struct field: %w", err)
+			}
+			fields = append(fields, field)
+		}
+
+		return NewStructTypeSerializer(fields), nil
+	}
+
+	return nil, fmt.Errorf("unsupported type: %T", f.Type)
+}
+
+// IsListType はフィールドの型がlist型かどうかをチェックする
+func (f *IcebergSchemaField) IsListType() bool {
+	if m, ok := f.Type.(map[string]interface{}); ok {
+		typeVal, hasType := m["type"]
+		return hasType && typeVal == "list"
+	}
+	return false
+}
+
+// IsStructType はフィールドの型がstruct型かどうかをチェックする
+func (f *IcebergSchemaField) IsStructType() bool {
+	if m, ok := f.Type.(map[string]interface{}); ok {
+		typeVal, hasType := m["type"]
+		return hasType && typeVal == "struct"
+	}
+	return false
+}
+
+// GetListType はlist型の構造を返す
+func (f *IcebergSchemaField) GetListType() (map[string]interface{}, error) {
+	if m, ok := f.Type.(map[string]interface{}); ok {
+		return m, nil
+	}
+	return nil, fmt.Errorf("type is not a list type")
+}
+
+// GetStructType はstruct型の構造を返す
+func (f *IcebergSchemaField) GetStructType() (map[string]interface{}, error) {
+	if m, ok := f.Type.(map[string]interface{}); ok {
+		return m, nil
+	}
+	return nil, fmt.Errorf("type is not a struct type")
+}
