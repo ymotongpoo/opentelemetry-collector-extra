@@ -16,6 +16,7 @@ package s3tablesexporter
 
 import (
 	"encoding/json"
+	"fmt"
 )
 
 // IcebergSchemaSerializer はIcebergスキーマを様々な形式にシリアライズするための中心的なコンポーネント
@@ -402,4 +403,128 @@ func (s *IcebergSchemaSerializer) SerializeToJSON() (string, error) {
 	}
 
 	return string(jsonBytes), nil
+}
+
+// Deserialize はJSON文字列からIcebergSchemaを復元する
+// シリアライズされたスキーマをデシリアライズし、元のIcebergSchema構造を復元する
+// data: シリアライズされたスキーマのJSONバイト列
+// 返り値: 復元されたIcebergSchema、エラー
+func (s *IcebergSchemaSerializer) Deserialize(data []byte) (*IcebergSchema, error) {
+	// JSONをパース
+	var schemaData map[string]interface{}
+	if err := json.Unmarshal(data, &schemaData); err != nil {
+		return nil, &SerializationError{
+			Operation: "unmarshal JSON to schema",
+			Cause:     err,
+		}
+	}
+
+	// typeフィールドの検証
+	typeVal, ok := schemaData["type"].(string)
+	if !ok || typeVal != "struct" {
+		return nil, &SchemaValidationError{
+			Field:  "type",
+			Reason: "schema type must be 'struct'",
+		}
+	}
+
+	// fieldsフィールドの取得
+	fieldsInterface, ok := schemaData["fields"]
+	if !ok {
+		return nil, &SchemaValidationError{
+			Field:  "fields",
+			Reason: "schema missing 'fields' key",
+		}
+	}
+
+	// fieldsを[]interface{}に変換
+	fieldsSlice, ok := fieldsInterface.([]interface{})
+	if !ok {
+		return nil, &SchemaValidationError{
+			Field:  "fields",
+			Reason: "schema 'fields' is not an array",
+		}
+	}
+
+	// 各フィールドをIcebergSchemaFieldに変換
+	fields := make([]IcebergSchemaField, 0, len(fieldsSlice))
+	for i, fieldInterface := range fieldsSlice {
+		fieldMap, ok := fieldInterface.(map[string]interface{})
+		if !ok {
+			return nil, &SchemaValidationError{
+				Field:  "fields",
+				Reason: fmt.Sprintf("field at index %d is not an object", i),
+			}
+		}
+
+		field, err := convertToSchemaField(fieldMap)
+		if err != nil {
+			return nil, &SerializationError{
+				Operation: fmt.Sprintf("convert field at index %d", i),
+				Cause:     err,
+			}
+		}
+
+		fields = append(fields, field)
+	}
+
+	// IcebergSchemaを構築
+	schema := &IcebergSchema{
+		SchemaID: 0, // デフォルト値
+		Fields:   fields,
+	}
+
+	return schema, nil
+}
+
+// convertToSchemaField はmap[string]interface{}からIcebergSchemaFieldに変換する
+// ヘルパー関数として、デシリアライゼーション時に使用される
+func convertToSchemaField(fieldMap map[string]interface{}) (IcebergSchemaField, error) {
+	// IDの取得
+	var id int
+	if idVal, ok := fieldMap["id"].(float64); ok {
+		id = int(idVal)
+	} else if idVal, ok := fieldMap["id"].(int); ok {
+		id = idVal
+	} else {
+		return IcebergSchemaField{}, fmt.Errorf("field missing or invalid 'id'")
+	}
+
+	// Nameの取得
+	name, ok := fieldMap["name"].(string)
+	if !ok {
+		return IcebergSchemaField{}, fmt.Errorf("field missing or invalid 'name'")
+	}
+
+	// Requiredの取得
+	required, ok := fieldMap["required"].(bool)
+	if !ok {
+		required = false // デフォルト値
+	}
+
+	// Typeの取得
+	typeVal, ok := fieldMap["type"]
+	if !ok {
+		return IcebergSchemaField{}, fmt.Errorf("field missing 'type'")
+	}
+
+	// Typeの処理
+	var fieldType interface{}
+	switch t := typeVal.(type) {
+	case string:
+		// プリミティブ型
+		fieldType = t
+	case map[string]interface{}:
+		// 複雑型（map、list、struct）
+		fieldType = t
+	default:
+		return IcebergSchemaField{}, fmt.Errorf("unsupported type format: %T", typeVal)
+	}
+
+	return IcebergSchemaField{
+		ID:       id,
+		Name:     name,
+		Required: required,
+		Type:     fieldType,
+	}, nil
 }
