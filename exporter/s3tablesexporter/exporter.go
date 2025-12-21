@@ -233,38 +233,7 @@ func convertToSchemaField(fieldMap map[string]interface{}) (IcebergSchemaField, 
 	}, nil
 }
 
-// convertIcebergSchemaFieldToAWSSchemaField converts an IcebergSchemaField to AWS SDK SchemaField
-// IcebergSchemaFieldをAWS SDKのSchemaFieldに変換
-//
-// AWS SDKのSchemaField.Typeは*string型であるため、複合型（map、list、struct）を
-// 適切に表現する必要があります。S3 Tables APIは、Apache Iceberg仕様に準拠した
-// 型表現を期待しています。
-//
-// プリミティブ型の場合: 型名をそのまま文字列として使用（例: "string", "int", "long"）
-// 複合型の場合: JSON形式で表現（例: {"type":"map","key-id":3,"key":"string","value-id":4,"value":"string"}）
-func convertIcebergSchemaFieldToAWSSchemaField(field IcebergSchemaField) (types.SchemaField, error) {
-	var typeStr string
 
-	if field.IsPrimitiveType() {
-		// プリミティブ型の場合、型名をそのまま使用
-		primitiveType, _ := field.GetPrimitiveType()
-		typeStr = primitiveType
-	} else {
-		// 複合型の場合、JSON文字列として表現
-		// S3 Tables APIは、Apache Iceberg仕様に準拠したJSON形式の型定義を受け入れます
-		jsonBytes, err := json.Marshal(field.Type)
-		if err != nil {
-			return types.SchemaField{}, fmt.Errorf("failed to marshal complex type to JSON: %w", err)
-		}
-		typeStr = string(jsonBytes)
-	}
-
-	return types.SchemaField{
-		Name:     &field.Name,
-		Type:     &typeStr,
-		Required: field.Required,
-	}, nil
-}
 
 // extractBucketNameFromArn extracts the bucket name from a Table Bucket ARN
 // Table Bucket ARNからバケット名を抽出
@@ -362,18 +331,38 @@ func (e *s3TablesExporter) getOrCreateTable(ctx context.Context, namespace, tabl
 		return cachedInfo, nil
 	}
 
+	e.logger.Debug("Table not in cache, attempting to retrieve from S3 Tables API",
+		"namespace", namespace,
+		"table", tableName)
+
 	// テーブルの取得を試みる
 	tableInfo, err := e.getTable(ctx, namespace, tableName)
 	if err == nil {
 		// テーブルが存在する場合はキャッシュに保存
+		e.logger.Debug("Table exists, caching information",
+			"namespace", namespace,
+			"table", tableName,
+			"table_arn", tableInfo.TableARN)
 		e.tableCache[cacheKey] = tableInfo
 		return tableInfo, nil
 	}
 
+	e.logger.Debug("Table does not exist, will create new table",
+		"namespace", namespace,
+		"table", tableName,
+		"error", err)
+
 	// テーブルが存在しない場合は、まずNamespaceを作成
+	e.logger.Debug("Ensuring namespace exists",
+		"namespace", namespace)
 	if err := e.createNamespaceIfNotExists(ctx, namespace); err != nil {
 		return nil, fmt.Errorf("failed to create namespace: %w", err)
 	}
+
+	// スキーマシリアライゼーションのステップをデバッグログに記録
+	e.logger.Debug("Starting schema serialization for table creation",
+		"namespace", namespace,
+		"table", tableName)
 
 	// テーブルを作成
 	tableInfo, err = e.createTable(ctx, namespace, tableName, schema)
@@ -383,6 +372,11 @@ func (e *s3TablesExporter) getOrCreateTable(ctx context.Context, namespace, tabl
 
 	// キャッシュに保存
 	e.tableCache[cacheKey] = tableInfo
+
+	e.logger.Debug("Table created and cached",
+		"namespace", namespace,
+		"table", tableName,
+		"table_arn", tableInfo.TableARN)
 
 	return tableInfo, nil
 }
@@ -441,29 +435,80 @@ func (e *s3TablesExporter) createTable(ctx context.Context, namespace, tableName
 		return nil, fmt.Errorf("failed to convert schema to Iceberg format: %w", err)
 	}
 
+	// デバッグログ: スキーマシリアライゼーション開始
+	e.logger.Debug("Starting schema serialization",
+		"namespace", namespace,
+		"table", tableName,
+		"field_count", len(icebergSchema.Fields))
+
+	// AWSSchemaAdapterを使用してスキーマをシリアライズ
+	adapter := NewAWSSchemaAdapter(icebergSchema)
+
+	// スキーマをJSON形式でデバッグログに出力
+	serializer := NewIcebergSchemaSerializer(icebergSchema)
+	schemaJSON, err := serializer.SerializeToJSON()
+	if err != nil {
+		e.logger.Error("Failed to serialize schema to JSON for debugging",
+			"namespace", namespace,
+			"table", tableName,
+			"error", err)
+		// デバッグログの失敗は致命的ではないので続行
+	} else {
+		e.logger.Debug("Serialized Iceberg schema",
+			"namespace", namespace,
+			"table", tableName,
+			"schema_json", schemaJSON)
+	}
+
+	// CustomSchemaFieldsを取得
+	customFields, err := adapter.MarshalSchemaFields()
+	if err != nil {
+		e.logger.Error("Failed to marshal schema fields",
+			"namespace", namespace,
+			"table", tableName,
+			"schema_json", schemaJSON,
+			"error", err)
+		return nil, fmt.Errorf("failed to marshal schema fields: %w", err)
+	}
+
 	// AWS SDKのSchemaFieldに変換
 	// 注: AWS SDKのtypes.IcebergMetadataはSchemaフィールドのみをサポート
 	// S3 Tablesは、スキーマ情報のみを受け取り、その他のメタデータ（snapshots等）は自動的に管理します
-	awsSchemaFields := make([]types.SchemaField, 0, len(icebergSchema.Fields))
-	for _, field := range icebergSchema.Fields {
-		awsField, err := convertIcebergSchemaFieldToAWSSchemaField(field)
-		if err != nil {
-			e.logger.Error("Failed to convert field to AWS schema field",
-				"namespace", namespace,
-				"table", tableName,
-				"field", field.Name,
-				"error", err)
-			return nil, fmt.Errorf("failed to convert field %s: %w", field.Name, err)
+	awsSchemaFields := make([]types.SchemaField, 0, len(customFields))
+	for _, customField := range customFields {
+		// Typeをシリアライズ
+		var typeBytes []byte
+		if typeStr, ok := customField.Type.(string); ok {
+			// プリミティブ型の場合、そのまま文字列として使用
+			typeBytes = []byte(typeStr)
+		} else {
+			// 複雑型の場合、JSON形式にシリアライズ
+			typeBytes, err = json.Marshal(customField.Type)
+			if err != nil {
+				e.logger.Error("Failed to marshal field type",
+					"namespace", namespace,
+					"table", tableName,
+					"field", customField.Name,
+					"error", err)
+				return nil, fmt.Errorf("failed to marshal field %s type: %w", customField.Name, err)
+			}
+		}
+		typeStr := string(typeBytes)
+
+		awsField := types.SchemaField{
+			Name:     &customField.Name,
+			Type:     &typeStr,
+			Required: customField.Required,
 		}
 		awsSchemaFields = append(awsSchemaFields, awsField)
 	}
 
-	// デバッグログ: スキーマの内容を出力
-	schemaJSON, _ := json.Marshal(awsSchemaFields)
+	// デバッグログ: 変換されたAWS SDK形式のスキーマ
+	awsSchemaJSON, _ := json.MarshalIndent(awsSchemaFields, "", "  ")
 	e.logger.Debug("Converted Iceberg schema to AWS SDK format",
 		"namespace", namespace,
 		"table", tableName,
-		"schema_json", string(schemaJSON))
+		"aws_schema_json", string(awsSchemaJSON))
 
 	// AWS SDKのIcebergMetadataを作成
 	// S3 Tables APIはスキーマのみを受け取り、その他のメタデータは自動的に管理されます
@@ -487,7 +532,8 @@ func (e *s3TablesExporter) createTable(ctx context.Context, namespace, tableName
 		e.logger.Error("Failed to create table",
 			"namespace", namespace,
 			"table", tableName,
-			"schema_json", string(schemaJSON),
+			"schema_json", schemaJSON,
+			"aws_schema_json", string(awsSchemaJSON),
 			"error", err)
 		return nil, fmt.Errorf("failed to create table %s.%s: %w", namespace, tableName, err)
 	}
