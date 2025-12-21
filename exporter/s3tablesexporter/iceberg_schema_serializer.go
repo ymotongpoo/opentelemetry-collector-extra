@@ -71,7 +71,7 @@ func (s *IcebergSchemaSerializer) Validate() error {
 		if existingField, exists := idSet[field.ID]; exists {
 			return &SchemaValidationError{
 				Field:  field.Name,
-				Reason: "duplicate field ID " + string(rune(field.ID)) + " (already used by field " + existingField + ")",
+				Reason: fmt.Sprintf("duplicate field ID %d (already used by field %s)", field.ID, existingField),
 			}
 		}
 		idSet[field.ID] = field.Name
@@ -132,7 +132,7 @@ func (s *IcebergSchemaSerializer) validateMapType(field *IcebergSchemaField, idS
 	if existingField, exists := idSet[keyID]; exists {
 		return &SchemaValidationError{
 			Field:  field.Name,
-			Reason: "duplicate key-id " + string(rune(keyID)) + " (already used by field " + existingField + ")",
+			Reason: fmt.Sprintf("duplicate key-id %d (already used by field %s)", keyID, existingField),
 		}
 	}
 	idSet[keyID] = field.Name + ".key"
@@ -161,7 +161,7 @@ func (s *IcebergSchemaSerializer) validateMapType(field *IcebergSchemaField, idS
 	if existingField, exists := idSet[valueID]; exists {
 		return &SchemaValidationError{
 			Field:  field.Name,
-			Reason: "duplicate value-id " + string(rune(valueID)) + " (already used by field " + existingField + ")",
+			Reason: fmt.Sprintf("duplicate value-id %d (already used by field %s)", valueID, existingField),
 		}
 	}
 	idSet[valueID] = field.Name + ".value"
@@ -218,7 +218,7 @@ func (s *IcebergSchemaSerializer) validateListType(field *IcebergSchemaField, id
 	if existingField, exists := idSet[elementID]; exists {
 		return &SchemaValidationError{
 			Field:  field.Name,
-			Reason: "duplicate element-id " + string(rune(elementID)) + " (already used by field " + existingField + ")",
+			Reason: fmt.Sprintf("duplicate element-id %d (already used by field %s)", elementID, existingField),
 		}
 	}
 	idSet[elementID] = field.Name + ".element"
@@ -288,7 +288,7 @@ func (s *IcebergSchemaSerializer) validateStructType(field *IcebergSchemaField, 
 		if existingField, exists := idSet[nestedID]; exists {
 			return &SchemaValidationError{
 				Field:  field.Name,
-				Reason: "duplicate nested field ID " + string(rune(nestedID)) + " (already used by field " + existingField + ")",
+				Reason: fmt.Sprintf("duplicate nested field ID %d (already used by field %s)", nestedID, existingField),
 			}
 		}
 
