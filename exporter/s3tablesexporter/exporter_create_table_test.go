@@ -126,36 +126,32 @@ func TestCreateTable_PrimitiveTypes(t *testing.T) {
 		t.Errorf("expected 3 fields in Schema, got %d", len(capturedMetadata.Schema.Fields))
 	}
 
-	// Propertiesフィールドに完全なメタデータが格納されていることを確認
-	if capturedMetadata.Properties == nil {
-		t.Fatal("Properties is nil")
-	}
-	metadataJSON, ok := capturedMetadata.Properties["iceberg.metadata.json"]
-	if !ok {
-		t.Fatal("iceberg.metadata.json not found in Properties")
-	}
-
-	// JSON文字列をパース
-	var metadata IcebergMetadata
-	if err := json.Unmarshal([]byte(metadataJSON), &metadata); err != nil {
-		t.Fatalf("failed to parse metadata JSON: %v", err)
-	}
-
-	// メタデータの内容を検証
-	if metadata.FormatVersion != 2 {
-		t.Errorf("expected FormatVersion 2, got %d", metadata.FormatVersion)
-	}
-	if len(metadata.Schemas) != 1 {
-		t.Errorf("expected 1 schema, got %d", len(metadata.Schemas))
-	}
-	if len(metadata.Schemas[0].Fields) != 3 {
-		t.Errorf("expected 3 fields, got %d", len(metadata.Schemas[0].Fields))
-	}
-
 	// フィールドの型を検証
-	for _, field := range metadata.Schemas[0].Fields {
-		if !field.IsPrimitiveType() {
-			t.Errorf("field %s should be primitive type", field.Name)
+	for _, field := range capturedMetadata.Schema.Fields {
+		if field.Name == nil || field.Type == nil {
+			t.Error("field Name or Type is nil")
+		}
+	}
+
+	// プリミティブ型のフィールドを検証
+	// AWS SDKのSchemaFieldは*string型のTypeフィールドを持つ
+	// プリミティブ型の場合、型名がそのまま文字列として格納される
+	expectedTypes := map[string]string{
+		"timestamp":    "timestamptz",
+		"service_name": "string",
+		"value":        "double",
+	}
+	for _, field := range capturedMetadata.Schema.Fields {
+		if field.Name == nil || field.Type == nil {
+			continue
+		}
+		expectedType, ok := expectedTypes[*field.Name]
+		if !ok {
+			t.Errorf("unexpected field name: %s", *field.Name)
+			continue
+		}
+		if *field.Type != expectedType {
+			t.Errorf("field %s: expected type %s, got %s", *field.Name, expectedType, *field.Type)
 		}
 	}
 }
@@ -251,34 +247,16 @@ func TestCreateTable_ComplexTypes(t *testing.T) {
 		t.Fatal("Schema is nil")
 	}
 
-	// Propertiesフィールドに完全なメタデータが格納されていることを確認
-	if capturedMetadata.Properties == nil {
-		t.Fatal("Properties is nil")
-	}
-	metadataJSON, ok := capturedMetadata.Properties["iceberg.metadata.json"]
-	if !ok {
-		t.Fatal("iceberg.metadata.json not found in Properties")
-	}
-
-	// JSON文字列をパース
-	var metadata IcebergMetadata
-	if err := json.Unmarshal([]byte(metadataJSON), &metadata); err != nil {
-		t.Fatalf("failed to parse metadata JSON: %v", err)
-	}
-
-	// メタデータの内容を検証
-	if len(metadata.Schemas) != 1 {
-		t.Errorf("expected 1 schema, got %d", len(metadata.Schemas))
-	}
-	if len(metadata.Schemas[0].Fields) != 2 {
-		t.Errorf("expected 2 fields, got %d", len(metadata.Schemas[0].Fields))
+	// フィールド数を検証
+	if len(capturedMetadata.Schema.Fields) != 2 {
+		t.Errorf("expected 2 fields in Schema, got %d", len(capturedMetadata.Schema.Fields))
 	}
 
 	// map型のフィールドを検証
-	var mapField *IcebergSchemaField
-	for i := range metadata.Schemas[0].Fields {
-		if metadata.Schemas[0].Fields[i].Name == "resource_attributes" {
-			mapField = &metadata.Schemas[0].Fields[i]
+	var mapField *types.SchemaField
+	for i := range capturedMetadata.Schema.Fields {
+		if capturedMetadata.Schema.Fields[i].Name != nil && *capturedMetadata.Schema.Fields[i].Name == "resource_attributes" {
+			mapField = &capturedMetadata.Schema.Fields[i]
 			break
 		}
 	}
@@ -286,18 +264,18 @@ func TestCreateTable_ComplexTypes(t *testing.T) {
 		t.Fatal("map field not found")
 	}
 
-	// map型であることを確認
-	if !mapField.IsMapType() {
-		t.Error("field should be map type")
+	// map型がJSON文字列として格納されていることを確認
+	if mapField.Type == nil {
+		t.Fatal("map field Type is nil")
+	}
+
+	// JSON文字列をパース
+	var mapType map[string]interface{}
+	if err := json.Unmarshal([]byte(*mapField.Type), &mapType); err != nil {
+		t.Fatalf("failed to parse map type JSON: %v", err)
 	}
 
 	// map型の内容を検証
-	mapType, err := mapField.GetMapType()
-	if err != nil {
-		t.Fatalf("failed to get map type: %v", err)
-	}
-
-	// map型がネストされたJSONオブジェクトとして保持されていることを確認
 	if mapType["type"] != "map" {
 		t.Errorf("expected type 'map', got %v", mapType["type"])
 	}
@@ -306,6 +284,14 @@ func TestCreateTable_ComplexTypes(t *testing.T) {
 	}
 	if mapType["value"] != "string" {
 		t.Errorf("expected value type 'string', got %v", mapType["value"])
+	}
+
+	// key-idとvalue-idが含まれていることを確認
+	if _, ok := mapType["key-id"]; !ok {
+		t.Error("key-id not found in map type")
+	}
+	if _, ok := mapType["value-id"]; !ok {
+		t.Error("value-id not found in map type")
 	}
 }
 
