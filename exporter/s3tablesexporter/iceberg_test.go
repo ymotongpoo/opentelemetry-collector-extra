@@ -472,3 +472,373 @@ func TestGenerateManifestFileName(t *testing.T) {
 		})
 	}
 }
+
+// TestIsPrimitiveType tests IcebergSchemaField.IsPrimitiveType method
+// IcebergSchemaField.IsPrimitiveTypeメソッドのテスト
+func TestIsPrimitiveType(t *testing.T) {
+	tests := []struct {
+		name  string
+		field IcebergSchemaField
+		want  bool
+	}{
+		{
+			name: "primitive type - string",
+			field: IcebergSchemaField{
+				ID:       1,
+				Name:     "name",
+				Required: true,
+				Type:     "string",
+			},
+			want: true,
+		},
+		{
+			name: "primitive type - long",
+			field: IcebergSchemaField{
+				ID:       2,
+				Name:     "timestamp",
+				Required: true,
+				Type:     "long",
+			},
+			want: true,
+		},
+		{
+			name: "primitive type - double",
+			field: IcebergSchemaField{
+				ID:       3,
+				Name:     "value",
+				Required: false,
+				Type:     "double",
+			},
+			want: true,
+		},
+		{
+			name: "complex type - map",
+			field: IcebergSchemaField{
+				ID:       4,
+				Name:     "attributes",
+				Required: false,
+				Type: map[string]interface{}{
+					"type":           "map",
+					"key-id":         5,
+					"key":            "string",
+					"value-id":       6,
+					"value":          "string",
+					"value-required": false,
+				},
+			},
+			want: false,
+		},
+		{
+			name: "complex type - list",
+			field: IcebergSchemaField{
+				ID:       7,
+				Name:     "items",
+				Required: false,
+				Type: map[string]interface{}{
+					"type":            "list",
+					"element-id":      8,
+					"element":         "string",
+					"element-required": false,
+				},
+			},
+			want: false,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got := tt.field.IsPrimitiveType()
+			if got != tt.want {
+				t.Errorf("IsPrimitiveType() = %v, want %v", got, tt.want)
+			}
+		})
+	}
+}
+
+// TestIsMapType tests IcebergSchemaField.IsMapType method
+// IcebergSchemaField.IsMapTypeメソッドのテスト
+func TestIsMapType(t *testing.T) {
+	tests := []struct {
+		name  string
+		field IcebergSchemaField
+		want  bool
+	}{
+		{
+			name: "map type",
+			field: IcebergSchemaField{
+				ID:       1,
+				Name:     "attributes",
+				Required: false,
+				Type: map[string]interface{}{
+					"type":           "map",
+					"key-id":         2,
+					"key":            "string",
+					"value-id":       3,
+					"value":          "string",
+					"value-required": false,
+				},
+			},
+			want: true,
+		},
+		{
+			name: "primitive type",
+			field: IcebergSchemaField{
+				ID:       4,
+				Name:     "name",
+				Required: true,
+				Type:     "string",
+			},
+			want: false,
+		},
+		{
+			name: "list type",
+			field: IcebergSchemaField{
+				ID:       5,
+				Name:     "items",
+				Required: false,
+				Type: map[string]interface{}{
+					"type":            "list",
+					"element-id":      6,
+					"element":         "string",
+					"element-required": false,
+				},
+			},
+			want: false,
+		},
+		{
+			name: "map without type field",
+			field: IcebergSchemaField{
+				ID:       7,
+				Name:     "invalid",
+				Required: false,
+				Type: map[string]interface{}{
+					"key":   "string",
+					"value": "string",
+				},
+			},
+			want: false,
+		},
+		{
+			name: "empty map",
+			field: IcebergSchemaField{
+				ID:       8,
+				Name:     "empty",
+				Required: false,
+				Type:     map[string]interface{}{},
+			},
+			want: false,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got := tt.field.IsMapType()
+			if got != tt.want {
+				t.Errorf("IsMapType() = %v, want %v", got, tt.want)
+			}
+		})
+	}
+}
+
+// TestGetPrimitiveType tests IcebergSchemaField.GetPrimitiveType method
+// IcebergSchemaField.GetPrimitiveTypeメソッドのテスト
+func TestGetPrimitiveType(t *testing.T) {
+	tests := []struct {
+		name    string
+		field   IcebergSchemaField
+		want    string
+		wantErr bool
+	}{
+		{
+			name: "primitive type - string",
+			field: IcebergSchemaField{
+				ID:       1,
+				Name:     "name",
+				Required: true,
+				Type:     "string",
+			},
+			want:    "string",
+			wantErr: false,
+		},
+		{
+			name: "primitive type - long",
+			field: IcebergSchemaField{
+				ID:       2,
+				Name:     "timestamp",
+				Required: true,
+				Type:     "long",
+			},
+			want:    "long",
+			wantErr: false,
+		},
+		{
+			name: "primitive type - timestamptz",
+			field: IcebergSchemaField{
+				ID:       3,
+				Name:     "created_at",
+				Required: false,
+				Type:     "timestamptz",
+			},
+			want:    "timestamptz",
+			wantErr: false,
+		},
+		{
+			name: "complex type - map",
+			field: IcebergSchemaField{
+				ID:       4,
+				Name:     "attributes",
+				Required: false,
+				Type: map[string]interface{}{
+					"type":           "map",
+					"key-id":         5,
+					"key":            "string",
+					"value-id":       6,
+					"value":          "string",
+					"value-required": false,
+				},
+			},
+			want:    "",
+			wantErr: true,
+		},
+		{
+			name: "complex type - list",
+			field: IcebergSchemaField{
+				ID:       7,
+				Name:     "items",
+				Required: false,
+				Type: map[string]interface{}{
+					"type":            "list",
+					"element-id":      8,
+					"element":         "string",
+					"element-required": false,
+				},
+			},
+			want:    "",
+			wantErr: true,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got, err := tt.field.GetPrimitiveType()
+			if (err != nil) != tt.wantErr {
+				t.Errorf("GetPrimitiveType() error = %v, wantErr %v", err, tt.wantErr)
+				return
+			}
+			if got != tt.want {
+				t.Errorf("GetPrimitiveType() = %v, want %v", got, tt.want)
+			}
+		})
+	}
+}
+
+// TestGetMapType tests IcebergSchemaField.GetMapType method
+// IcebergSchemaField.GetMapTypeメソッドのテスト
+func TestGetMapType(t *testing.T) {
+	tests := []struct {
+		name    string
+		field   IcebergSchemaField
+		want    map[string]interface{}
+		wantErr bool
+	}{
+		{
+			name: "map type",
+			field: IcebergSchemaField{
+				ID:       1,
+				Name:     "attributes",
+				Required: false,
+				Type: map[string]interface{}{
+					"type":           "map",
+					"key-id":         2,
+					"key":            "string",
+					"value-id":       3,
+					"value":          "string",
+					"value-required": false,
+				},
+			},
+			want: map[string]interface{}{
+				"type":           "map",
+				"key-id":         2,
+				"key":            "string",
+				"value-id":       3,
+				"value":          "string",
+				"value-required": false,
+			},
+			wantErr: false,
+		},
+		{
+			name: "list type",
+			field: IcebergSchemaField{
+				ID:       4,
+				Name:     "items",
+				Required: false,
+				Type: map[string]interface{}{
+					"type":            "list",
+					"element-id":      5,
+					"element":         "string",
+					"element-required": false,
+				},
+			},
+			want: map[string]interface{}{
+				"type":            "list",
+				"element-id":      5,
+				"element":         "string",
+				"element-required": false,
+			},
+			wantErr: false,
+		},
+		{
+			name: "primitive type - string",
+			field: IcebergSchemaField{
+				ID:       6,
+				Name:     "name",
+				Required: true,
+				Type:     "string",
+			},
+			want:    nil,
+			wantErr: true,
+		},
+		{
+			name: "primitive type - long",
+			field: IcebergSchemaField{
+				ID:       7,
+				Name:     "timestamp",
+				Required: true,
+				Type:     "long",
+			},
+			want:    nil,
+			wantErr: true,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got, err := tt.field.GetMapType()
+			if (err != nil) != tt.wantErr {
+				t.Errorf("GetMapType() error = %v, wantErr %v", err, tt.wantErr)
+				return
+			}
+			if tt.wantErr {
+				if got != nil {
+					t.Errorf("GetMapType() = %v, want nil", got)
+				}
+				return
+			}
+
+			// マップの内容を検証
+			if len(got) != len(tt.want) {
+				t.Errorf("GetMapType() map length = %v, want %v", len(got), len(tt.want))
+			}
+			for key, wantValue := range tt.want {
+				gotValue, ok := got[key]
+				if !ok {
+					t.Errorf("GetMapType() missing key %v", key)
+					continue
+				}
+				if gotValue != wantValue {
+					t.Errorf("GetMapType()[%v] = %v, want %v", key, gotValue, wantValue)
+				}
+			}
+		})
+	}
+}
