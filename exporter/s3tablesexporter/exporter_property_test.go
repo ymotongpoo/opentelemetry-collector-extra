@@ -29,9 +29,7 @@ import (
 // mockS3TablesClient is a mock implementation of S3 Tables client for testing
 type mockS3TablesClient struct {
 	getTableFunc                    func(ctx context.Context, params *s3tables.GetTableInput, optFns ...func(*s3tables.Options)) (*s3tables.GetTableOutput, error)
-	createTableFunc                 func(ctx context.Context, params *s3tables.CreateTableInput, optFns ...func(*s3tables.Options)) (*s3tables.CreateTableOutput, error)
 	getNamespaceFunc                func(ctx context.Context, params *s3tables.GetNamespaceInput, optFns ...func(*s3tables.Options)) (*s3tables.GetNamespaceOutput, error)
-	createNamespaceFunc             func(ctx context.Context, params *s3tables.CreateNamespaceInput, optFns ...func(*s3tables.Options)) (*s3tables.CreateNamespaceOutput, error)
 	getTableMetadataLocationFunc    func(ctx context.Context, params *s3tables.GetTableMetadataLocationInput, optFns ...func(*s3tables.Options)) (*s3tables.GetTableMetadataLocationOutput, error)
 	updateTableMetadataLocationFunc func(ctx context.Context, params *s3tables.UpdateTableMetadataLocationInput, optFns ...func(*s3tables.Options)) (*s3tables.UpdateTableMetadataLocationOutput, error)
 }
@@ -43,25 +41,11 @@ func (m *mockS3TablesClient) GetTable(ctx context.Context, params *s3tables.GetT
 	return nil, fmt.Errorf("GetTable not implemented")
 }
 
-func (m *mockS3TablesClient) CreateTable(ctx context.Context, params *s3tables.CreateTableInput, optFns ...func(*s3tables.Options)) (*s3tables.CreateTableOutput, error) {
-	if m.createTableFunc != nil {
-		return m.createTableFunc(ctx, params, optFns...)
-	}
-	return nil, fmt.Errorf("CreateTable not implemented")
-}
-
 func (m *mockS3TablesClient) GetNamespace(ctx context.Context, params *s3tables.GetNamespaceInput, optFns ...func(*s3tables.Options)) (*s3tables.GetNamespaceOutput, error) {
 	if m.getNamespaceFunc != nil {
 		return m.getNamespaceFunc(ctx, params, optFns...)
 	}
 	return nil, fmt.Errorf("GetNamespace not implemented")
-}
-
-func (m *mockS3TablesClient) CreateNamespace(ctx context.Context, params *s3tables.CreateNamespaceInput, optFns ...func(*s3tables.Options)) (*s3tables.CreateNamespaceOutput, error) {
-	if m.createNamespaceFunc != nil {
-		return m.createNamespaceFunc(ctx, params, optFns...)
-	}
-	return nil, fmt.Errorf("CreateNamespace not implemented")
 }
 
 func (m *mockS3TablesClient) GetTableMetadataLocation(ctx context.Context, params *s3tables.GetTableMetadataLocationInput, optFns ...func(*s3tables.Options)) (*s3tables.GetTableMetadataLocationOutput, error) {
@@ -671,16 +655,6 @@ func TestProperty_ErrorPropagation(t *testing.T) {
 				operation: "GetTable",
 			},
 			{
-				name:      "CreateTable error",
-				errorMsg:  "insufficient permissions",
-				operation: "CreateTable",
-			},
-			{
-				name:      "CreateNamespace error",
-				errorMsg:  "quota exceeded",
-				operation: "CreateNamespace",
-			},
-			{
 				name:      "GetNamespace error",
 				errorMsg:  "namespace not found",
 				operation: "GetNamespace",
@@ -713,23 +687,11 @@ func TestProperty_ErrorPropagation(t *testing.T) {
 						}
 						return nil, fmt.Errorf("table not found")
 					},
-					createTableFunc: func(ctx context.Context, params *s3tables.CreateTableInput, optFns ...func(*s3tables.Options)) (*s3tables.CreateTableOutput, error) {
-						if apiErr.operation == "CreateTable" {
-							return nil, fmt.Errorf("%s", apiErr.errorMsg)
-						}
-						return nil, fmt.Errorf("CreateTable failed")
-					},
 					getNamespaceFunc: func(ctx context.Context, params *s3tables.GetNamespaceInput, optFns ...func(*s3tables.Options)) (*s3tables.GetNamespaceOutput, error) {
 						if apiErr.operation == "GetNamespace" {
 							return nil, fmt.Errorf("%s", apiErr.errorMsg)
 						}
 						return nil, fmt.Errorf("namespace not found")
-					},
-					createNamespaceFunc: func(ctx context.Context, params *s3tables.CreateNamespaceInput, optFns ...func(*s3tables.Options)) (*s3tables.CreateNamespaceOutput, error) {
-						if apiErr.operation == "CreateNamespace" {
-							return nil, fmt.Errorf("%s", apiErr.errorMsg)
-						}
-						return nil, fmt.Errorf("CreateNamespace failed")
 					},
 				}
 				exporter.s3TablesClient = mockClient
@@ -863,9 +825,6 @@ func TestProperty_ErrorPropagation(t *testing.T) {
 				},
 				getNamespaceFunc: func(ctx context.Context, params *s3tables.GetNamespaceInput, optFns ...func(*s3tables.Options)) (*s3tables.GetNamespaceOutput, error) {
 					return &s3tables.GetNamespaceOutput{}, nil
-				},
-				createTableFunc: func(ctx context.Context, params *s3tables.CreateTableInput, optFns ...func(*s3tables.Options)) (*s3tables.CreateTableOutput, error) {
-					return nil, fmt.Errorf("%s", randomErrorMsg)
 				},
 			}
 			exporter.s3TablesClient = mockClient
@@ -1023,89 +982,6 @@ func TestProperty_ContextCancellation(t *testing.T) {
 			}
 		}
 	})
-
-	/*
-	// テストケース4: createTableでのコンテキストキャンセル
-	// TODO: このテストはテーブル作成機能削除後に削除される
-	t.Run("createTable_handles_cancelled_context", func(t *testing.T) {
-		iterations := 50
-		for i := 0; i < iterations; i++ {
-			cfg := &Config{
-				TableBucketArn: "arn:aws:s3tables:us-east-1:123456789012:bucket/test-bucket",
-				Region:         "us-east-1",
-				Namespace:      "test-namespace",
-				Tables: TableNamesConfig{
-					Traces:  "otel_traces",
-					Metrics: "otel_metrics",
-					Logs:    "otel_logs",
-				},
-			}
-			set := exportertest.NewNopSettings(component.MustNewType("s3tables"))
-			exporter, err := newS3TablesExporter(cfg, set)
-			if err != nil {
-				t.Fatalf("iteration %d: newS3TablesExporter() failed: %v", i, err)
-			}
-
-			// キャンセル済みのコンテキストを作成
-			ctx, cancel := context.WithCancel(context.Background())
-			cancel()
-
-			// テーブル作成を試行
-			schema := createMetricsSchema()
-			_, err = exporter.createTable(ctx, "test-namespace", "test-table", schema)
-			if err == nil {
-				t.Errorf("iteration %d: expected error when context is cancelled", i)
-				continue
-			}
-
-			// エラーメッセージにコンテキストキャンセルが含まれることを確認
-			expectedSubstr := "table creation cancelled"
-			if len(err.Error()) < len(expectedSubstr) {
-				t.Errorf("iteration %d: error message should contain '%s', got '%s'", i, expectedSubstr, err.Error())
-			}
-		}
-	})
-
-	// テストケース5: createNamespaceIfNotExistsでのコンテキストキャンセル
-	// TODO: このテストはNamespace作成機能削除後に削除される
-	t.Run("createNamespaceIfNotExists_handles_cancelled_context", func(t *testing.T) {
-		iterations := 50
-		for i := 0; i < iterations; i++ {
-			cfg := &Config{
-				TableBucketArn: "arn:aws:s3tables:us-east-1:123456789012:bucket/test-bucket",
-				Region:         "us-east-1",
-				Namespace:      "test-namespace",
-				Tables: TableNamesConfig{
-					Traces:  "otel_traces",
-					Metrics: "otel_metrics",
-					Logs:    "otel_logs",
-				},
-			}
-			set := exportertest.NewNopSettings(component.MustNewType("s3tables"))
-			exporter, err := newS3TablesExporter(cfg, set)
-			if err != nil {
-				t.Fatalf("iteration %d: newS3TablesExporter() failed: %v", i, err)
-			}
-
-			// キャンセル済みのコンテキストを作成
-			ctx, cancel := context.WithCancel(context.Background())
-			cancel()
-
-			// Namespace作成を試行
-			err = exporter.createNamespaceIfNotExists(ctx, "test-namespace")
-			if err == nil {
-				t.Errorf("iteration %d: expected error when context is cancelled", i)
-				continue
-			}
-
-			// エラーメッセージにコンテキストキャンセルが含まれることを確認
-			expectedSubstr := "namespace creation cancelled"
-			if len(err.Error()) < len(expectedSubstr) {
-				t.Errorf("iteration %d: error message should contain '%s', got '%s'", i, expectedSubstr, err.Error())
-			}
-		}
-	})
-	*/
 
 	// テストケース6: updateTableMetadataでのコンテキストキャンセル
 	t.Run("updateTableMetadata_handles_cancelled_context", func(t *testing.T) {

@@ -15,15 +15,11 @@
 package s3tablesexporter
 
 import (
-	"context"
 	"encoding/json"
 	"fmt"
 	"testing"
 
-	"github.com/aws/aws-sdk-go-v2/service/s3tables"
-	"github.com/aws/aws-sdk-go-v2/service/s3tables/types"
-	"go.opentelemetry.io/collector/component"
-	"go.opentelemetry.io/collector/exporter/exportertest"
+	"github.com/google/uuid"
 )
 
 // TestProperty_MetadataJSONSerializationAccuracy tests metadata JSON serialization accuracy
@@ -215,372 +211,53 @@ func generateRandomSchemaWithComplexTypes(seed int) *IcebergSchema {
 	}
 }
 
-// TestProperty_TableCreationSuccess tests table creation success with random schemas
-// Feature: fix-aws-sdk-metadata-serialization, Property 2: テーブル作成の成功
-// Validates: Requirements 1.3, 2.4
-func TestProperty_TableCreationSuccess(t *testing.T) {
-	if testing.Short() {
-		t.Skip("Skipping property-based test in short mode")
-	}
-
-	// プロパティ: 任意の有効なスキーマ（プリミティブ型と複合型を含む）でテーブルを作成した場合、
-	// S3 Tables APIはエラーを返さず、テーブルが正常に作成されるべきである
-
-	iterations := 100
-	for i := 0; i < iterations; i++ {
-		// ランダムなスキーマを生成
-		schema := generateRandomSchemaWithComplexTypes(i)
-
-		// スキーマをmap[string]interface{}形式に変換
-		schemaMap := map[string]interface{}{
-			"fields": convertSchemaToFieldMaps(schema),
-		}
-
-		// エクスポーターを作成
-		cfg := &Config{
-			TableBucketArn: "arn:aws:s3tables:us-east-1:123456789012:bucket/test-bucket",
-			Region:         "us-east-1",
-			Namespace:      "test-namespace",
-			Tables: TableNamesConfig{
-				Traces:  "otel_traces",
-				Metrics: "otel_metrics",
-				Logs:    "otel_logs",
-			},
-		}
-		set := exportertest.NewNopSettings(component.MustNewType("s3tables"))
-		exporter, err := newS3TablesExporter(cfg, set)
-		if err != nil {
-			t.Fatalf("iteration %d: newS3TablesExporter() failed: %v", i, err)
-		}
-
-		// モックS3 Tablesクライアントを設定
-		tableName := fmt.Sprintf("test_table_%d", i)
-		tableARN := fmt.Sprintf("arn:aws:s3tables:us-east-1:123456789012:bucket/test-bucket/table/%s", tableName)
-		warehouseLocation := fmt.Sprintf("s3://test-bucket/warehouse/%s", tableName)
-		versionToken := fmt.Sprintf("version-token-%d", i)
-
-		mockS3TablesClient := &mockS3TablesClient{
-			getNamespaceFunc: func(ctx context.Context, params *s3tables.GetNamespaceInput, optFns ...func(*s3tables.Options)) (*s3tables.GetNamespaceOutput, error) {
-				// Namespaceが既に存在すると仮定
-				return &s3tables.GetNamespaceOutput{}, nil
-			},
-			createTableFunc: func(ctx context.Context, params *s3tables.CreateTableInput, optFns ...func(*s3tables.Options)) (*s3tables.CreateTableOutput, error) {
-				// テーブル作成が成功
-				return &s3tables.CreateTableOutput{
-					TableARN:     &tableARN,
-					VersionToken: &versionToken,
-				}, nil
-			},
-			getTableFunc: func(ctx context.Context, params *s3tables.GetTableInput, optFns ...func(*s3tables.Options)) (*s3tables.GetTableOutput, error) {
-				// GetTableを呼び出してwarehouse locationを返す
-				return &s3tables.GetTableOutput{
-					TableARN:          &tableARN,
-					WarehouseLocation: &warehouseLocation,
-					VersionToken:      &versionToken,
-				}, nil
-			},
-		}
-		exporter.s3TablesClient = mockS3TablesClient
-
-		// テーブルを作成
-		tableInfo, err := exporter.createTable(context.Background(), "test-namespace", tableName, schemaMap)
-		if err != nil {
-			t.Errorf("iteration %d: createTable() failed: %v", i, err)
-			continue
-		}
-
-		// テーブル情報を検証
-		if tableInfo.TableARN != tableARN {
-			t.Errorf("iteration %d: expected TableARN '%s', got '%s'", i, tableARN, tableInfo.TableARN)
-		}
-		if tableInfo.WarehouseLocation != warehouseLocation {
-			t.Errorf("iteration %d: expected WarehouseLocation '%s', got '%s'", i, warehouseLocation, tableInfo.WarehouseLocation)
-		}
-		if tableInfo.VersionToken != versionToken {
-			t.Errorf("iteration %d: expected VersionToken '%s', got '%s'", i, versionToken, tableInfo.VersionToken)
-		}
+// createInitialIcebergMetadata creates an initial Iceberg metadata for testing
+// テスト用の初期Icebergメタデータを作成
+func createInitialIcebergMetadata(schema *IcebergSchema) *IcebergMetadata {
+	return &IcebergMetadata{
+		FormatVersion:      2,
+		TableUUID:          uuid.New().String(),
+		Location:           "", // S3 Tablesが自動的に設定
+		LastSequenceNumber: 0,
+		LastUpdatedMS:      0, // S3 Tablesが自動的に設定
+		LastColumnID:       getLastColumnID(schema),
+		Schemas:            []IcebergSchema{*schema},
+		CurrentSchemaID:    0,
+		PartitionSpecs:     []IcebergPartitionSpec{{SpecID: 0, Fields: []IcebergPartitionField{}}},
+		DefaultSpecID:      0,
+		LastPartitionID:    0,
+		Properties:         map[string]string{},
+		CurrentSnapshotID:  -1,
+		Snapshots:          []IcebergSnapshot{},
+		SnapshotLog:        []IcebergSnapshotLog{},
+		MetadataLog:        []IcebergMetadataLog{},
 	}
 }
 
-// convertSchemaToFieldMaps converts IcebergSchema to []map[string]interface{} format
-// IcebergSchemaを[]map[string]interface{}形式に変換
-func convertSchemaToFieldMaps(schema *IcebergSchema) []map[string]interface{} {
-	fieldMaps := make([]map[string]interface{}, 0, len(schema.Fields))
+// getLastColumnID returns the last column ID from the schema
+// スキーマから最後のカラムIDを取得
+func getLastColumnID(schema *IcebergSchema) int {
+	maxID := 0
 	for _, field := range schema.Fields {
-		fieldMap := map[string]interface{}{
-			"id":       field.ID,
-			"name":     field.Name,
-			"required": field.Required,
-			"type":     field.Type,
+		if field.ID > maxID {
+			maxID = field.ID
 		}
-		fieldMaps = append(fieldMaps, fieldMap)
+		// map型の場合、key-idとvalue-idも考慮
+		if field.IsMapType() {
+			mapType, _ := field.GetMapType()
+			if keyID, ok := mapType["key-id"].(int); ok && keyID > maxID {
+				maxID = keyID
+			}
+			if keyID, ok := mapType["key-id"].(float64); ok && int(keyID) > maxID {
+				maxID = int(keyID)
+			}
+			if valueID, ok := mapType["value-id"].(int); ok && valueID > maxID {
+				maxID = valueID
+			}
+			if valueID, ok := mapType["value-id"].(float64); ok && int(valueID) > maxID {
+				maxID = int(valueID)
+			}
+		}
 	}
-	return fieldMaps
-}
-
-// TestProperty_BackwardCompatibility tests backward compatibility with existing tests
-// Feature: fix-aws-sdk-metadata-serialization, Property 3: 後方互換性の保持
-// Validates: Requirements 3.1, 3.2, 3.3, 3.4
-func TestProperty_BackwardCompatibility(t *testing.T) {
-	if testing.Short() {
-		t.Skip("Skipping property-based test in short mode")
-	}
-
-	// プロパティ: 任意の既存のテストケースにおいて、createTable関数の修正後も同じ結果が得られるべきである
-
-	// 既存のテストケースを再実行して、同じ結果が得られることを確認
-	testCases := []struct {
-		name   string
-		schema map[string]interface{}
-	}{
-		{
-			name: "primitive_types_only",
-			schema: map[string]interface{}{
-				"fields": []map[string]interface{}{
-					{
-						"id":       1,
-						"name":     "timestamp",
-						"required": true,
-						"type":     "timestamptz",
-					},
-					{
-						"id":       2,
-						"name":     "service_name",
-						"required": false,
-						"type":     "string",
-					},
-					{
-						"id":       3,
-						"name":     "value",
-						"required": false,
-						"type":     "double",
-					},
-				},
-			},
-		},
-		{
-			name: "complex_types_with_map",
-			schema: map[string]interface{}{
-				"fields": []map[string]interface{}{
-					{
-						"id":       1,
-						"name":     "timestamp",
-						"required": true,
-						"type":     "timestamptz",
-					},
-					{
-						"id":       4,
-						"name":     "resource_attributes",
-						"required": false,
-						"type": map[string]interface{}{
-							"type":           "map",
-							"key-id":         2,
-							"key":            "string",
-							"value-id":       3,
-							"value":          "string",
-							"value-required": false,
-						},
-					},
-				},
-			},
-		},
-		{
-			name: "multiple_complex_types",
-			schema: map[string]interface{}{
-				"fields": []map[string]interface{}{
-					{
-						"id":       1,
-						"name":     "timestamp",
-						"required": true,
-						"type":     "timestamptz",
-					},
-					{
-						"id":       4,
-						"name":     "attributes",
-						"required": false,
-						"type": map[string]interface{}{
-							"type":           "map",
-							"key-id":         2,
-							"key":            "string",
-							"value-id":       3,
-							"value":          "string",
-							"value-required": false,
-						},
-					},
-					{
-						"id":       7,
-						"name":     "labels",
-						"required": false,
-						"type": map[string]interface{}{
-							"type":           "map",
-							"key-id":         5,
-							"key":            "string",
-							"value-id":       6,
-							"value":          "string",
-							"value-required": false,
-						},
-					},
-				},
-			},
-		},
-	}
-
-	for _, tc := range testCases {
-		t.Run(tc.name, func(t *testing.T) {
-			// エクスポーターを作成
-			cfg := &Config{
-				TableBucketArn: "arn:aws:s3tables:us-east-1:123456789012:bucket/test-bucket",
-				Region:         "us-east-1",
-				Namespace:      "test-namespace",
-				Tables: TableNamesConfig{
-					Traces:  "otel_traces",
-					Metrics: "otel_metrics",
-					Logs:    "otel_logs",
-				},
-			}
-			set := exportertest.NewNopSettings(component.MustNewType("s3tables"))
-			exporter, err := newS3TablesExporter(cfg, set)
-			if err != nil {
-				t.Fatalf("newS3TablesExporter() failed: %v", err)
-			}
-
-			// モックS3 Tablesクライアントを設定
-			tableName := "test_table"
-			tableARN := fmt.Sprintf("arn:aws:s3tables:us-east-1:123456789012:bucket/test-bucket/table/%s", tableName)
-			warehouseLocation := fmt.Sprintf("s3://test-bucket/warehouse/%s", tableName)
-			versionToken := "version-token-1"
-
-			var capturedMetadata *types.IcebergMetadata
-			mockS3TablesClient := &mockS3TablesClient{
-				getNamespaceFunc: func(ctx context.Context, params *s3tables.GetNamespaceInput, optFns ...func(*s3tables.Options)) (*s3tables.GetNamespaceOutput, error) {
-					return &s3tables.GetNamespaceOutput{}, nil
-				},
-				createTableFunc: func(ctx context.Context, params *s3tables.CreateTableInput, optFns ...func(*s3tables.Options)) (*s3tables.CreateTableOutput, error) {
-					// メタデータをキャプチャ
-					if params.Metadata != nil {
-						if member, ok := params.Metadata.(*types.TableMetadataMemberIceberg); ok {
-							capturedMetadata = &member.Value
-						}
-					}
-					return &s3tables.CreateTableOutput{
-						TableARN:     &tableARN,
-						VersionToken: &versionToken,
-					}, nil
-				},
-				getTableFunc: func(ctx context.Context, params *s3tables.GetTableInput, optFns ...func(*s3tables.Options)) (*s3tables.GetTableOutput, error) {
-					return &s3tables.GetTableOutput{
-						TableARN:          &tableARN,
-						WarehouseLocation: &warehouseLocation,
-						VersionToken:      &versionToken,
-					}, nil
-				},
-			}
-			exporter.s3TablesClient = mockS3TablesClient
-
-			// テーブルを作成
-			tableInfo, err := exporter.createTable(context.Background(), "test-namespace", tableName, tc.schema)
-			if err != nil {
-				t.Fatalf("createTable() failed: %v", err)
-			}
-
-			// テーブル情報を検証（既存のテストと同じ結果が得られることを確認）
-			if tableInfo.TableARN != tableARN {
-				t.Errorf("expected TableARN '%s', got '%s'", tableARN, tableInfo.TableARN)
-			}
-			if tableInfo.WarehouseLocation != warehouseLocation {
-				t.Errorf("expected WarehouseLocation '%s', got '%s'", warehouseLocation, tableInfo.WarehouseLocation)
-			}
-			if tableInfo.VersionToken != versionToken {
-				t.Errorf("expected VersionToken '%s', got '%s'", versionToken, tableInfo.VersionToken)
-			}
-
-			// メタデータが正しくキャプチャされたことを確認
-			if capturedMetadata == nil {
-				t.Fatal("metadata was not captured")
-			}
-
-			// スキーマが正しく変換されたことを確認
-			if capturedMetadata.Schema == nil {
-				t.Fatal("schema is nil")
-			}
-
-			// フィールド数が一致することを確認
-			expectedFieldCount := len(tc.schema["fields"].([]map[string]interface{}))
-			actualFieldCount := len(capturedMetadata.Schema.Fields)
-			if actualFieldCount != expectedFieldCount {
-				t.Errorf("expected %d fields, got %d", expectedFieldCount, actualFieldCount)
-			}
-
-			// 各フィールドの基本情報が正しく変換されたことを確認
-			for i, expectedFieldMap := range tc.schema["fields"].([]map[string]interface{}) {
-				if i >= len(capturedMetadata.Schema.Fields) {
-					t.Errorf("field %d is missing in captured metadata", i)
-					continue
-				}
-
-				actualField := capturedMetadata.Schema.Fields[i]
-
-				// 名前の検証
-				expectedName := expectedFieldMap["name"].(string)
-				if *actualField.Name != expectedName {
-					t.Errorf("field %d: expected name '%s', got '%s'", i, expectedName, *actualField.Name)
-				}
-
-				// requiredの検証
-				expectedRequired := expectedFieldMap["required"].(bool)
-				if actualField.Required != expectedRequired {
-					t.Errorf("field %d: expected required %v, got %v", i, expectedRequired, actualField.Required)
-				}
-
-				// 型の検証
-				expectedType := expectedFieldMap["type"]
-				if typeStr, ok := expectedType.(string); ok {
-					// プリミティブ型の場合
-					if *actualField.Type != typeStr {
-						t.Errorf("field %d: expected type '%s', got '%s'", i, typeStr, *actualField.Type)
-					}
-				} else if typeMap, ok := expectedType.(map[string]interface{}); ok {
-					// 複合型の場合、JSON文字列として変換されていることを確認
-					var actualTypeMap map[string]interface{}
-					if err := json.Unmarshal([]byte(*actualField.Type), &actualTypeMap); err != nil {
-						t.Errorf("field %d: failed to unmarshal type JSON: %v", i, err)
-						continue
-					}
-
-					// 型の種類を確認
-					if actualTypeMap["type"] != typeMap["type"] {
-						t.Errorf("field %d: expected type '%s', got '%s'", i, typeMap["type"], actualTypeMap["type"])
-					}
-				}
-			}
-
-			// Propertiesに完全なIcebergメタデータが格納されていることを確認
-			// 注: 新しい実装では、S3 Tables APIがスキーマのみを受け取り、
-			// その他のメタデータは自動的に管理されるため、Propertiesフィールドは設定されません
-			if capturedMetadata.Properties != nil {
-				metadataJSON, ok := capturedMetadata.Properties["iceberg.metadata.json"]
-				if ok {
-					// メタデータJSONが有効なJSONであることを確認
-					var fullMetadata IcebergMetadata
-					if err := json.Unmarshal([]byte(metadataJSON), &fullMetadata); err != nil {
-						t.Fatalf("failed to unmarshal full metadata JSON: %v", err)
-					}
-
-					// 完全なメタデータの基本フィールドを検証
-					if fullMetadata.FormatVersion != 2 {
-						t.Errorf("expected format-version 2, got %d", fullMetadata.FormatVersion)
-					}
-					if fullMetadata.TableUUID == "" {
-						t.Error("table-uuid is empty")
-					}
-					if len(fullMetadata.Schemas) == 0 {
-						t.Error("schemas is empty")
-					}
-					if fullMetadata.CurrentSnapshotID != -1 {
-						t.Errorf("expected current-snapshot-id -1, got %d", fullMetadata.CurrentSnapshotID)
-					}
-				}
-			}
-		})
-	}
+	return maxID
 }

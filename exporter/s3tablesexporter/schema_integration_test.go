@@ -15,68 +15,15 @@
 package s3tablesexporter
 
 import (
-	"context"
-	"encoding/json"
-	"io"
-	"net/http"
-	"net/http/httptest"
-	"strings"
 	"testing"
-
-	"go.opentelemetry.io/collector/component"
-	exportertest "go.opentelemetry.io/collector/exporter/exportertest"
 )
 
-// TestSchemaIntegration_TracesSchema tests end-to-end table creation with traces schema
-// トレーススキーマを使用したエンドツーエンドのテーブル作成をテスト
-// Requirements: 4.1
+// TestSchemaIntegration_TracesSchema tests traces schema serialization
+// トレーススキーマのシリアライゼーションをテスト
+// Requirements: 3.1, 3.2
 func TestSchemaIntegration_TracesSchema(t *testing.T) {
 	// トレーススキーマを作成
 	schema := createTracesSchema()
-
-	// HTTPモックサーバーを作成
-	var capturedRequest *CreateTableRequest
-	mockServer := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		// リクエストボディを読み取る
-		body, err := io.ReadAll(r.Body)
-		if err != nil {
-			t.Fatalf("failed to read request body: %v", err)
-		}
-
-		// リクエストボディをパース
-		var req CreateTableRequest
-		if err := json.Unmarshal(body, &req); err != nil {
-			t.Fatalf("failed to parse request body: %v", err)
-		}
-		capturedRequest = &req
-
-		// レスポンスを返す
-		resp := CreateTableResponse{
-			TableARN:     "arn:aws:s3tables:us-east-1:123456789012:bucket/test-bucket/table/test-namespace/otel_traces",
-			VersionToken: "version-token-1",
-		}
-		w.Header().Set("Content-Type", "application/json")
-		w.WriteHeader(http.StatusCreated)
-		json.NewEncoder(w).Encode(resp)
-	}))
-	defer mockServer.Close()
-
-	// Exporterを作成
-	cfg := &Config{
-		TableBucketArn: "arn:aws:s3tables:us-east-1:123456789012:bucket/test-bucket",
-		Region:         "us-east-1",
-		Namespace:      "test-namespace",
-		Tables: TableNamesConfig{
-			Traces:  "otel_traces",
-			Metrics: "otel_metrics",
-			Logs:    "otel_logs",
-		},
-	}
-	set := exportertest.NewNopSettings(component.MustNewType("s3tables"))
-	_, err := newS3TablesExporter(cfg, set)
-	if err != nil {
-		t.Fatalf("newS3TablesExporter() failed: %v", err)
-	}
 
 	// スキーマをIcebergSchema形式に変換
 	icebergSchema, err := convertToIcebergSchema(schema)
@@ -91,59 +38,8 @@ func TestSchemaIntegration_TracesSchema(t *testing.T) {
 		t.Fatalf("MarshalSchemaFields() failed: %v", err)
 	}
 
-	// HTTPクライアントを使用してモックサーバーにリクエストを送信
-	endpoint := mockServer.URL + "/tables"
-	httpClient := &http.Client{}
-
-	// リクエストボディを構築
-	requestBody := CreateTableRequest{
-		TableBucketARN: cfg.TableBucketArn,
-		Namespace:      cfg.Namespace,
-		Name:           cfg.Tables.Traces,
-		Format:         "ICEBERG",
-		Metadata: CreateTableMetadata{
-			Iceberg: CreateTableIcebergMetadata{
-				Schema: CreateTableSchema{
-					Fields: customFields,
-				},
-			},
-		},
-	}
-
-	// リクエストボディをJSONにシリアライズ
-	requestBodyBytes, err := json.Marshal(requestBody)
-	if err != nil {
-		t.Fatalf("failed to marshal request body: %v", err)
-	}
-
-	// HTTPリクエストを作成
-	req, err := http.NewRequestWithContext(context.Background(), "POST", endpoint, strings.NewReader(string(requestBodyBytes)))
-	if err != nil {
-		t.Fatalf("failed to create HTTP request: %v", err)
-	}
-
-	// Content-Typeヘッダーを設定
-	req.Header.Set("Content-Type", "application/json")
-
-	// HTTPリクエストを送信
-	resp, err := httpClient.Do(req)
-	if err != nil {
-		t.Fatalf("failed to send HTTP request: %v", err)
-	}
-	defer resp.Body.Close()
-
-	// レスポンスを検証
-	if resp.StatusCode != http.StatusCreated {
-		t.Errorf("expected status code %d, got %d", http.StatusCreated, resp.StatusCode)
-	}
-
-	// リクエストがキャプチャされたことを確認
-	if capturedRequest == nil {
-		t.Fatal("request was not captured")
-	}
-
 	// スキーマフィールドを検証
-	fields := capturedRequest.Metadata.Iceberg.Schema.Fields
+	fields := customFields
 
 	// トレーススキーマは8つのフィールドを持つ
 	expectedFieldCount := 8
@@ -218,14 +114,12 @@ func TestSchemaIntegration_TracesSchema(t *testing.T) {
 		}
 	}
 
-	// シリアライズされたスキーマがS3 Tables APIに受け入れられることを確認
-	// （モックが正常に完了したことで確認済み）
-	t.Log("Traces schema successfully serialized and accepted by S3 Tables API")
+	t.Log("Traces schema successfully serialized")
 }
 
-// TestSchemaIntegration_MetricsSchema tests end-to-end table creation with metrics schema
-// メトリクススキーマを使用したエンドツーエンドのテーブル作成をテスト
-// Requirements: 4.2
+// TestSchemaIntegration_MetricsSchema tests metrics schema serialization
+// メトリクススキーマのシリアライゼーションをテスト
+// Requirements: 3.1, 3.2
 func TestSchemaIntegration_MetricsSchema(t *testing.T) {
 	// メトリクススキーマを作成
 	schema := createMetricsSchema()
@@ -301,9 +195,9 @@ func TestSchemaIntegration_MetricsSchema(t *testing.T) {
 	t.Log("Metrics schema successfully serialized")
 }
 
-// TestSchemaIntegration_LogsSchema tests end-to-end table creation with logs schema
-// ログスキーマを使用したエンドツーエンドのテーブル作成をテスト
-// Requirements: 4.3
+// TestSchemaIntegration_LogsSchema tests logs schema serialization
+// ログスキーマのシリアライゼーションをテスト
+// Requirements: 3.1, 3.2
 func TestSchemaIntegration_LogsSchema(t *testing.T) {
 	// ログスキーマを作成
 	schema := createLogsSchema()

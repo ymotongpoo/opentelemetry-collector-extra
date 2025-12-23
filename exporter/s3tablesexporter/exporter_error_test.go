@@ -66,90 +66,6 @@ func TestGetTable_APIError(t *testing.T) {
 	}
 }
 
-// TestCreateTable_APIError tests S3 Tables CreateTable API error handling
-// Requirements: 5.1
-func TestCreateTable_APIError(t *testing.T) {
-	cfg := &Config{
-		TableBucketArn: "arn:aws:s3tables:us-east-1:123456789012:bucket/test-bucket",
-		Region:         "us-east-1",
-		Namespace:      "test-namespace",
-		Tables: TableNamesConfig{
-			Traces:  "otel_traces",
-			Metrics: "otel_metrics",
-			Logs:    "otel_logs",
-		},
-	}
-	set := exportertest.NewNopSettings(component.MustNewType("s3tables"))
-	exporter, err := newS3TablesExporter(cfg, set)
-	if err != nil {
-		t.Fatalf("newS3TablesExporter() failed: %v", err)
-	}
-
-	// モックS3 Tablesクライアントを設定してエラーを返す
-	mockClient := &mockS3TablesClient{
-		createTableFunc: func(ctx context.Context, params *s3tables.CreateTableInput, optFns ...func(*s3tables.Options)) (*s3tables.CreateTableOutput, error) {
-			return nil, fmt.Errorf("CreateTable API error: insufficient permissions")
-		},
-	}
-	exporter.s3TablesClient = mockClient
-
-	// テーブル作成を試行
-	schema := createMetricsSchema()
-	_, err = exporter.createTable(context.Background(), "test-namespace", "test-table", schema)
-	if err == nil {
-		t.Fatal("expected error from createTable when API fails")
-	}
-
-	// エラーメッセージに適切なコンテキストが含まれることを確認
-	expectedSubstr := "failed to create table"
-	if len(err.Error()) < len(expectedSubstr) {
-		t.Errorf("error message too short: '%s'", err.Error())
-	}
-}
-
-// TestCreateNamespace_APIError tests S3 Tables CreateNamespace API error handling
-// Requirements: 5.1
-func TestCreateNamespace_APIError(t *testing.T) {
-	cfg := &Config{
-		TableBucketArn: "arn:aws:s3tables:us-east-1:123456789012:bucket/test-bucket",
-		Region:         "us-east-1",
-		Namespace:      "test-namespace",
-		Tables: TableNamesConfig{
-			Traces:  "otel_traces",
-			Metrics: "otel_metrics",
-			Logs:    "otel_logs",
-		},
-	}
-	set := exportertest.NewNopSettings(component.MustNewType("s3tables"))
-	exporter, err := newS3TablesExporter(cfg, set)
-	if err != nil {
-		t.Fatalf("newS3TablesExporter() failed: %v", err)
-	}
-
-	// モックS3 Tablesクライアントを設定してエラーを返す
-	mockClient := &mockS3TablesClient{
-		getNamespaceFunc: func(ctx context.Context, params *s3tables.GetNamespaceInput, optFns ...func(*s3tables.Options)) (*s3tables.GetNamespaceOutput, error) {
-			return nil, fmt.Errorf("namespace not found")
-		},
-		createNamespaceFunc: func(ctx context.Context, params *s3tables.CreateNamespaceInput, optFns ...func(*s3tables.Options)) (*s3tables.CreateNamespaceOutput, error) {
-			return nil, fmt.Errorf("CreateNamespace API error: quota exceeded")
-		},
-	}
-	exporter.s3TablesClient = mockClient
-
-	// Namespace作成を試行
-	err = exporter.createNamespaceIfNotExists(context.Background(), "test-namespace")
-	if err == nil {
-		t.Fatal("expected error from createNamespaceIfNotExists when API fails")
-	}
-
-	// エラーメッセージに適切なコンテキストが含まれることを確認
-	expectedSubstr := "failed to create namespace"
-	if len(err.Error()) < len(expectedSubstr) {
-		t.Errorf("error message too short: '%s'", err.Error())
-	}
-}
-
 // TestUploadToWarehouseLocation_S3Error tests S3 PutObject API error handling
 // Requirements: 5.2
 func TestUploadToWarehouseLocation_S3Error(t *testing.T) {
@@ -190,106 +106,6 @@ func TestUploadToWarehouseLocation_S3Error(t *testing.T) {
 	}
 }
 
-// 注: コンテキストキャンセルのテストは既存のテストファイルに存在するため、ここでは省略
-
-// TestGetOrCreateTable_GetTableError tests error handling when GetTable fails
-// Requirements: 5.1, 5.5
-func TestGetOrCreateTable_GetTableError(t *testing.T) {
-	cfg := &Config{
-		TableBucketArn: "arn:aws:s3tables:us-east-1:123456789012:bucket/test-bucket",
-		Region:         "us-east-1",
-		Namespace:      "test-namespace",
-		Tables: TableNamesConfig{
-			Traces:  "otel_traces",
-			Metrics: "otel_metrics",
-			Logs:    "otel_logs",
-		},
-	}
-	set := exportertest.NewNopSettings(component.MustNewType("s3tables"))
-	exporter, err := newS3TablesExporter(cfg, set)
-	if err != nil {
-		t.Fatalf("newS3TablesExporter() failed: %v", err)
-	}
-
-	// モックS3 Tablesクライアントを設定
-	// GetTableは失敗、GetNamespaceは成功、CreateTableも失敗
-	mockClient := &mockS3TablesClient{
-		getTableFunc: func(ctx context.Context, params *s3tables.GetTableInput, optFns ...func(*s3tables.Options)) (*s3tables.GetTableOutput, error) {
-			return nil, fmt.Errorf("table not found")
-		},
-		getNamespaceFunc: func(ctx context.Context, params *s3tables.GetNamespaceInput, optFns ...func(*s3tables.Options)) (*s3tables.GetNamespaceOutput, error) {
-			return &s3tables.GetNamespaceOutput{}, nil
-		},
-		createTableFunc: func(ctx context.Context, params *s3tables.CreateTableInput, optFns ...func(*s3tables.Options)) (*s3tables.CreateTableOutput, error) {
-			return nil, fmt.Errorf("CreateTable failed: insufficient permissions")
-		},
-	}
-	exporter.s3TablesClient = mockClient
-
-	// テーブル取得または作成を試行
-	schema := createMetricsSchema()
-	_, err = exporter.getOrCreateTable(context.Background(), "test-namespace", "test-table", schema)
-	if err == nil {
-		t.Fatal("expected error from getOrCreateTable when CreateTable fails")
-	}
-
-	// エラーメッセージに適切なコンテキストが含まれることを確認
-	expectedSubstr := "failed to create table"
-	if len(err.Error()) < len(expectedSubstr) {
-		t.Errorf("error message should contain '%s', got '%s'", expectedSubstr, err.Error())
-	}
-}
-
-// TestGetOrCreateTable_CreateNamespaceError tests error handling when CreateNamespace fails
-// Requirements: 5.1, 5.5
-func TestGetOrCreateTable_CreateNamespaceError(t *testing.T) {
-	cfg := &Config{
-		TableBucketArn: "arn:aws:s3tables:us-east-1:123456789012:bucket/test-bucket",
-		Region:         "us-east-1",
-		Namespace:      "test-namespace",
-		Tables: TableNamesConfig{
-			Traces:  "otel_traces",
-			Metrics: "otel_metrics",
-			Logs:    "otel_logs",
-		},
-	}
-	set := exportertest.NewNopSettings(component.MustNewType("s3tables"))
-	exporter, err := newS3TablesExporter(cfg, set)
-	if err != nil {
-		t.Fatalf("newS3TablesExporter() failed: %v", err)
-	}
-
-	// モックS3 Tablesクライアントを設定
-	// GetTableは失敗、GetNamespaceも失敗、CreateNamespaceも失敗
-	mockClient := &mockS3TablesClient{
-		getTableFunc: func(ctx context.Context, params *s3tables.GetTableInput, optFns ...func(*s3tables.Options)) (*s3tables.GetTableOutput, error) {
-			return nil, fmt.Errorf("table not found")
-		},
-		getNamespaceFunc: func(ctx context.Context, params *s3tables.GetNamespaceInput, optFns ...func(*s3tables.Options)) (*s3tables.GetNamespaceOutput, error) {
-			return nil, fmt.Errorf("namespace not found")
-		},
-		createNamespaceFunc: func(ctx context.Context, params *s3tables.CreateNamespaceInput, optFns ...func(*s3tables.Options)) (*s3tables.CreateNamespaceOutput, error) {
-			return nil, fmt.Errorf("CreateNamespace failed: quota exceeded")
-		},
-	}
-	exporter.s3TablesClient = mockClient
-
-	// テーブル取得または作成を試行
-	schema := createMetricsSchema()
-	_, err = exporter.getOrCreateTable(context.Background(), "test-namespace", "test-table", schema)
-	if err == nil {
-		t.Fatal("expected error from getOrCreateTable when CreateNamespace fails")
-	}
-
-	// エラーメッセージに適切なコンテキストが含まれることを確認
-	expectedSubstr := "failed to create namespace"
-	if len(err.Error()) < len(expectedSubstr) {
-		t.Errorf("error message should contain '%s', got '%s'", expectedSubstr, err.Error())
-	}
-}
-
-// 注: 空データのテストは既存のテストファイルに存在するため、ここでは省略
-
 // TestUploadToS3Tables_UnconfiguredTable tests that unconfigured table names are handled correctly
 // Requirements: 7.1, 7.2, 7.3, 7.4
 func TestUploadToS3Tables_UnconfiguredTable(t *testing.T) {
@@ -316,6 +132,73 @@ func TestUploadToS3Tables_UnconfiguredTable(t *testing.T) {
 	}
 }
 
+// TestUploadToS3Tables_GetTableInfoError tests that getTableInfo errors propagate correctly
+// Requirements: 3.3, 7.1, 7.2
+func TestUploadToS3Tables_GetTableInfoError(t *testing.T) {
+	cfg := &Config{
+		TableBucketArn: "arn:aws:s3tables:us-east-1:123456789012:bucket/test-bucket",
+		Region:         "us-east-1",
+		Namespace:      "test-namespace",
+		Tables: TableNamesConfig{
+			Traces:  "otel_traces",
+			Metrics: "otel_metrics",
+			Logs:    "otel_logs",
+		},
+	}
+	set := exportertest.NewNopSettings(component.MustNewType("s3tables"))
+	exporter, err := newS3TablesExporter(cfg, set)
+	if err != nil {
+		t.Fatalf("newS3TablesExporter() failed: %v", err)
+	}
+
+	// モックS3 Tablesクライアントを設定してテーブルが存在しないエラーを返す
+	mockClient := &mockS3TablesClient{
+		getTableFunc: func(ctx context.Context, params *s3tables.GetTableInput, optFns ...func(*s3tables.Options)) (*s3tables.GetTableOutput, error) {
+			return nil, fmt.Errorf("ResourceNotFoundException: table not found")
+		},
+	}
+	exporter.s3TablesClient = mockClient
+
+	// アップロードを試行
+	err = exporter.uploadToS3Tables(context.Background(), []byte("test data"), "metrics")
+	if err == nil {
+		t.Fatal("expected error from uploadToS3Tables when table does not exist")
+	}
+
+	// エラーメッセージに必要な情報が含まれることを確認
+	errMsg := err.Error()
+
+	// 要件3.3: テーブルが存在しない場合のエラーメッセージ
+	if !stringContains(errMsg, "failed to get table information") {
+		t.Errorf("error message should contain 'failed to get table information', got: %s", errMsg)
+	}
+
+	// 要件7.1: エラーメッセージに"table not found"が含まれる
+	if !stringContains(errMsg, "table not found") {
+		t.Errorf("error message should contain 'table not found', got: %s", errMsg)
+	}
+
+	// 要件7.2: エラーメッセージにテーブル作成コマンドが含まれる
+	requiredStrings := []string{
+		"aws s3tables create-table",
+		"--table-bucket-arn",
+		"--namespace",
+		"--name",
+		"--format",
+		"--region",
+		cfg.TableBucketArn,
+		cfg.Namespace,
+		"otel_metrics",
+		cfg.Region,
+	}
+
+	for _, required := range requiredStrings {
+		if !stringContains(errMsg, required) {
+			t.Errorf("error message should contain '%s', got: %s", required, errMsg)
+		}
+	}
+}
+
 // TestUploadToS3Tables_ErrorPropagation tests that errors are properly propagated
 // Requirements: 5.1, 5.2, 5.5
 func TestUploadToS3Tables_ErrorPropagation(t *testing.T) {
@@ -325,22 +208,16 @@ func TestUploadToS3Tables_ErrorPropagation(t *testing.T) {
 		expectedError string
 	}{
 		{
-			name: "GetTable error propagates",
+			name: "GetTableInfo error propagates",
 			setupMock: func(e *s3TablesExporter) {
 				mockClient := &mockS3TablesClient{
 					getTableFunc: func(ctx context.Context, params *s3tables.GetTableInput, optFns ...func(*s3tables.Options)) (*s3tables.GetTableOutput, error) {
 						return nil, fmt.Errorf("GetTable API error")
 					},
-					getNamespaceFunc: func(ctx context.Context, params *s3tables.GetNamespaceInput, optFns ...func(*s3tables.Options)) (*s3tables.GetNamespaceOutput, error) {
-						return &s3tables.GetNamespaceOutput{}, nil
-					},
-					createTableFunc: func(ctx context.Context, params *s3tables.CreateTableInput, optFns ...func(*s3tables.Options)) (*s3tables.CreateTableOutput, error) {
-						return nil, fmt.Errorf("CreateTable API error")
-					},
 				}
 				e.s3TablesClient = mockClient
 			},
-			expectedError: "failed to get or create table",
+			expectedError: "failed to get",
 		},
 		{
 			name: "PutObject error propagates",
@@ -456,4 +333,108 @@ func TestErrorWrapping(t *testing.T) {
 			}
 		})
 	}
+}
+
+// TestGetTableInfo_TableNotFoundErrorMessage tests that error messages contain table creation commands
+// テーブルが存在しない場合のエラーメッセージにテーブル作成コマンドが含まれることを検証
+// Requirements: 3.3, 7.1, 7.2
+func TestGetTableInfo_TableNotFoundErrorMessage(t *testing.T) {
+	tests := []struct {
+		name      string
+		namespace string
+		tableName string
+	}{
+		{
+			name:      "metrics table not found",
+			namespace: "test-namespace",
+			tableName: "otel_metrics",
+		},
+		{
+			name:      "traces table not found",
+			namespace: "prod-namespace",
+			tableName: "otel_traces",
+		},
+		{
+			name:      "logs table not found",
+			namespace: "dev-namespace",
+			tableName: "otel_logs",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			cfg := &Config{
+				TableBucketArn: "arn:aws:s3tables:us-west-2:987654321098:bucket/my-bucket",
+				Region:         "us-west-2",
+				Namespace:      tt.namespace,
+				Tables: TableNamesConfig{
+					Traces:  "otel_traces",
+					Metrics: "otel_metrics",
+					Logs:    "otel_logs",
+				},
+			}
+			set := exportertest.NewNopSettings(component.MustNewType("s3tables"))
+			exporter, err := newS3TablesExporter(cfg, set)
+			if err != nil {
+				t.Fatalf("newS3TablesExporter() failed: %v", err)
+			}
+
+			// モックS3 Tablesクライアントを設定してテーブルが存在しないエラーを返す
+			mockClient := &mockS3TablesClient{
+				getTableFunc: func(ctx context.Context, params *s3tables.GetTableInput, optFns ...func(*s3tables.Options)) (*s3tables.GetTableOutput, error) {
+					return nil, fmt.Errorf("ResourceNotFoundException: The specified table does not exist")
+				},
+			}
+			exporter.s3TablesClient = mockClient
+
+			// getTableInfoを呼び出す
+			_, err = exporter.getTableInfo(context.Background(), tt.namespace, tt.tableName)
+			if err == nil {
+				t.Fatal("expected error when table does not exist")
+			}
+
+			errMsg := err.Error()
+
+			// 要件3.3: エラーメッセージに"failed to get table information"が含まれる
+			if !stringContains(errMsg, "failed to get table information") {
+				t.Errorf("error message should contain 'failed to get table information', got: %s", errMsg)
+			}
+
+			// 要件7.1: エラーメッセージに元のエラー（table not found）が含まれる
+			if !stringContains(errMsg, "ResourceNotFoundException") {
+				t.Errorf("error message should contain original error 'ResourceNotFoundException', got: %s", errMsg)
+			}
+
+			// 要件7.2: エラーメッセージにテーブル作成コマンドの例が含まれる
+			requiredStrings := []string{
+				"Please create the table before running the exporter",
+				"aws s3tables create-table",
+				"--table-bucket-arn",
+				"--namespace",
+				"--name",
+				"--format \"ICEBERG\"",
+				"--region",
+				cfg.TableBucketArn,
+				tt.namespace,
+				tt.tableName,
+				cfg.Region,
+			}
+
+			for _, required := range requiredStrings {
+				if !stringContains(errMsg, required) {
+					t.Errorf("error message should contain '%s', but it was not found.\nFull error message:\n%s", required, errMsg)
+				}
+			}
+		})
+	}
+}
+
+// stringContains is a helper function to check if a string contains a substring
+func stringContains(s, substr string) bool {
+	for i := 0; i <= len(s)-len(substr); i++ {
+		if s[i:i+len(substr)] == substr {
+			return true
+		}
+	}
+	return false
 }

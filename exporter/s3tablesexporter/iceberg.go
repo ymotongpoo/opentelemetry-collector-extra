@@ -169,57 +169,6 @@ type IcebergDataFile struct {
 	UpperBounds     map[int][]byte `json:"upper-bounds,omitempty"`
 }
 
-// createInitialIcebergMetadata creates an initial Iceberg metadata for a new table
-// 新しいテーブル用の初期Icebergメタデータを作成
-func createInitialIcebergMetadata(schema *IcebergSchema) *IcebergMetadata {
-	return &IcebergMetadata{
-		FormatVersion:      2,
-		TableUUID:          uuid.New().String(),
-		Location:           "", // S3 Tablesが自動的に設定
-		LastSequenceNumber: 0,
-		LastUpdatedMS:      0, // S3 Tablesが自動的に設定
-		LastColumnID:       getLastColumnID(schema),
-		Schemas:            []IcebergSchema{*schema},
-		CurrentSchemaID:    0,
-		PartitionSpecs:     []IcebergPartitionSpec{{SpecID: 0, Fields: []IcebergPartitionField{}}},
-		DefaultSpecID:      0,
-		LastPartitionID:    0,
-		Properties:         map[string]string{},
-		CurrentSnapshotID:  -1,
-		Snapshots:          []IcebergSnapshot{},
-		SnapshotLog:        []IcebergSnapshotLog{},
-		MetadataLog:        []IcebergMetadataLog{},
-	}
-}
-
-// getLastColumnID returns the last column ID from the schema
-// スキーマから最後のカラムIDを取得
-func getLastColumnID(schema *IcebergSchema) int {
-	maxID := 0
-	for _, field := range schema.Fields {
-		if field.ID > maxID {
-			maxID = field.ID
-		}
-		// map型の場合、key-idとvalue-idも考慮
-		if field.IsMapType() {
-			mapType, _ := field.GetMapType()
-			if keyID, ok := mapType["key-id"].(int); ok && keyID > maxID {
-				maxID = keyID
-			}
-			if keyID, ok := mapType["key-id"].(float64); ok && int(keyID) > maxID {
-				maxID = int(keyID)
-			}
-			if valueID, ok := mapType["value-id"].(int); ok && valueID > maxID {
-				maxID = valueID
-			}
-			if valueID, ok := mapType["value-id"].(float64); ok && int(valueID) > maxID {
-				maxID = int(valueID)
-			}
-		}
-	}
-	return maxID
-}
-
 // generateNewMetadata generates a new metadata file with a new snapshot
 // 新しいスナップショットを含む新しいメタデータファイルを生成
 //

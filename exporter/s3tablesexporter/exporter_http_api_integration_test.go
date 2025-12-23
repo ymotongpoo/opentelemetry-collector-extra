@@ -15,17 +15,12 @@
 package s3tablesexporter
 
 import (
-	"context"
-	"encoding/json"
-	"io"
-	"net/http"
-	"strings"
 	"testing"
 )
 
-// TestHTTPAPIIntegration_TracesSchema tests end-to-end table creation with traces schema using HTTP API
-// トレーススキーマを使用したHTTP APIによるエンドツーエンドのテーブル作成をテスト
-// Requirements: 4.1
+// TestHTTPAPIIntegration_TracesSchema tests schema serialization for traces with pre-existing table
+// 事前に存在するテーブルを使用したトレーススキーマのシリアライゼーションをテスト
+// Requirements: 3.1, 3.2
 func TestHTTPAPIIntegration_TracesSchema(t *testing.T) {
 	// トレーススキーマを作成
 	schema := createTracesSchema()
@@ -43,110 +38,8 @@ func TestHTTPAPIIntegration_TracesSchema(t *testing.T) {
 		t.Fatalf("MarshalSchemaFields() failed: %v", err)
 	}
 
-	// HTTPモックサーバーを作成
-	var capturedRequest *CreateTableRequest
-	mockServer := NewMockS3TablesServer(t, MockS3TablesServerConfig{
-		StatusCode: http.StatusCreated,
-		ResponseBody: CreateTableResponse{
-			TableARN:     "arn:aws:s3tables:us-east-1:123456789012:bucket/test-bucket/table/test-namespace/otel_traces",
-			VersionToken: "version-token-1",
-		},
-		CaptureCreateTableRequest: &capturedRequest,
-		ValidateRequest: ValidateCreateTableRequest("POST", "/tables"),
-	})
-	defer mockServer.Close()
-
-	// リクエストボディを構築
-	requestBody := CreateTableRequest{
-		TableBucketARN: "arn:aws:s3tables:us-east-1:123456789012:bucket/test-bucket",
-		Namespace:      "test-namespace",
-		Name:           "otel_traces",
-		Format:         "ICEBERG",
-		Metadata: CreateTableMetadata{
-			Iceberg: CreateTableIcebergMetadata{
-				Schema: CreateTableSchema{
-					Fields: customFields,
-				},
-			},
-		},
-	}
-
-	// リクエストボディをJSONにシリアライズ
-	requestBodyBytes, err := json.Marshal(requestBody)
-	if err != nil {
-		t.Fatalf("failed to marshal request body: %v", err)
-	}
-
-	// HTTPリクエストを作成
-	endpoint := mockServer.URL + "/tables"
-	req, err := http.NewRequestWithContext(context.Background(), "POST", endpoint, strings.NewReader(string(requestBodyBytes)))
-	if err != nil {
-		t.Fatalf("failed to create HTTP request: %v", err)
-	}
-
-	// Content-Typeヘッダーを設定
-	req.Header.Set("Content-Type", "application/json")
-
-	// HTTPリクエストを送信
-	httpClient := &http.Client{}
-	resp, err := httpClient.Do(req)
-	if err != nil {
-		t.Fatalf("failed to send HTTP request: %v", err)
-	}
-	defer resp.Body.Close()
-
-	// レスポンスステータスコードを検証
-	if resp.StatusCode != http.StatusCreated {
-		t.Errorf("expected status code %d, got %d", http.StatusCreated, resp.StatusCode)
-	}
-
-	// レスポンスボディを読み取る
-	respBody, err := io.ReadAll(resp.Body)
-	if err != nil {
-		t.Fatalf("failed to read response body: %v", err)
-	}
-
-	// レスポンスボディをパース
-	var createResp CreateTableResponse
-	if err := json.Unmarshal(respBody, &createResp); err != nil {
-		t.Fatalf("failed to parse response body: %v", err)
-	}
-
-	// レスポンスを検証
-	expectedTableARN := "arn:aws:s3tables:us-east-1:123456789012:bucket/test-bucket/table/test-namespace/otel_traces"
-	if createResp.TableARN != expectedTableARN {
-		t.Errorf("expected TableARN %s, got %s", expectedTableARN, createResp.TableARN)
-	}
-
-	expectedVersionToken := "version-token-1"
-	if createResp.VersionToken != expectedVersionToken {
-		t.Errorf("expected VersionToken %s, got %s", expectedVersionToken, createResp.VersionToken)
-	}
-
-	// リクエストがキャプチャされたことを確認
-	if capturedRequest == nil {
-		t.Fatal("request was not captured")
-	}
-
-	// リクエストボディの構造を検証
-	if capturedRequest.TableBucketARN != requestBody.TableBucketARN {
-		t.Errorf("expected TableBucketARN %s, got %s", requestBody.TableBucketARN, capturedRequest.TableBucketARN)
-	}
-
-	if capturedRequest.Namespace != requestBody.Namespace {
-		t.Errorf("expected Namespace %s, got %s", requestBody.Namespace, capturedRequest.Namespace)
-	}
-
-	if capturedRequest.Name != requestBody.Name {
-		t.Errorf("expected Name %s, got %s", requestBody.Name, capturedRequest.Name)
-	}
-
-	if capturedRequest.Format != "ICEBERG" {
-		t.Errorf("expected Format ICEBERG, got %s", capturedRequest.Format)
-	}
-
 	// スキーマフィールドを検証
-	fields := capturedRequest.Metadata.Iceberg.Schema.Fields
+	fields := customFields
 
 	// トレーススキーマは8つのフィールドを持つ
 	expectedFieldCount := 8
@@ -256,14 +149,13 @@ func TestHTTPAPIIntegration_TracesSchema(t *testing.T) {
 		}
 	}
 
-	// シリアライズされたスキーマがS3 Tables APIに受け入れられることを確認
-	// （モックが正常に完了したことで確認済み）
-	t.Log("Traces schema successfully serialized and accepted by S3 Tables API")
+	// スキーマが正しくシリアライズされることを確認
+	t.Log("Traces schema successfully serialized")
 }
 
-// TestHTTPAPIIntegration_MetricsSchema tests end-to-end table creation with metrics schema using HTTP API
-// メトリクススキーマを使用したHTTP APIによるエンドツーエンドのテーブル作成をテスト
-// Requirements: 4.2
+// TestHTTPAPIIntegration_MetricsSchema tests schema serialization for metrics with pre-existing table
+// 事前に存在するテーブルを使用したメトリクススキーマのシリアライゼーションをテスト
+// Requirements: 3.1, 3.2
 func TestHTTPAPIIntegration_MetricsSchema(t *testing.T) {
 	// メトリクススキーマを作成
 	schema := createMetricsSchema()
@@ -281,110 +173,8 @@ func TestHTTPAPIIntegration_MetricsSchema(t *testing.T) {
 		t.Fatalf("MarshalSchemaFields() failed: %v", err)
 	}
 
-	// HTTPモックサーバーを作成
-	var capturedRequest *CreateTableRequest
-	mockServer := NewMockS3TablesServer(t, MockS3TablesServerConfig{
-		StatusCode: http.StatusCreated,
-		ResponseBody: CreateTableResponse{
-			TableARN:     "arn:aws:s3tables:us-east-1:123456789012:bucket/test-bucket/table/test-namespace/otel_metrics",
-			VersionToken: "version-token-1",
-		},
-		CaptureCreateTableRequest: &capturedRequest,
-		ValidateRequest: ValidateCreateTableRequest("POST", "/tables"),
-	})
-	defer mockServer.Close()
-
-	// リクエストボディを構築
-	requestBody := CreateTableRequest{
-		TableBucketARN: "arn:aws:s3tables:us-east-1:123456789012:bucket/test-bucket",
-		Namespace:      "test-namespace",
-		Name:           "otel_metrics",
-		Format:         "ICEBERG",
-		Metadata: CreateTableMetadata{
-			Iceberg: CreateTableIcebergMetadata{
-				Schema: CreateTableSchema{
-					Fields: customFields,
-				},
-			},
-		},
-	}
-
-	// リクエストボディをJSONにシリアライズ
-	requestBodyBytes, err := json.Marshal(requestBody)
-	if err != nil {
-		t.Fatalf("failed to marshal request body: %v", err)
-	}
-
-	// HTTPリクエストを作成
-	endpoint := mockServer.URL + "/tables"
-	req, err := http.NewRequestWithContext(context.Background(), "POST", endpoint, strings.NewReader(string(requestBodyBytes)))
-	if err != nil {
-		t.Fatalf("failed to create HTTP request: %v", err)
-	}
-
-	// Content-Typeヘッダーを設定
-	req.Header.Set("Content-Type", "application/json")
-
-	// HTTPリクエストを送信
-	httpClient := &http.Client{}
-	resp, err := httpClient.Do(req)
-	if err != nil {
-		t.Fatalf("failed to send HTTP request: %v", err)
-	}
-	defer resp.Body.Close()
-
-	// レスポンスステータスコードを検証
-	if resp.StatusCode != http.StatusCreated {
-		t.Errorf("expected status code %d, got %d", http.StatusCreated, resp.StatusCode)
-	}
-
-	// レスポンスボディを読み取る
-	respBody, err := io.ReadAll(resp.Body)
-	if err != nil {
-		t.Fatalf("failed to read response body: %v", err)
-	}
-
-	// レスポンスボディをパース
-	var createResp CreateTableResponse
-	if err := json.Unmarshal(respBody, &createResp); err != nil {
-		t.Fatalf("failed to parse response body: %v", err)
-	}
-
-	// レスポンスを検証
-	expectedTableARN := "arn:aws:s3tables:us-east-1:123456789012:bucket/test-bucket/table/test-namespace/otel_metrics"
-	if createResp.TableARN != expectedTableARN {
-		t.Errorf("expected TableARN %s, got %s", expectedTableARN, createResp.TableARN)
-	}
-
-	expectedVersionToken := "version-token-1"
-	if createResp.VersionToken != expectedVersionToken {
-		t.Errorf("expected VersionToken %s, got %s", expectedVersionToken, createResp.VersionToken)
-	}
-
-	// リクエストがキャプチャされたことを確認
-	if capturedRequest == nil {
-		t.Fatal("request was not captured")
-	}
-
-	// リクエストボディの構造を検証
-	if capturedRequest.TableBucketARN != requestBody.TableBucketARN {
-		t.Errorf("expected TableBucketARN %s, got %s", requestBody.TableBucketARN, capturedRequest.TableBucketARN)
-	}
-
-	if capturedRequest.Namespace != requestBody.Namespace {
-		t.Errorf("expected Namespace %s, got %s", requestBody.Namespace, capturedRequest.Namespace)
-	}
-
-	if capturedRequest.Name != requestBody.Name {
-		t.Errorf("expected Name %s, got %s", requestBody.Name, capturedRequest.Name)
-	}
-
-	if capturedRequest.Format != "ICEBERG" {
-		t.Errorf("expected Format ICEBERG, got %s", capturedRequest.Format)
-	}
-
 	// スキーマフィールドを検証
-	fields := capturedRequest.Metadata.Iceberg.Schema.Fields
+	fields := customFields
 
 	// メトリクススキーマは6つのフィールドを持つ
 	expectedFieldCount := 6
@@ -492,14 +282,13 @@ func TestHTTPAPIIntegration_MetricsSchema(t *testing.T) {
 		}
 	}
 
-	// シリアライズされたスキーマがS3 Tables APIに受け入れられることを確認
-	// （モックが正常に完了したことで確認済み）
-	t.Log("Metrics schema successfully serialized and accepted by S3 Tables API")
+	// スキーマが正しくシリアライズされることを確認
+	t.Log("Metrics schema successfully serialized")
 }
 
-// TestHTTPAPIIntegration_LogsSchema tests end-to-end table creation with logs schema using HTTP API
-// ログスキーマを使用したHTTP APIによるエンドツーエンドのテーブル作成をテスト
-// Requirements: 4.3
+// TestHTTPAPIIntegration_LogsSchema tests schema serialization for logs with pre-existing table
+// 事前に存在するテーブルを使用したログスキーマのシリアライゼーションをテスト
+// Requirements: 3.1, 3.2
 func TestHTTPAPIIntegration_LogsSchema(t *testing.T) {
 	// ログスキーマを作成
 	schema := createLogsSchema()
@@ -517,110 +306,8 @@ func TestHTTPAPIIntegration_LogsSchema(t *testing.T) {
 		t.Fatalf("MarshalSchemaFields() failed: %v", err)
 	}
 
-	// HTTPモックサーバーを作成
-	var capturedRequest *CreateTableRequest
-	mockServer := NewMockS3TablesServer(t, MockS3TablesServerConfig{
-		StatusCode: http.StatusCreated,
-		ResponseBody: CreateTableResponse{
-			TableARN:     "arn:aws:s3tables:us-east-1:123456789012:bucket/test-bucket/table/test-namespace/otel_logs",
-			VersionToken: "version-token-1",
-		},
-		CaptureCreateTableRequest: &capturedRequest,
-		ValidateRequest: ValidateCreateTableRequest("POST", "/tables"),
-	})
-	defer mockServer.Close()
-
-	// リクエストボディを構築
-	requestBody := CreateTableRequest{
-		TableBucketARN: "arn:aws:s3tables:us-east-1:123456789012:bucket/test-bucket",
-		Namespace:      "test-namespace",
-		Name:           "otel_logs",
-		Format:         "ICEBERG",
-		Metadata: CreateTableMetadata{
-			Iceberg: CreateTableIcebergMetadata{
-				Schema: CreateTableSchema{
-					Fields: customFields,
-				},
-			},
-		},
-	}
-
-	// リクエストボディをJSONにシリアライズ
-	requestBodyBytes, err := json.Marshal(requestBody)
-	if err != nil {
-		t.Fatalf("failed to marshal request body: %v", err)
-	}
-
-	// HTTPリクエストを作成
-	endpoint := mockServer.URL + "/tables"
-	req, err := http.NewRequestWithContext(context.Background(), "POST", endpoint, strings.NewReader(string(requestBodyBytes)))
-	if err != nil {
-		t.Fatalf("failed to create HTTP request: %v", err)
-	}
-
-	// Content-Typeヘッダーを設定
-	req.Header.Set("Content-Type", "application/json")
-
-	// HTTPリクエストを送信
-	httpClient := &http.Client{}
-	resp, err := httpClient.Do(req)
-	if err != nil {
-		t.Fatalf("failed to send HTTP request: %v", err)
-	}
-	defer resp.Body.Close()
-
-	// レスポンスステータスコードを検証
-	if resp.StatusCode != http.StatusCreated {
-		t.Errorf("expected status code %d, got %d", http.StatusCreated, resp.StatusCode)
-	}
-
-	// レスポンスボディを読み取る
-	respBody, err := io.ReadAll(resp.Body)
-	if err != nil {
-		t.Fatalf("failed to read response body: %v", err)
-	}
-
-	// レスポンスボディをパース
-	var createResp CreateTableResponse
-	if err := json.Unmarshal(respBody, &createResp); err != nil {
-		t.Fatalf("failed to parse response body: %v", err)
-	}
-
-	// レスポンスを検証
-	expectedTableARN := "arn:aws:s3tables:us-east-1:123456789012:bucket/test-bucket/table/test-namespace/otel_logs"
-	if createResp.TableARN != expectedTableARN {
-		t.Errorf("expected TableARN %s, got %s", expectedTableARN, createResp.TableARN)
-	}
-
-	expectedVersionToken := "version-token-1"
-	if createResp.VersionToken != expectedVersionToken {
-		t.Errorf("expected VersionToken %s, got %s", expectedVersionToken, createResp.VersionToken)
-	}
-
-	// リクエストがキャプチャされたことを確認
-	if capturedRequest == nil {
-		t.Fatal("request was not captured")
-	}
-
-	// リクエストボディの構造を検証
-	if capturedRequest.TableBucketARN != requestBody.TableBucketARN {
-		t.Errorf("expected TableBucketARN %s, got %s", requestBody.TableBucketARN, capturedRequest.TableBucketARN)
-	}
-
-	if capturedRequest.Namespace != requestBody.Namespace {
-		t.Errorf("expected Namespace %s, got %s", requestBody.Namespace, capturedRequest.Namespace)
-	}
-
-	if capturedRequest.Name != requestBody.Name {
-		t.Errorf("expected Name %s, got %s", requestBody.Name, capturedRequest.Name)
-	}
-
-	if capturedRequest.Format != "ICEBERG" {
-		t.Errorf("expected Format ICEBERG, got %s", capturedRequest.Format)
-	}
-
 	// スキーマフィールドを検証
-	fields := capturedRequest.Metadata.Iceberg.Schema.Fields
+	fields := customFields
 
 	// ログスキーマは5つのフィールドを持つ
 	expectedFieldCount := 5
@@ -726,7 +413,6 @@ func TestHTTPAPIIntegration_LogsSchema(t *testing.T) {
 		}
 	}
 
-	// シリアライズされたスキーマがS3 Tables APIに受け入れられることを確認
-	// （モックが正常に完了したことで確認済み）
-	t.Log("Logs schema successfully serialized and accepted by S3 Tables API")
+	// スキーマが正しくシリアライズされることを確認
+	t.Log("Logs schema successfully serialized")
 }

@@ -187,15 +187,6 @@ func TestUploadToS3Tables_Integration_ContextCancellation(t *testing.T) {
 	}
 }
 
-// TestUploadToS3Tables_Integration_TableCreation tests table creation flow
-// テーブル作成フローを検証
-// Requirements: 1.1, 2.1
-// Note: このテストはDirect HTTP API対応のため、現在スキップされています
-// 実際のHTTPモックサーバーを使用する必要があるため、別のテストで十分にカバーされています
-func TestUploadToS3Tables_Integration_TableCreation(t *testing.T) {
-	t.Skip("Skipping test: Direct HTTP API requires HTTP mock server setup. Covered by exporter_create_table_test.go")
-}
-
 // TestUploadToS3Tables_Integration_MultipleDataTypes tests uploading different data types
 // 異なるデータタイプのアップロードを検証
 // Requirements: 1.1, 1.2, 1.3, 1.4
