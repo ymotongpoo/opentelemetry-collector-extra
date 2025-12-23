@@ -19,14 +19,11 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"io"
 	"log/slog"
-	"net/http"
 	"regexp"
 	"time"
 
 	"github.com/aws/aws-sdk-go-v2/aws"
-	"github.com/aws/aws-sdk-go-v2/aws/signer/v4"
 	"github.com/aws/aws-sdk-go-v2/config"
 	"github.com/aws/aws-sdk-go-v2/service/s3"
 	"github.com/aws/aws-sdk-go-v2/service/s3tables"
@@ -70,37 +67,6 @@ type s3TablesExporter struct {
 	s3TablesClient s3TablesClientInterface
 	s3Client       s3ClientInterface
 	tableCache     map[string]*TableInfo // キャッシュキーは "namespace.tableName" 形式
-	awsConfig      aws.Config            // AWS設定（SigV4署名用）
-}
-
-// CreateTableRequest はCreateTable APIのHTTPリクエストボディを表す
-type CreateTableRequest struct {
-	TableBucketARN string                 `json:"tableBucketARN"`
-	Namespace      string                 `json:"namespace"`
-	Name           string                 `json:"name"`
-	Format         string                 `json:"format"` // "ICEBERG"
-	Metadata       CreateTableMetadata    `json:"metadata"`
-}
-
-// CreateTableMetadata はCreateTableリクエストのmetadataセクションを表す
-type CreateTableMetadata struct {
-	Iceberg CreateTableIcebergMetadata `json:"iceberg"`
-}
-
-// CreateTableIcebergMetadata はIcebergメタデータを表す
-type CreateTableIcebergMetadata struct {
-	Schema CreateTableSchema `json:"schema"`
-}
-
-// CreateTableSchema はスキーマセクションを表す
-type CreateTableSchema struct {
-	Fields []CustomSchemaField `json:"fields"`
-}
-
-// CreateTableResponse はCreateTable APIのHTTPレスポンスを表す
-type CreateTableResponse struct {
-	TableARN     string `json:"tableARN"`
-	VersionToken string `json:"versionToken"`
 }
 
 // newS3TablesExporter creates a new S3 Tables exporter instance.
@@ -123,7 +89,6 @@ func newS3TablesExporter(cfg *Config, set exporter.Settings) (*s3TablesExporter,
 		s3TablesClient: s3tables.NewFromConfig(awsCfg),
 		s3Client:       s3.NewFromConfig(awsCfg),
 		tableCache:     make(map[string]*TableInfo),
-		awsConfig:      awsCfg, // AWS設定を保存（SigV4署名用）
 	}, nil
 }
 
@@ -285,70 +250,6 @@ func (e *s3TablesExporter) uploadToWarehouseLocation(ctx context.Context, wareho
 	return s3Path, nil
 }
 
-// getOrCreateTable gets an existing table or creates a new one
-// テーブルが存在する場合は取得、存在しない場合は作成
-func (e *s3TablesExporter) getOrCreateTable(ctx context.Context, namespace, tableName string, schema map[string]interface{}) (*TableInfo, error) {
-	// キャッシュキーを生成
-	cacheKey := fmt.Sprintf("%s.%s", namespace, tableName)
-
-	// キャッシュをチェック
-	if cachedInfo, ok := e.tableCache[cacheKey]; ok {
-		e.logger.Debug("Using cached table information",
-			"namespace", namespace,
-			"table", tableName)
-		return cachedInfo, nil
-	}
-
-	e.logger.Debug("Table not in cache, attempting to retrieve from S3 Tables API",
-		"namespace", namespace,
-		"table", tableName)
-
-	// テーブルの取得を試みる
-	tableInfo, err := e.getTable(ctx, namespace, tableName)
-	if err == nil {
-		// テーブルが存在する場合はキャッシュに保存
-		e.logger.Debug("Table exists, caching information",
-			"namespace", namespace,
-			"table", tableName,
-			"table_arn", tableInfo.TableARN)
-		e.tableCache[cacheKey] = tableInfo
-		return tableInfo, nil
-	}
-
-	e.logger.Debug("Table does not exist, will create new table",
-		"namespace", namespace,
-		"table", tableName,
-		"error", err)
-
-	// テーブルが存在しない場合は、まずNamespaceを作成
-	e.logger.Debug("Ensuring namespace exists",
-		"namespace", namespace)
-	if err := e.createNamespaceIfNotExists(ctx, namespace); err != nil {
-		return nil, fmt.Errorf("failed to create namespace: %w", err)
-	}
-
-	// スキーマシリアライゼーションのステップをデバッグログに記録
-	e.logger.Debug("Starting schema serialization for table creation",
-		"namespace", namespace,
-		"table", tableName)
-
-	// テーブルを作成
-	tableInfo, err = e.createTable(ctx, namespace, tableName, schema)
-	if err != nil {
-		return nil, fmt.Errorf("failed to create table: %w", err)
-	}
-
-	// キャッシュに保存
-	e.tableCache[cacheKey] = tableInfo
-
-	e.logger.Debug("Table created and cached",
-		"namespace", namespace,
-		"table", tableName,
-		"table_arn", tableInfo.TableARN)
-
-	return tableInfo, nil
-}
-
 // getTable retrieves table information using S3 Tables API
 // S3 Tables APIを使用してテーブル情報を取得
 func (e *s3TablesExporter) getTable(ctx context.Context, namespace, tableName string) (*TableInfo, error) {
@@ -385,300 +286,6 @@ func (e *s3TablesExporter) getTable(ctx context.Context, namespace, tableName st
 		"warehouse_location", tableInfo.WarehouseLocation)
 
 	return tableInfo, nil
-}
-
-// createTable creates a new table using S3 Tables API
-// S3 Tables APIを使用してテーブルを作成
-func (e *s3TablesExporter) createTable(ctx context.Context, namespace, tableName string, schema map[string]interface{}) (*TableInfo, error) {
-	// コンテキストキャンセルのチェック
-	select {
-	case <-ctx.Done():
-		return nil, fmt.Errorf("table creation cancelled: %w", ctx.Err())
-	default:
-	}
-
-	// スキーマをIcebergSchema形式に変換
-	icebergSchema, err := convertToIcebergSchema(schema)
-	if err != nil {
-		return nil, fmt.Errorf("failed to convert schema to Iceberg format: %w", err)
-	}
-
-	// デバッグログ: スキーマシリアライゼーション開始
-	e.logger.Debug("Starting schema serialization",
-		"namespace", namespace,
-		"table", tableName,
-		"field_count", len(icebergSchema.Fields))
-
-	// AWSSchemaAdapterを使用してスキーマをシリアライズ
-	adapter := NewAWSSchemaAdapter(icebergSchema)
-
-	// スキーマをJSON形式でデバッグログに出力
-	serializer := NewIcebergSchemaSerializer(icebergSchema)
-	schemaJSON, err := serializer.SerializeToJSON()
-	if err != nil {
-		e.logger.Error("Failed to serialize schema to JSON for debugging",
-			"namespace", namespace,
-			"table", tableName,
-			"error", err)
-		// デバッグログの失敗は致命的ではないので続行
-	} else {
-		e.logger.Debug("Serialized Iceberg schema",
-			"namespace", namespace,
-			"table", tableName,
-			"schema_json", schemaJSON)
-	}
-
-	// CustomSchemaFieldsを取得
-	customFields, err := adapter.MarshalSchemaFields()
-	if err != nil {
-		e.logger.Error("Failed to marshal schema fields",
-			"namespace", namespace,
-			"table", tableName,
-			"schema_json", schemaJSON,
-			"error", err)
-		return nil, fmt.Errorf("failed to marshal schema fields: %w", err)
-	}
-
-	// Direct HTTP APIを使用してテーブルを作成
-	tableInfo, err := e.createTableDirectAPI(ctx, namespace, tableName, customFields)
-	if err != nil {
-		e.logger.Error("Failed to create table using Direct HTTP API",
-			"namespace", namespace,
-			"table", tableName,
-			"schema_json", schemaJSON,
-			"error", err)
-		return nil, fmt.Errorf("failed to create table %s.%s: %w", namespace, tableName, err)
-	}
-
-	return tableInfo, nil
-}
-
-// createTableDirectAPI はDirect HTTP APIを使用してテーブルを作成する
-// AWS SDKの型制約（types.SchemaField.Typeが*string型）を回避するため、
-// 直接S3 Tables APIにHTTPリクエストを送信する
-func (e *s3TablesExporter) createTableDirectAPI(
-	ctx context.Context,
-	namespace string,
-	tableName string,
-	customFields []CustomSchemaField,
-) (*TableInfo, error) {
-	// コンテキストキャンセルのチェック
-	select {
-	case <-ctx.Done():
-		return nil, fmt.Errorf("table creation cancelled: %w", ctx.Err())
-	default:
-	}
-
-	e.logger.Debug("Creating table using Direct HTTP API",
-		"namespace", namespace,
-		"table", tableName,
-		"field_count", len(customFields))
-
-	// 1. HTTPクライアントを作成
-	httpClient := &http.Client{
-		Timeout: 30 * time.Second,
-	}
-
-	// 2. S3 Tables APIエンドポイントを構築
-	// 形式: https://s3tables.{region}.amazonaws.com/tables
-	endpoint := fmt.Sprintf("https://s3tables.%s.amazonaws.com/tables", e.config.Region)
-
-	// 3. リクエストボディを構築
-	requestBody := CreateTableRequest{
-		TableBucketARN: e.config.TableBucketArn,
-		Namespace:      namespace,
-		Name:           tableName,
-		Format:         "ICEBERG",
-		Metadata: CreateTableMetadata{
-			Iceberg: CreateTableIcebergMetadata{
-				Schema: CreateTableSchema{
-					Fields: customFields,
-				},
-			},
-		},
-	}
-
-	// リクエストボディをJSONにシリアライズ
-	requestBodyBytes, err := json.Marshal(requestBody)
-	if err != nil {
-		e.logger.Error("Failed to marshal request body",
-			"namespace", namespace,
-			"table", tableName,
-			"error", err)
-		return nil, fmt.Errorf("failed to marshal request body: %w", err)
-	}
-
-	// デバッグログ: リクエストボディ
-	e.logger.Debug("Direct HTTP API request body",
-		"namespace", namespace,
-		"table", tableName,
-		"request_body", string(requestBodyBytes))
-
-	// 4. HTTPリクエストを作成
-	req, err := http.NewRequestWithContext(ctx, "POST", endpoint, bytes.NewReader(requestBodyBytes))
-	if err != nil {
-		e.logger.Error("Failed to create HTTP request",
-			"endpoint", endpoint,
-			"error", err)
-		return nil, fmt.Errorf("failed to create HTTP request: %w", err)
-	}
-
-	// Content-Typeヘッダーを設定
-	req.Header.Set("Content-Type", "application/json")
-
-	// 5. AWS SigV4署名を追加
-	if err := e.signHTTPRequest(ctx, req, requestBodyBytes); err != nil {
-		e.logger.Error("Failed to sign HTTP request",
-			"endpoint", endpoint,
-			"error", err)
-		return nil, fmt.Errorf("failed to sign HTTP request: %w", err)
-	}
-
-	// 6. HTTPリクエストを送信
-	resp, err := httpClient.Do(req)
-	if err != nil {
-		e.logger.Error("Failed to send HTTP request",
-			"endpoint", endpoint,
-			"error", err)
-		return nil, fmt.Errorf("failed to send HTTP request: %w", err)
-	}
-	defer resp.Body.Close()
-
-	// 7. レスポンスボディを読み取る
-	respBodyBytes, err := io.ReadAll(resp.Body)
-	if err != nil {
-		e.logger.Error("Failed to read response body",
-			"status_code", resp.StatusCode,
-			"error", err)
-		return nil, fmt.Errorf("failed to read response body: %w", err)
-	}
-
-	// デバッグログ: レスポンス
-	e.logger.Debug("Direct HTTP API response",
-		"namespace", namespace,
-		"table", tableName,
-		"status_code", resp.StatusCode,
-		"response_body", string(respBodyBytes))
-
-	// 8. レスポンスハンドリング
-	if resp.StatusCode != http.StatusOK && resp.StatusCode != http.StatusCreated {
-		// エラーレスポンス
-		e.logger.Error("S3 Tables API rejected table creation",
-			"namespace", namespace,
-			"table", tableName,
-			"status_code", resp.StatusCode,
-			"response_body", string(respBodyBytes),
-			"request_body", string(requestBodyBytes))
-		return nil, fmt.Errorf("S3 Tables API returned status %d: %s", resp.StatusCode, string(respBodyBytes))
-	}
-
-	// 成功レスポンスを解析
-	var createResp CreateTableResponse
-	if err := json.Unmarshal(respBodyBytes, &createResp); err != nil {
-		e.logger.Error("Failed to parse response body",
-			"response_body", string(respBodyBytes),
-			"error", err)
-		return nil, fmt.Errorf("failed to parse response body: %w", err)
-	}
-
-	// 9. GetTableを呼び出してwarehouse locationを取得
-	getOutput, err := e.s3TablesClient.GetTable(ctx, &s3tables.GetTableInput{
-		TableBucketARN: &e.config.TableBucketArn,
-		Namespace:      &namespace,
-		Name:           &tableName,
-	})
-	if err != nil {
-		return nil, fmt.Errorf("failed to get table after creation %s.%s: %w", namespace, tableName, err)
-	}
-
-	// TableInfoを構築
-	tableInfo := &TableInfo{
-		TableARN:          createResp.TableARN,
-		WarehouseLocation: *getOutput.WarehouseLocation,
-		VersionToken:      createResp.VersionToken,
-	}
-
-	e.logger.Info("Created table using Direct HTTP API",
-		"namespace", namespace,
-		"table", tableName,
-		"table_arn", tableInfo.TableARN,
-		"warehouse_location", tableInfo.WarehouseLocation)
-
-	return tableInfo, nil
-}
-
-// signHTTPRequest はAWS SigV4署名を使用してHTTPリクエストに署名する
-func (e *s3TablesExporter) signHTTPRequest(ctx context.Context, req *http.Request, payload []byte) error {
-	// AWS認証情報を取得
-	credentials, err := e.awsConfig.Credentials.Retrieve(ctx)
-	if err != nil {
-		return fmt.Errorf("failed to retrieve AWS credentials: %w", err)
-	}
-
-	// SigV4署名者を作成
-	signer := v4.NewSigner()
-
-	// リクエストに署名
-	// サービス名: s3tables
-	// リージョン: e.config.Region
-	err = signer.SignHTTP(ctx, credentials, req, fmt.Sprintf("%x", payload), "s3tables", e.config.Region, time.Now())
-	if err != nil {
-		return fmt.Errorf("failed to sign HTTP request: %w", err)
-	}
-
-	return nil
-}
-
-
-
-// createNamespaceIfNotExists creates a namespace if it doesn't exist
-// Namespaceが存在しない場合は作成する
-func (e *s3TablesExporter) createNamespaceIfNotExists(ctx context.Context, namespace string) error {
-	// コンテキストキャンセルのチェック
-	select {
-	case <-ctx.Done():
-		return fmt.Errorf("namespace creation cancelled: %w", ctx.Err())
-	default:
-	}
-
-	// Table Bucket ARNからバケット名を抽出
-	bucketName, err := extractBucketNameFromArn(e.config.TableBucketArn)
-	if err != nil {
-		return fmt.Errorf("failed to extract bucket name from ARN: %w", err)
-	}
-
-	// Namespaceの存在確認
-	getInput := &s3tables.GetNamespaceInput{
-		TableBucketARN: &e.config.TableBucketArn,
-		Namespace:      &namespace,
-	}
-
-	_, err = e.s3TablesClient.GetNamespace(ctx, getInput)
-	if err == nil {
-		// Namespaceが既に存在する
-		e.logger.Debug("Namespace already exists",
-			"namespace", namespace,
-			"bucket", bucketName)
-		return nil
-	}
-
-	// Namespaceが存在しない場合は作成
-	// Namespaceは階層構造をサポートするため配列形式
-	createInput := &s3tables.CreateNamespaceInput{
-		TableBucketARN: &e.config.TableBucketArn,
-		Namespace:      []string{namespace},
-	}
-
-	_, err = e.s3TablesClient.CreateNamespace(ctx, createInput)
-	if err != nil {
-		return fmt.Errorf("failed to create namespace %s: %w", namespace, err)
-	}
-
-	e.logger.Info("Created namespace",
-		"namespace", namespace,
-		"bucket", bucketName)
-
-	return nil
 }
 
 // commitSnapshot commits a new snapshot to the Iceberg table
@@ -1188,17 +795,13 @@ func (e *s3TablesExporter) uploadBatchToS3Tables(ctx context.Context, dataList [
 
 	// データタイプに応じたテーブル名を取得
 	var tableName string
-	var schema map[string]interface{}
 	switch dataType {
 	case "metrics":
 		tableName = e.config.Tables.Metrics
-		schema = createMetricsSchema()
 	case "traces":
 		tableName = e.config.Tables.Traces
-		schema = createTracesSchema()
 	case "logs":
 		tableName = e.config.Tables.Logs
-		schema = createLogsSchema()
 	default:
 		return fmt.Errorf("unknown data type: %s", dataType)
 	}
@@ -1224,14 +827,14 @@ func (e *s3TablesExporter) uploadBatchToS3Tables(ctx context.Context, dataList [
 		"file_count", len(dataList),
 		"total_size", totalSize)
 
-	// 1. テーブルを取得または作成
-	tableInfo, err := e.getOrCreateTable(ctx, e.config.Namespace, tableName, schema)
+	// 1. テーブル情報を取得（一時的にgetTableを使用、タスク2でgetTableInfoに置き換え予定）
+	tableInfo, err := e.getTable(ctx, e.config.Namespace, tableName)
 	if err != nil {
-		e.logger.Error("Failed to get or create table",
+		e.logger.Error("Failed to get table",
 			"namespace", e.config.Namespace,
 			"table", tableName,
 			"error", err)
-		return fmt.Errorf("failed to get or create table: %w", err)
+		return fmt.Errorf("failed to get table: %w", err)
 	}
 
 	// 2. すべてのParquetファイルをWarehouse locationにアップロード
@@ -1305,17 +908,13 @@ func (e *s3TablesExporter) uploadToS3Tables(ctx context.Context, data []byte, da
 	// アップロード開始のログ出力
 	// データタイプに応じたテーブル名を取得
 	var tableName string
-	var schema map[string]interface{}
 	switch dataType {
 	case "metrics":
 		tableName = e.config.Tables.Metrics
-		schema = createMetricsSchema()
 	case "traces":
 		tableName = e.config.Tables.Traces
-		schema = createTracesSchema()
 	case "logs":
 		tableName = e.config.Tables.Logs
-		schema = createLogsSchema()
 	default:
 		return fmt.Errorf("unknown data type: %s", dataType)
 	}
@@ -1334,14 +933,14 @@ func (e *s3TablesExporter) uploadToS3Tables(ctx context.Context, data []byte, da
 		"data_type", dataType,
 		"size", len(data))
 
-	// 1. テーブルを取得または作成
-	tableInfo, err := e.getOrCreateTable(ctx, e.config.Namespace, tableName, schema)
+	// 1. テーブル情報を取得（一時的にgetTableを使用、タスク2でgetTableInfoに置き換え予定）
+	tableInfo, err := e.getTable(ctx, e.config.Namespace, tableName)
 	if err != nil {
-		e.logger.Error("Failed to get or create table",
+		e.logger.Error("Failed to get table",
 			"namespace", e.config.Namespace,
 			"table", tableName,
 			"error", err)
-		return fmt.Errorf("failed to get or create table: %w", err)
+		return fmt.Errorf("failed to get table: %w", err)
 	}
 
 	// 2. Warehouse locationにParquetファイルをアップロード
