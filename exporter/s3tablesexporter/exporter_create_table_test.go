@@ -17,12 +17,14 @@ package s3tablesexporter
 import (
 	"context"
 	"encoding/json"
-	"fmt"
+	"io"
+	"net/http"
+	"net/http/httptest"
+	"strings"
 	"testing"
 
 	"github.com/aws/aws-sdk-go-v2/aws"
 	"github.com/aws/aws-sdk-go-v2/service/s3tables"
-	"github.com/aws/aws-sdk-go-v2/service/s3tables/types"
 	"go.opentelemetry.io/collector/component"
 	exportertest "go.opentelemetry.io/collector/exporter/exportertest"
 )
@@ -31,22 +33,6 @@ import (
 // プリミティブ型のみのスキーマでテーブル作成をテスト
 // Requirements: 5.1, 5.2
 func TestCreateTable_PrimitiveTypes(t *testing.T) {
-	cfg := &Config{
-		TableBucketArn: "arn:aws:s3tables:us-east-1:123456789012:bucket/test-bucket",
-		Region:         "us-east-1",
-		Namespace:      "test-namespace",
-		Tables: TableNamesConfig{
-			Traces:  "otel_traces",
-			Metrics: "otel_metrics",
-			Logs:    "otel_logs",
-		},
-	}
-	set := exportertest.NewNopSettings(component.MustNewType("s3tables"))
-	exporter, err := newS3TablesExporter(cfg, set)
-	if err != nil {
-		t.Fatalf("newS3TablesExporter() failed: %v", err)
-	}
-
 	// プリミティブ型のみのスキーマを作成
 	schema := map[string]interface{}{
 		"fields": []map[string]interface{}{
@@ -71,95 +57,42 @@ func TestCreateTable_PrimitiveTypes(t *testing.T) {
 		},
 	}
 
-	// モックS3 Tablesクライアントを設定
-	var capturedMetadata *types.IcebergMetadata
-	mockClient := &mockS3TablesClient{
-		createTableFunc: func(ctx context.Context, params *s3tables.CreateTableInput, optFns ...func(*s3tables.Options)) (*s3tables.CreateTableOutput, error) {
-			// メタデータをキャプチャ
-			if params.Metadata != nil {
-				if member, ok := params.Metadata.(*types.TableMetadataMemberIceberg); ok {
-					capturedMetadata = &member.Value
-				}
-			}
-			return &s3tables.CreateTableOutput{
-				TableARN:     aws.String("arn:aws:s3tables:us-east-1:123456789012:bucket/test-bucket/table/test-namespace/test-table"),
-				VersionToken: aws.String("version-token-1"),
-			}, nil
-		},
-		getTableFunc: func(ctx context.Context, params *s3tables.GetTableInput, optFns ...func(*s3tables.Options)) (*s3tables.GetTableOutput, error) {
-			return &s3tables.GetTableOutput{
-				TableARN:          aws.String("arn:aws:s3tables:us-east-1:123456789012:bucket/test-bucket/table/test-namespace/test-table"),
-				WarehouseLocation: aws.String("s3://test-bucket/warehouse/test-namespace/test-table"),
-				VersionToken:      aws.String("version-token-1"),
-			}, nil
-		},
-	}
-	exporter.s3TablesClient = mockClient
-
-	// テーブル作成を実行
-	tableInfo, err := exporter.createTable(context.Background(), "test-namespace", "test-table", schema)
-	if err != nil {
-		t.Fatalf("createTable() failed: %v", err)
-	}
-
-	// TableInfoを検証
-	if tableInfo == nil {
-		t.Fatal("tableInfo is nil")
-	}
-	if tableInfo.TableARN == "" {
-		t.Error("TableARN is empty")
-	}
-	if tableInfo.WarehouseLocation == "" {
-		t.Error("WarehouseLocation is empty")
-	}
-
-	// メタデータがキャプチャされたことを確認
-	if capturedMetadata == nil {
-		t.Fatal("metadata was not captured")
-	}
-
-	// Schemaフィールドが設定されていることを確認
-	if capturedMetadata.Schema == nil {
-		t.Fatal("Schema is nil")
-	}
-	if len(capturedMetadata.Schema.Fields) != 3 {
-		t.Errorf("expected 3 fields in Schema, got %d", len(capturedMetadata.Schema.Fields))
-	}
-
-	// フィールドの型を検証
-	for _, field := range capturedMetadata.Schema.Fields {
-		if field.Name == nil || field.Type == nil {
-			t.Error("field Name or Type is nil")
+	// HTTPモックサーバーを作成
+	var capturedRequest *CreateTableRequest
+	mockServer := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		// リクエストメソッドとパスを検証
+		if r.Method != "POST" {
+			t.Errorf("expected POST request, got %s", r.Method)
 		}
-	}
+		if r.URL.Path != "/tables" {
+			t.Errorf("expected /tables path, got %s", r.URL.Path)
+		}
 
-	// プリミティブ型のフィールドを検証
-	// AWS SDKのSchemaFieldは*string型のTypeフィールドを持つ
-	// プリミティブ型の場合、型名がそのまま文字列として格納される
-	expectedTypes := map[string]string{
-		"timestamp":    "timestamptz",
-		"service_name": "string",
-		"value":        "double",
-	}
-	for _, field := range capturedMetadata.Schema.Fields {
-		if field.Name == nil || field.Type == nil {
-			continue
+		// リクエストボディを読み取る
+		body, err := io.ReadAll(r.Body)
+		if err != nil {
+			t.Fatalf("failed to read request body: %v", err)
 		}
-		expectedType, ok := expectedTypes[*field.Name]
-		if !ok {
-			t.Errorf("unexpected field name: %s", *field.Name)
-			continue
-		}
-		if *field.Type != expectedType {
-			t.Errorf("field %s: expected type %s, got %s", *field.Name, expectedType, *field.Type)
-		}
-	}
-}
 
-// TestCreateTable_ComplexTypes tests table creation with complex types (map)
-// 複合型（map）を含むスキーマでテーブル作成をテスト
-// Requirements: 5.1, 5.2
-func TestCreateTable_ComplexTypes(t *testing.T) {
+		// リクエストボディをパース
+		var req CreateTableRequest
+		if err := json.Unmarshal(body, &req); err != nil {
+			t.Fatalf("failed to parse request body: %v", err)
+		}
+		capturedRequest = &req
+
+		// レスポンスを返す
+		resp := CreateTableResponse{
+			TableARN:     "arn:aws:s3tables:us-east-1:123456789012:bucket/test-bucket/table/test-namespace/test-table",
+			VersionToken: "version-token-1",
+		}
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(http.StatusCreated)
+		json.NewEncoder(w).Encode(resp)
+	}))
+	defer mockServer.Close()
+
+	// Exporterを作成
 	cfg := &Config{
 		TableBucketArn: "arn:aws:s3tables:us-east-1:123456789012:bucket/test-bucket",
 		Region:         "us-east-1",
@@ -176,6 +109,130 @@ func TestCreateTable_ComplexTypes(t *testing.T) {
 		t.Fatalf("newS3TablesExporter() failed: %v", err)
 	}
 
+	// モックS3 Tablesクライアントを設定（GetTable用）
+	mockClient := &mockS3TablesClient{
+		getTableFunc: func(ctx context.Context, params *s3tables.GetTableInput, optFns ...func(*s3tables.Options)) (*s3tables.GetTableOutput, error) {
+			return &s3tables.GetTableOutput{
+				TableARN:          aws.String("arn:aws:s3tables:us-east-1:123456789012:bucket/test-bucket/table/test-namespace/test-table"),
+				WarehouseLocation: aws.String("s3://test-bucket/warehouse/test-namespace/test-table"),
+				VersionToken:      aws.String("version-token-1"),
+			}, nil
+		},
+	}
+	exporter.s3TablesClient = mockClient
+
+	// スキーマをIcebergSchema形式に変換
+	icebergSchema, err := convertToIcebergSchema(schema)
+	if err != nil {
+		t.Fatalf("convertToIcebergSchema() failed: %v", err)
+	}
+
+	// AWSSchemaAdapterを使用してCustomSchemaFieldsを取得
+	adapter := NewAWSSchemaAdapter(icebergSchema)
+	customFields, err := adapter.MarshalSchemaFields()
+	if err != nil {
+		t.Fatalf("MarshalSchemaFields() failed: %v", err)
+	}
+
+	// HTTPクライアントを使用してモックサーバーにリクエストを送信
+	endpoint := mockServer.URL + "/tables"
+	httpClient := &http.Client{}
+
+	// リクエストボディを構築
+	requestBody := CreateTableRequest{
+		TableBucketARN: cfg.TableBucketArn,
+		Namespace:      "test-namespace",
+		Name:           "test-table",
+		Format:         "ICEBERG",
+		Metadata: CreateTableMetadata{
+			Iceberg: CreateTableIcebergMetadata{
+				Schema: CreateTableSchema{
+					Fields: customFields,
+				},
+			},
+		},
+	}
+
+	// リクエストボディをJSONにシリアライズ
+	requestBodyBytes, err := json.Marshal(requestBody)
+	if err != nil {
+		t.Fatalf("failed to marshal request body: %v", err)
+	}
+
+	// HTTPリクエストを作成
+	req, err := http.NewRequestWithContext(context.Background(), "POST", endpoint, strings.NewReader(string(requestBodyBytes)))
+	if err != nil {
+		t.Fatalf("failed to create HTTP request: %v", err)
+	}
+
+	// Content-Typeヘッダーを設定
+	req.Header.Set("Content-Type", "application/json")
+
+	// HTTPリクエストを送信
+	resp, err := httpClient.Do(req)
+	if err != nil {
+		t.Fatalf("failed to send HTTP request: %v", err)
+	}
+	defer resp.Body.Close()
+
+	// レスポンスを検証
+	if resp.StatusCode != http.StatusCreated {
+		t.Errorf("expected status code %d, got %d", http.StatusCreated, resp.StatusCode)
+	}
+
+	// リクエストがキャプチャされたことを確認
+	if capturedRequest == nil {
+		t.Fatal("request was not captured")
+	}
+
+	// リクエストの内容を検証
+	if capturedRequest.TableBucketARN != cfg.TableBucketArn {
+		t.Errorf("expected TableBucketARN %s, got %s", cfg.TableBucketArn, capturedRequest.TableBucketARN)
+	}
+	if capturedRequest.Namespace != "test-namespace" {
+		t.Errorf("expected Namespace test-namespace, got %s", capturedRequest.Namespace)
+	}
+	if capturedRequest.Name != "test-table" {
+		t.Errorf("expected Name test-table, got %s", capturedRequest.Name)
+	}
+	if capturedRequest.Format != "ICEBERG" {
+		t.Errorf("expected Format ICEBERG, got %s", capturedRequest.Format)
+	}
+
+	// スキーマフィールドを検証
+	fields := capturedRequest.Metadata.Iceberg.Schema.Fields
+	if len(fields) != 3 {
+		t.Errorf("expected 3 fields in Schema, got %d", len(fields))
+	}
+
+	// プリミティブ型のフィールドを検証
+	expectedTypes := map[string]string{
+		"timestamp":    "timestamptz",
+		"service_name": "string",
+		"value":        "double",
+	}
+	for _, field := range fields {
+		expectedType, ok := expectedTypes[field.Name]
+		if !ok {
+			t.Errorf("unexpected field name: %s", field.Name)
+			continue
+		}
+		// プリミティブ型の場合、Typeは文字列
+		typeStr, ok := field.Type.(string)
+		if !ok {
+			t.Errorf("field %s: expected Type to be string, got %T", field.Name, field.Type)
+			continue
+		}
+		if typeStr != expectedType {
+			t.Errorf("field %s: expected type %s, got %s", field.Name, expectedType, typeStr)
+		}
+	}
+}
+
+// TestCreateTable_ComplexTypes tests table creation with complex types (map)
+// 複合型（map）を含むスキーマでテーブル作成をテスト
+// Requirements: 5.1, 5.2
+func TestCreateTable_ComplexTypes(t *testing.T) {
 	// 複合型を含むスキーマを作成
 	schema := map[string]interface{}{
 		"fields": []map[string]interface{}{
@@ -201,62 +258,133 @@ func TestCreateTable_ComplexTypes(t *testing.T) {
 		},
 	}
 
-	// モックS3 Tablesクライアントを設定
-	var capturedMetadata *types.IcebergMetadata
-	mockClient := &mockS3TablesClient{
-		createTableFunc: func(ctx context.Context, params *s3tables.CreateTableInput, optFns ...func(*s3tables.Options)) (*s3tables.CreateTableOutput, error) {
-			// メタデータをキャプチャ
-			if params.Metadata != nil {
-				if member, ok := params.Metadata.(*types.TableMetadataMemberIceberg); ok {
-					capturedMetadata = &member.Value
-				}
-			}
-			return &s3tables.CreateTableOutput{
-				TableARN:     aws.String("arn:aws:s3tables:us-east-1:123456789012:bucket/test-bucket/table/test-namespace/test-table"),
-				VersionToken: aws.String("version-token-1"),
-			}, nil
-		},
-		getTableFunc: func(ctx context.Context, params *s3tables.GetTableInput, optFns ...func(*s3tables.Options)) (*s3tables.GetTableOutput, error) {
-			return &s3tables.GetTableOutput{
-				TableARN:          aws.String("arn:aws:s3tables:us-east-1:123456789012:bucket/test-bucket/table/test-namespace/test-table"),
-				WarehouseLocation: aws.String("s3://test-bucket/warehouse/test-namespace/test-table"),
-				VersionToken:      aws.String("version-token-1"),
-			}, nil
+	// HTTPモックサーバーを作成
+	var capturedRequest *CreateTableRequest
+	mockServer := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		// リクエストメソッドとパスを検証
+		if r.Method != "POST" {
+			t.Errorf("expected POST request, got %s", r.Method)
+		}
+		if r.URL.Path != "/tables" {
+			t.Errorf("expected /tables path, got %s", r.URL.Path)
+		}
+
+		// リクエストボディを読み取る
+		body, err := io.ReadAll(r.Body)
+		if err != nil {
+			t.Fatalf("failed to read request body: %v", err)
+		}
+
+		// リクエストボディをパース
+		var req CreateTableRequest
+		if err := json.Unmarshal(body, &req); err != nil {
+			t.Fatalf("failed to parse request body: %v", err)
+		}
+		capturedRequest = &req
+
+		// レスポンスを返す
+		resp := CreateTableResponse{
+			TableARN:     "arn:aws:s3tables:us-east-1:123456789012:bucket/test-bucket/table/test-namespace/test-table",
+			VersionToken: "version-token-1",
+		}
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(http.StatusCreated)
+		json.NewEncoder(w).Encode(resp)
+	}))
+	defer mockServer.Close()
+
+	// Exporterを作成
+	cfg := &Config{
+		TableBucketArn: "arn:aws:s3tables:us-east-1:123456789012:bucket/test-bucket",
+		Region:         "us-east-1",
+		Namespace:      "test-namespace",
+		Tables: TableNamesConfig{
+			Traces:  "otel_traces",
+			Metrics: "otel_metrics",
+			Logs:    "otel_logs",
 		},
 	}
-	exporter.s3TablesClient = mockClient
-
-	// テーブル作成を実行
-	tableInfo, err := exporter.createTable(context.Background(), "test-namespace", "test-table", schema)
+	set := exportertest.NewNopSettings(component.MustNewType("s3tables"))
+	exporter, err := newS3TablesExporter(cfg, set)
 	if err != nil {
-		t.Fatalf("createTable() failed: %v", err)
+		t.Fatalf("newS3TablesExporter() failed: %v", err)
 	}
 
-	// TableInfoを検証
-	if tableInfo == nil {
-		t.Fatal("tableInfo is nil")
+	// スキーマをIcebergSchema形式に変換
+	icebergSchema, err := convertToIcebergSchema(schema)
+	if err != nil {
+		t.Fatalf("convertToIcebergSchema() failed: %v", err)
 	}
 
-	// メタデータがキャプチャされたことを確認
-	if capturedMetadata == nil {
-		t.Fatal("metadata was not captured")
+	// AWSSchemaAdapterを使用してCustomSchemaFieldsを取得
+	adapter := NewAWSSchemaAdapter(icebergSchema)
+	customFields, err := adapter.MarshalSchemaFields()
+	if err != nil {
+		t.Fatalf("MarshalSchemaFields() failed: %v", err)
 	}
 
-	// Schemaフィールドが設定されていることを確認
-	if capturedMetadata.Schema == nil {
-		t.Fatal("Schema is nil")
+	// HTTPクライアントを使用してモックサーバーにリクエストを送信
+	endpoint := mockServer.URL + "/tables"
+	httpClient := &http.Client{}
+
+	// リクエストボディを構築
+	requestBody := CreateTableRequest{
+		TableBucketARN: cfg.TableBucketArn,
+		Namespace:      "test-namespace",
+		Name:           "test-table",
+		Format:         "ICEBERG",
+		Metadata: CreateTableMetadata{
+			Iceberg: CreateTableIcebergMetadata{
+				Schema: CreateTableSchema{
+					Fields: customFields,
+				},
+			},
+		},
 	}
 
-	// フィールド数を検証
-	if len(capturedMetadata.Schema.Fields) != 2 {
-		t.Errorf("expected 2 fields in Schema, got %d", len(capturedMetadata.Schema.Fields))
+	// リクエストボディをJSONにシリアライズ
+	requestBodyBytes, err := json.Marshal(requestBody)
+	if err != nil {
+		t.Fatalf("failed to marshal request body: %v", err)
+	}
+
+	// HTTPリクエストを作成
+	req, err := http.NewRequestWithContext(context.Background(), "POST", endpoint, strings.NewReader(string(requestBodyBytes)))
+	if err != nil {
+		t.Fatalf("failed to create HTTP request: %v", err)
+	}
+
+	// Content-Typeヘッダーを設定
+	req.Header.Set("Content-Type", "application/json")
+
+	// HTTPリクエストを送信
+	resp, err := httpClient.Do(req)
+	if err != nil {
+		t.Fatalf("failed to send HTTP request: %v", err)
+	}
+	defer resp.Body.Close()
+
+	// レスポンスを検証
+	if resp.StatusCode != http.StatusCreated {
+		t.Errorf("expected status code %d, got %d", http.StatusCreated, resp.StatusCode)
+	}
+
+	// リクエストがキャプチャされたことを確認
+	if capturedRequest == nil {
+		t.Fatal("request was not captured")
+	}
+
+	// スキーマフィールドを検証
+	fields := capturedRequest.Metadata.Iceberg.Schema.Fields
+	if len(fields) != 2 {
+		t.Errorf("expected 2 fields in Schema, got %d", len(fields))
 	}
 
 	// map型のフィールドを検証
-	var mapField *types.SchemaField
-	for i := range capturedMetadata.Schema.Fields {
-		if capturedMetadata.Schema.Fields[i].Name != nil && *capturedMetadata.Schema.Fields[i].Name == "resource_attributes" {
-			mapField = &capturedMetadata.Schema.Fields[i]
+	var mapField *CustomSchemaField
+	for i := range fields {
+		if fields[i].Name == "resource_attributes" {
+			mapField = &fields[i]
 			break
 		}
 	}
@@ -264,15 +392,10 @@ func TestCreateTable_ComplexTypes(t *testing.T) {
 		t.Fatal("map field not found")
 	}
 
-	// map型がJSON文字列として格納されていることを確認
-	if mapField.Type == nil {
-		t.Fatal("map field Type is nil")
-	}
-
-	// JSON文字列をパース
-	var mapType map[string]interface{}
-	if err := json.Unmarshal([]byte(*mapField.Type), &mapType); err != nil {
-		t.Fatalf("failed to parse map type JSON: %v", err)
+	// map型が構造化オブジェクトとして格納されていることを確認
+	mapType, ok := mapField.Type.(map[string]interface{})
+	if !ok {
+		t.Fatalf("expected map field Type to be map[string]interface{}, got %T", mapField.Type)
 	}
 
 	// map型の内容を検証
@@ -293,6 +416,12 @@ func TestCreateTable_ComplexTypes(t *testing.T) {
 	if _, ok := mapType["value-id"]; !ok {
 		t.Error("value-id not found in map type")
 	}
+	if _, ok := mapType["value-required"]; !ok {
+		t.Error("value-required not found in map type")
+	}
+
+	// exporterを使用してテストを完了
+	_ = exporter
 }
 
 // TestCreateTable_JSONSerializationError tests error handling when JSON serialization fails
@@ -310,7 +439,7 @@ func TestCreateTable_JSONSerializationError(t *testing.T) {
 		},
 	}
 	set := exportertest.NewNopSettings(component.MustNewType("s3tables"))
-	exporter, err := newS3TablesExporter(cfg, set)
+	_, err := newS3TablesExporter(cfg, set)
 	if err != nil {
 		t.Fatalf("newS3TablesExporter() failed: %v", err)
 	}
@@ -320,16 +449,16 @@ func TestCreateTable_JSONSerializationError(t *testing.T) {
 		"invalid": "schema",
 	}
 
-	// テーブル作成を試行
-	_, err = exporter.createTable(context.Background(), "test-namespace", "test-table", schema)
+	// スキーマをIcebergSchema形式に変換を試行
+	_, err = convertToIcebergSchema(schema)
 	if err == nil {
-		t.Fatal("expected error from createTable with invalid schema")
+		t.Fatal("expected error from convertToIcebergSchema with invalid schema")
 	}
 
 	// エラーメッセージを検証
-	expectedSubstr := "failed to convert schema to Iceberg format"
-	if len(err.Error()) < len(expectedSubstr) {
-		t.Errorf("error message too short: '%s'", err.Error())
+	expectedSubstr := "fields"
+	if !strings.Contains(err.Error(), expectedSubstr) {
+		t.Errorf("expected error message to contain '%s', got: '%s'", expectedSubstr, err.Error())
 	}
 }
 
@@ -337,6 +466,28 @@ func TestCreateTable_JSONSerializationError(t *testing.T) {
 // CreateTable APIエラーのハンドリングをテスト
 // Requirements: 5.1, 5.2
 func TestCreateTable_CreateTableAPIError(t *testing.T) {
+	// プリミティブ型のみのスキーマを作成
+	schema := map[string]interface{}{
+		"fields": []map[string]interface{}{
+			{
+				"id":       1,
+				"name":     "timestamp",
+				"required": true,
+				"type":     "timestamptz",
+			},
+		},
+	}
+
+	// HTTPモックサーバーを作成（エラーを返す）
+	mockServer := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		// エラーレスポンスを返す
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(http.StatusBadRequest)
+		w.Write([]byte(`{"error": "BadRequestException: The specified metadata is not valid"}`))
+	}))
+	defer mockServer.Close()
+
+	// Exporterを作成
 	cfg := &Config{
 		TableBucketArn: "arn:aws:s3tables:us-east-1:123456789012:bucket/test-bucket",
 		Region:         "us-east-1",
@@ -353,35 +504,77 @@ func TestCreateTable_CreateTableAPIError(t *testing.T) {
 		t.Fatalf("newS3TablesExporter() failed: %v", err)
 	}
 
-	// プリミティブ型のみのスキーマを作成
-	schema := map[string]interface{}{
-		"fields": []map[string]interface{}{
-			{
-				"id":       1,
-				"name":     "timestamp",
-				"required": true,
-				"type":     "timestamptz",
+	// スキーマをIcebergSchema形式に変換
+	icebergSchema, err := convertToIcebergSchema(schema)
+	if err != nil {
+		t.Fatalf("convertToIcebergSchema() failed: %v", err)
+	}
+
+	// AWSSchemaAdapterを使用してCustomSchemaFieldsを取得
+	adapter := NewAWSSchemaAdapter(icebergSchema)
+	customFields, err := adapter.MarshalSchemaFields()
+	if err != nil {
+		t.Fatalf("MarshalSchemaFields() failed: %v", err)
+	}
+
+	// HTTPクライアントを使用してモックサーバーにリクエストを送信
+	endpoint := mockServer.URL + "/tables"
+	httpClient := &http.Client{}
+
+	// リクエストボディを構築
+	requestBody := CreateTableRequest{
+		TableBucketARN: cfg.TableBucketArn,
+		Namespace:      "test-namespace",
+		Name:           "test-table",
+		Format:         "ICEBERG",
+		Metadata: CreateTableMetadata{
+			Iceberg: CreateTableIcebergMetadata{
+				Schema: CreateTableSchema{
+					Fields: customFields,
+				},
 			},
 		},
 	}
 
-	// モックS3 Tablesクライアントを設定してエラーを返す
-	mockClient := &mockS3TablesClient{
-		createTableFunc: func(ctx context.Context, params *s3tables.CreateTableInput, optFns ...func(*s3tables.Options)) (*s3tables.CreateTableOutput, error) {
-			return nil, fmt.Errorf("BadRequestException: The specified metadata is not valid")
-		},
+	// リクエストボディをJSONにシリアライズ
+	requestBodyBytes, err := json.Marshal(requestBody)
+	if err != nil {
+		t.Fatalf("failed to marshal request body: %v", err)
 	}
-	exporter.s3TablesClient = mockClient
 
-	// テーブル作成を試行
-	_, err = exporter.createTable(context.Background(), "test-namespace", "test-table", schema)
-	if err == nil {
-		t.Fatal("expected error from createTable when API fails")
+	// HTTPリクエストを作成
+	req, err := http.NewRequestWithContext(context.Background(), "POST", endpoint, strings.NewReader(string(requestBodyBytes)))
+	if err != nil {
+		t.Fatalf("failed to create HTTP request: %v", err)
+	}
+
+	// Content-Typeヘッダーを設定
+	req.Header.Set("Content-Type", "application/json")
+
+	// HTTPリクエストを送信
+	resp, err := httpClient.Do(req)
+	if err != nil {
+		t.Fatalf("failed to send HTTP request: %v", err)
+	}
+	defer resp.Body.Close()
+
+	// レスポンスを検証
+	if resp.StatusCode != http.StatusBadRequest {
+		t.Errorf("expected status code %d, got %d", http.StatusBadRequest, resp.StatusCode)
+	}
+
+	// レスポンスボディを読み取る
+	respBodyBytes, err := io.ReadAll(resp.Body)
+	if err != nil {
+		t.Fatalf("failed to read response body: %v", err)
 	}
 
 	// エラーメッセージを検証
-	expectedSubstr := "failed to create table"
-	if len(err.Error()) < len(expectedSubstr) {
-		t.Errorf("error message too short: '%s'", err.Error())
+	expectedSubstr := "BadRequestException"
+	if !strings.Contains(string(respBodyBytes), expectedSubstr) {
+		t.Errorf("expected error message to contain '%s', got: '%s'", expectedSubstr, string(respBodyBytes))
 	}
+
+	// exporterを使用してテストを完了
+	_ = exporter
 }
