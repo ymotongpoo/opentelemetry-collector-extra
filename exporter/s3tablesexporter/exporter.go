@@ -250,6 +250,53 @@ func (e *s3TablesExporter) uploadToWarehouseLocation(ctx context.Context, wareho
 	return s3Path, nil
 }
 
+// getTableInfo retrieves table information and caches it
+// テーブル情報を取得してキャッシュする
+func (e *s3TablesExporter) getTableInfo(ctx context.Context, namespace, tableName string) (*TableInfo, error) {
+	// キャッシュキーを生成
+	cacheKey := fmt.Sprintf("%s.%s", namespace, tableName)
+
+	// キャッシュをチェック
+	if cachedInfo, ok := e.tableCache[cacheKey]; ok {
+		e.logger.Debug("Using cached table information",
+			"namespace", namespace,
+			"table", tableName,
+			"cache_key", cacheKey)
+		return cachedInfo, nil
+	}
+
+	// キャッシュにない場合はgetTableを呼び出す
+	tableInfo, err := e.getTable(ctx, namespace, tableName)
+	if err != nil {
+		// テーブルが存在しない場合は詳細なエラーメッセージを返す
+		return nil, fmt.Errorf("failed to get table information for %s.%s: %w\n\n"+
+			"Please create the table before running the exporter using the AWS CLI:\n\n"+
+			"aws s3tables create-table \\\n"+
+			"  --table-bucket-arn \"%s\" \\\n"+
+			"  --namespace \"%s\" \\\n"+
+			"  --name \"%s\" \\\n"+
+			"  --format \"ICEBERG\" \\\n"+
+			"  --region %s",
+			namespace, tableName, err,
+			e.config.TableBucketArn,
+			namespace,
+			tableName,
+			e.config.Region)
+	}
+
+	// キャッシュに保存
+	e.tableCache[cacheKey] = tableInfo
+
+	e.logger.Info("Retrieved and cached table information",
+		"namespace", namespace,
+		"table", tableName,
+		"cache_key", cacheKey,
+		"table_arn", tableInfo.TableARN,
+		"warehouse_location", tableInfo.WarehouseLocation)
+
+	return tableInfo, nil
+}
+
 // getTable retrieves table information using S3 Tables API
 // S3 Tables APIを使用してテーブル情報を取得
 func (e *s3TablesExporter) getTable(ctx context.Context, namespace, tableName string) (*TableInfo, error) {
@@ -827,8 +874,8 @@ func (e *s3TablesExporter) uploadBatchToS3Tables(ctx context.Context, dataList [
 		"file_count", len(dataList),
 		"total_size", totalSize)
 
-	// 1. テーブル情報を取得（一時的にgetTableを使用、タスク2でgetTableInfoに置き換え予定）
-	tableInfo, err := e.getTable(ctx, e.config.Namespace, tableName)
+	// 1. テーブル情報を取得
+	tableInfo, err := e.getTableInfo(ctx, e.config.Namespace, tableName)
 	if err != nil {
 		e.logger.Error("Failed to get table",
 			"namespace", e.config.Namespace,
@@ -933,8 +980,8 @@ func (e *s3TablesExporter) uploadToS3Tables(ctx context.Context, data []byte, da
 		"data_type", dataType,
 		"size", len(data))
 
-	// 1. テーブル情報を取得（一時的にgetTableを使用、タスク2でgetTableInfoに置き換え予定）
-	tableInfo, err := e.getTable(ctx, e.config.Namespace, tableName)
+	// 1. テーブル情報を取得
+	tableInfo, err := e.getTableInfo(ctx, e.config.Namespace, tableName)
 	if err != nil {
 		e.logger.Error("Failed to get table",
 			"namespace", e.config.Namespace,
