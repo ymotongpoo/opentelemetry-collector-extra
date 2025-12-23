@@ -1024,7 +1024,9 @@ func TestProperty_ContextCancellation(t *testing.T) {
 		}
 	})
 
+	/*
 	// テストケース4: createTableでのコンテキストキャンセル
+	// TODO: このテストはテーブル作成機能削除後に削除される
 	t.Run("createTable_handles_cancelled_context", func(t *testing.T) {
 		iterations := 50
 		for i := 0; i < iterations; i++ {
@@ -1065,6 +1067,7 @@ func TestProperty_ContextCancellation(t *testing.T) {
 	})
 
 	// テストケース5: createNamespaceIfNotExistsでのコンテキストキャンセル
+	// TODO: このテストはNamespace作成機能削除後に削除される
 	t.Run("createNamespaceIfNotExists_handles_cancelled_context", func(t *testing.T) {
 		iterations := 50
 		for i := 0; i < iterations; i++ {
@@ -1102,6 +1105,7 @@ func TestProperty_ContextCancellation(t *testing.T) {
 			}
 		}
 	})
+	*/
 
 	// テストケース6: updateTableMetadataでのコンテキストキャンセル
 	t.Run("updateTableMetadata_handles_cancelled_context", func(t *testing.T) {

@@ -16,9 +16,9 @@ package s3tablesexporter
 
 import (
 	"context"
-	"fmt"
 	"testing"
 
+	"github.com/aws/aws-sdk-go-v2/service/s3tables"
 	"go.opentelemetry.io/collector/component"
 	"go.opentelemetry.io/collector/exporter/exportertest"
 	"go.opentelemetry.io/collector/pdata/plog"
@@ -107,7 +107,7 @@ func TestNewS3TablesExporter_WithEmptyTableBucketArn(t *testing.T) {
 }
 
 func TestPushMetrics(t *testing.T) {
-	t.Skip("Integration test: requires actual S3 Tables API access. Run with -integration flag.")
+	t.Skip("Integration test: requires pre-created table in S3 Tables. Run with -integration flag.")
 	cfg := &Config{
 		TableBucketArn: "arn:aws:s3tables:us-east-1:123456789012:bucket/test-bucket",
 		Region:         "us-east-1",
@@ -135,6 +135,7 @@ func TestPushMetrics(t *testing.T) {
 	dp.SetDoubleValue(42.0)
 
 	// 実際のS3 Tables APIを呼び出すため、統合テスト環境でのみ実行
+	// テーブルは事前に作成されている必要がある
 	err = exporter.pushMetrics(context.Background(), md)
 	if err != nil {
 		t.Logf("pushMetrics() returned error (expected in unit test): %v", err)
@@ -142,7 +143,7 @@ func TestPushMetrics(t *testing.T) {
 }
 
 func TestPushTraces(t *testing.T) {
-	t.Skip("Integration test: requires actual S3 Tables API access. Run with -integration flag.")
+	t.Skip("Integration test: requires pre-created table in S3 Tables. Run with -integration flag.")
 	cfg := &Config{
 		TableBucketArn: "arn:aws:s3tables:us-east-1:123456789012:bucket/test-bucket",
 		Region:         "us-east-1",
@@ -167,6 +168,7 @@ func TestPushTraces(t *testing.T) {
 	span.SetName("test-span")
 
 	// 実際のS3 Tables APIを呼び出すため、統合テスト環境でのみ実行
+	// テーブルは事前に作成されている必要がある
 	err = exporter.pushTraces(context.Background(), td)
 	if err != nil {
 		t.Logf("pushTraces() returned error (expected in unit test): %v", err)
@@ -174,7 +176,7 @@ func TestPushTraces(t *testing.T) {
 }
 
 func TestPushLogs(t *testing.T) {
-	t.Skip("Integration test: requires actual S3 Tables API access. Run with -integration flag.")
+	t.Skip("Integration test: requires pre-created table in S3 Tables. Run with -integration flag.")
 	cfg := &Config{
 		TableBucketArn: "arn:aws:s3tables:us-east-1:123456789012:bucket/test-bucket",
 		Region:         "us-east-1",
@@ -199,15 +201,16 @@ func TestPushLogs(t *testing.T) {
 	log.Body().SetStr("test log message")
 
 	// 実際のS3 Tables APIを呼び出すため、統合テスト環境でのみ実行
+	// テーブルは事前に作成されている必要がある
 	err = exporter.pushLogs(context.Background(), ld)
 	if err != nil {
 		t.Logf("pushLogs() returned error (expected in unit test): %v", err)
 	}
 }
 
-// TestNewS3TablesExporter_CatalogFieldsInitialized tests that Iceberg Catalog fields are initialized
-// Requirements: 2.1, 2.4
-// Note: このテストは実際のREST endpointに接続せず、構造体のフィールドが正しく初期化されることを検証します
+// TestNewS3TablesExporter_CatalogFieldsInitialized tests that configuration fields are initialized
+// Requirements: 3.1, 3.2
+// Note: このテストはテーブルが事前に作成されている前提で、設定が正しく初期化されることを検証します
 func TestNewS3TablesExporter_CatalogFieldsInitialized(t *testing.T) {
 	cfg := &Config{
 		TableBucketArn: "arn:aws:s3tables:us-west-2:123456789012:bucket/test-bucket",
@@ -220,26 +223,31 @@ func TestNewS3TablesExporter_CatalogFieldsInitialized(t *testing.T) {
 		},
 	}
 
-	// Catalog初期化に必要なパラメータが正しく設定されていることを確認
+	// 設定に必要なパラメータが正しく設定されていることを確認
 	if cfg.TableBucketArn == "" {
 		t.Error("TableBucketArn should not be empty")
 	}
 	if cfg.Region == "" {
 		t.Error("Region should not be empty")
 	}
+	if cfg.Namespace == "" {
+		t.Error("Namespace should not be empty")
+	}
 
-	// REST endpoint URLの形式を確認
-	expectedEndpoint := fmt.Sprintf("https://s3tables.%s.amazonaws.com/iceberg", cfg.Region)
-	expectedEndpoint2 := "https://s3tables.us-west-2.amazonaws.com/iceberg"
-	if expectedEndpoint != expectedEndpoint2 {
-		t.Errorf("expected endpoint %s, got %s", expectedEndpoint2, expectedEndpoint)
+	// エクスポーターが正しく初期化されることを確認
+	set := exportertest.NewNopSettings(component.MustNewType("s3tables"))
+	exporter, err := newS3TablesExporter(cfg, set)
+	if err != nil {
+		t.Fatalf("newS3TablesExporter() failed: %v", err)
+	}
+	if exporter == nil {
+		t.Fatal("newS3TablesExporter() returned nil")
 	}
 }
 
-// TestCreateNamespaceIfNotExists_Parameters tests that createNamespaceIfNotExists uses correct parameters
-// Requirements: 2.2
-// Note: このテストは実際のIceberg Catalogに接続せず、正しいパラメータが使用されることを検証します
-func TestCreateNamespaceIfNotExists_Parameters(t *testing.T) {
+// TestGetTableInfo_WithMock tests that getTableInfo works correctly with mocked GetTable
+// Requirements: 3.1, 3.2
+func TestGetTableInfo_WithMock(t *testing.T) {
 	cfg := &Config{
 		TableBucketArn: "arn:aws:s3tables:us-east-1:123456789012:bucket/test-bucket",
 		Region:         "us-east-1",
@@ -256,11 +264,34 @@ func TestCreateNamespaceIfNotExists_Parameters(t *testing.T) {
 		t.Fatalf("newS3TablesExporter() failed: %v", err)
 	}
 
-	// Catalogがnilの場合はpanicが発生する可能性があるため、
-	// この関数は実際のCatalogが必要
-	// ここでは設定が正しく渡されることを確認
-	if exporter.config.Namespace != "test-namespace" {
-		t.Errorf("expected namespace 'test-namespace', got '%s'", exporter.config.Namespace)
+	// モックのS3TablesClientを設定
+	mockClient := &mockS3TablesClient{
+		getTableFunc: func(ctx context.Context, params *s3tables.GetTableInput, optFns ...func(*s3tables.Options)) (*s3tables.GetTableOutput, error) {
+			// テーブルが存在する場合の成功レスポンスを返す
+			tableArn := "arn:aws:s3tables:us-east-1:123456789012:bucket/test-bucket/table/test-namespace/otel_metrics"
+			warehouseLocation := "s3://test-warehouse-bucket/data"
+			versionToken := "test-version-token"
+			return &s3tables.GetTableOutput{
+				TableARN:          &tableArn,
+				WarehouseLocation: &warehouseLocation,
+				VersionToken:      &versionToken,
+			}, nil
+		},
+	}
+	exporter.s3TablesClient = mockClient
+
+	// getTableInfoを呼び出してテーブル情報を取得
+	tableInfo, err := exporter.getTableInfo(context.Background(), "test-namespace", "otel_metrics")
+	if err != nil {
+		t.Fatalf("getTableInfo() failed: %v", err)
+	}
+
+	// テーブル情報が正しく取得されることを確認
+	if tableInfo.WarehouseLocation != "s3://test-warehouse-bucket/data" {
+		t.Errorf("expected warehouse location 's3://test-warehouse-bucket/data', got '%s'", tableInfo.WarehouseLocation)
+	}
+	if tableInfo.VersionToken != "test-version-token" {
+		t.Errorf("expected version token 'test-version-token', got '%s'", tableInfo.VersionToken)
 	}
 }
 
