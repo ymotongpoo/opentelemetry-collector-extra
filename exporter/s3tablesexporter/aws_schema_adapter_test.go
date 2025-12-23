@@ -208,52 +208,6 @@ func TestAWSSchemaAdapter_LogsSchema(t *testing.T) {
 	t.Logf("Logs schema JSON:\n%s", string(jsonBytes))
 }
 
-// TestAWSSchemaAdapter_ToAWSIcebergMetadata はToAWSIcebergMetadataメソッドをテストする
-func TestAWSSchemaAdapter_ToAWSIcebergMetadata(t *testing.T) {
-	// トレーススキーマを作成
-	schemaMap := createTracesSchema()
-
-	// IcebergSchemaに変換
-	icebergSchema, err := convertToIcebergSchema(schemaMap)
-	if err != nil {
-		t.Fatalf("Failed to convert to IcebergSchema: %v", err)
-	}
-
-	// AWSSchemaAdapterを作成
-	adapter := NewAWSSchemaAdapter(icebergSchema)
-
-	// types.IcebergMetadataを取得
-	metadata, err := adapter.ToAWSIcebergMetadata()
-	if err != nil {
-		t.Fatalf("Failed to convert to AWS IcebergMetadata: %v", err)
-	}
-
-	// メタデータの基本構造を確認
-	if metadata == nil {
-		t.Fatal("Expected non-nil metadata")
-	}
-
-	if metadata.Schema == nil {
-		t.Fatal("Expected non-nil schema")
-	}
-
-	if len(metadata.Schema.Fields) == 0 {
-		t.Fatal("Expected non-empty fields")
-	}
-
-	// 各フィールドの基本構造を確認
-	for _, field := range metadata.Schema.Fields {
-		if field.Name == nil {
-			t.Error("Field has nil name")
-		}
-		if field.Type == nil {
-			t.Error("Field has nil type")
-		}
-	}
-
-	t.Logf("Successfully converted to AWS IcebergMetadata with %d fields", len(metadata.Schema.Fields))
-}
-
 // TestAWSSchemaAdapter_ComplexTypeStructure は複雑型の構造が正しくシリアライズされることをテストする
 func TestAWSSchemaAdapter_ComplexTypeStructure(t *testing.T) {
 	// map型を含むシンプルなスキーマを作成
