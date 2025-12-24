@@ -673,9 +673,23 @@ func (e *s3TablesExporter) getTableMetadata(ctx context.Context, namespace, tabl
 		return nil, fmt.Errorf("failed to get table metadata location for %s.%s: %w", namespace, tableName, err)
 	}
 
-	// メタデータロケーションとバージョントークンを取得
+	// MetadataLocationのnilチェック
+	if metadataLocationOutput.MetadataLocation == nil {
+		e.logger.Info("Table has no metadata location, generating initial metadata",
+			"namespace", namespace,
+			"table", tableName)
+
+		return e.generateInitialMetadata(ctx, namespace, tableName, tableInfo)
+	}
+
+	// メタデータロケーションを取得
 	metadataLocation := *metadataLocationOutput.MetadataLocation
-	versionToken := *metadataLocationOutput.VersionToken
+
+	// VersionTokenのnilチェックとデフォルト値の設定
+	versionToken := ""
+	if metadataLocationOutput.VersionToken != nil {
+		versionToken = *metadataLocationOutput.VersionToken
+	}
 
 	e.logger.Debug("Retrieved metadata location",
 		"namespace", namespace,
@@ -741,6 +755,127 @@ func parseS3URI(uri string) (bucket, key string, err error) {
 		return "", "", fmt.Errorf("invalid S3 URI format: %s (expected s3://bucket-name/key)", uri)
 	}
 	return matches[1], matches[2], nil
+}
+
+// generateInitialMetadata generates initial Iceberg metadata for a new table
+// 新規テーブル用の初期Icebergメタデータを生成
+func (e *s3TablesExporter) generateInitialMetadata(
+	ctx context.Context,
+	namespace string,
+	tableName string,
+	tableInfo *TableInfo,
+) (*IcebergMetadata, error) {
+	// コンテキストキャンセルのチェック
+	select {
+	case <-ctx.Done():
+		return nil, fmt.Errorf("initial metadata generation cancelled: %w", ctx.Err())
+	default:
+	}
+
+	e.logger.Info("Generating initial metadata for table",
+		"namespace", namespace,
+		"table", tableName)
+
+	// テーブル名からテーブルタイプを判断してスキーマを取得
+	var schemaMap map[string]interface{}
+	if tableName == e.config.Tables.Metrics {
+		schemaMap = createMetricsSchema()
+	} else if tableName == e.config.Tables.Traces {
+		schemaMap = createTracesSchema()
+	} else if tableName == e.config.Tables.Logs {
+		schemaMap = createLogsSchema()
+	} else {
+		// デフォルトスキーマ（空のスキーマ）
+		e.logger.Warn("Unknown table type, using empty schema",
+			"namespace", namespace,
+			"table", tableName)
+		schemaMap = map[string]interface{}{
+			"type":   "struct",
+			"fields": []map[string]interface{}{},
+		}
+	}
+
+	// スキーママップをIcebergSchema形式に変換
+	schema, err := convertToIcebergSchema(schemaMap)
+	if err != nil {
+		e.logger.Error("Failed to convert schema to Iceberg format",
+			"namespace", namespace,
+			"table", tableName,
+			"error", err)
+		return nil, fmt.Errorf("failed to convert schema for %s.%s: %w", namespace, tableName, err)
+	}
+
+	// 初期メタデータを生成
+	initialMetadata := &IcebergMetadata{
+		FormatVersion:      2,
+		TableUUID:          uuid.New().String(),
+		Location:           tableInfo.WarehouseLocation,
+		LastSequenceNumber: 0,
+		LastUpdatedMS:      time.Now().UnixMilli(),
+		LastColumnID:       calculateLastColumnID(*schema),
+		Schemas:            []IcebergSchema{*schema},
+		CurrentSchemaID:    0,
+		PartitionSpecs:     []IcebergPartitionSpec{},
+		DefaultSpecID:      0,
+		LastPartitionID:    0,
+		Properties:         map[string]string{},
+		CurrentSnapshotID:  -1,
+		Snapshots:          []IcebergSnapshot{},
+		SnapshotLog:        []IcebergSnapshotLog{},
+		MetadataLog:        []IcebergMetadataLog{},
+	}
+
+	// VersionTokenのデフォルト値を設定
+	tableInfo.VersionToken = ""
+
+	e.logger.Info("Successfully generated initial metadata",
+		"namespace", namespace,
+		"table", tableName,
+		"table_uuid", initialMetadata.TableUUID,
+		"last_column_id", initialMetadata.LastColumnID)
+
+	return initialMetadata, nil
+}
+
+// calculateLastColumnID calculates the maximum field ID in the schema
+// スキーマ内の最大フィールドIDを計算
+func calculateLastColumnID(schema IcebergSchema) int {
+	maxID := 0
+
+	for _, field := range schema.Fields {
+		if field.ID > maxID {
+			maxID = field.ID
+		}
+
+		// 複合型の場合、ネストされたフィールドも確認
+		if field.IsMapType() {
+			mapType, _ := field.GetMapType()
+			if keyID, ok := mapType["key-id"].(int); ok && keyID > maxID {
+				maxID = keyID
+			}
+			if valueID, ok := mapType["value-id"].(int); ok && valueID > maxID {
+				maxID = valueID
+			}
+		} else if field.IsListType() {
+			listType, _ := field.GetListType()
+			if elementID, ok := listType["element-id"].(int); ok && elementID > maxID {
+				maxID = elementID
+			}
+		} else if field.IsStructType() {
+			structType, _ := field.GetStructType()
+			if fieldsInterface, ok := structType["fields"]; ok {
+				if fieldsSlice, ok := fieldsInterface.([]map[string]interface{}); ok {
+					for _, nestedFieldMap := range fieldsSlice {
+						if id, ok := nestedFieldMap["id"].(int); ok && id > maxID {
+							maxID = id
+						}
+					}
+				}
+			}
+		}
+	}
+
+	return maxID
 }
 
 // generateSnapshot generates a new Iceberg snapshot
