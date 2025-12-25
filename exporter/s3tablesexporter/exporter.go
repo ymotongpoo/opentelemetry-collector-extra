@@ -776,7 +776,31 @@ func (e *s3TablesExporter) generateInitialMetadata(
 		"namespace", namespace,
 		"table", tableName)
 
+	// GetTable APIを使用してテーブル情報を取得（テーブルの存在確認とバリデーション）
+	getTableInput := &s3tables.GetTableInput{
+		TableBucketARN: &e.config.TableBucketArn,
+		Namespace:      &namespace,
+		Name:           &tableName,
+	}
+
+	tableOutput, err := e.s3TablesClient.GetTable(ctx, getTableInput)
+	if err != nil {
+		e.logger.Error("Failed to get table for initial metadata",
+			"namespace", namespace,
+			"table", tableName,
+			"error", err)
+		return nil, fmt.Errorf("failed to get table %s.%s for initial metadata: %w", namespace, tableName, err)
+	}
+
+	e.logger.Debug("Retrieved table information for initial metadata generation",
+		"namespace", namespace,
+		"table", tableName,
+		"table_arn", *tableOutput.TableARN,
+		"format", tableOutput.Format)
+
 	// テーブル名からテーブルタイプを判断してスキーマを取得
+	// 注: GetTable APIのレスポンスにはスキーマ情報が含まれていないため、
+	// テーブル名から事前定義されたスキーマを使用する
 	var schemaMap map[string]interface{}
 	if tableName == e.config.Tables.Metrics {
 		schemaMap = createMetricsSchema()

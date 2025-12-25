@@ -24,6 +24,7 @@ import (
 	"github.com/aws/aws-sdk-go-v2/aws"
 	"github.com/aws/aws-sdk-go-v2/service/s3"
 	"github.com/aws/aws-sdk-go-v2/service/s3tables"
+	"github.com/aws/aws-sdk-go-v2/service/s3tables/types"
 )
 
 // TestGetTableMetadata_MetadataLocationNil tests getTableMetadata when MetadataLocation is nil
@@ -48,6 +49,14 @@ func TestGetTableMetadata_MetadataLocationNil(t *testing.T) {
 			return &s3tables.GetTableMetadataLocationOutput{
 				MetadataLocation: nil,
 				VersionToken:     aws.String("test-version-token"),
+			}, nil
+		},
+		getTableFunc: func(ctx context.Context, params *s3tables.GetTableInput, optFns ...func(*s3tables.Options)) (*s3tables.GetTableOutput, error) {
+			return &s3tables.GetTableOutput{
+				TableARN:  aws.String("arn:aws:s3tables:us-east-1:123456789012:bucket/test-bucket/table/test-table-id"),
+				Name:      aws.String("metrics"),
+				Namespace: []string{"test-namespace"},
+				Format:    types.OpenTableFormatIceberg,
 			}, nil
 		},
 	}
