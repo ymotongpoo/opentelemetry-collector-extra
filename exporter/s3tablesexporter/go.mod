@@ -10,7 +10,7 @@ require (
 	github.com/aws/aws-sdk-go-v2/service/s3 v1.94.0
 	github.com/aws/aws-sdk-go-v2/service/s3tables v1.13.1
 	github.com/google/uuid v1.6.0
-	github.com/parquet-go/parquet-go v0.26.2
+	github.com/parquet-go/parquet-go v0.26.4
 	go.opentelemetry.io/collector/component v1.47.0
 	go.opentelemetry.io/collector/component/componenttest v0.141.0
 	go.opentelemetry.io/collector/exporter v1.47.0
