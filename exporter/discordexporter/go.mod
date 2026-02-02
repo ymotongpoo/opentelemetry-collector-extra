@@ -5,7 +5,7 @@ go 1.24.0
 toolchain go1.24.4
 
 require (
-	github.com/bwmarrin/discordgo v0.28.1
+	github.com/bwmarrin/discordgo v0.29.0
 	go.opentelemetry.io/collector/component v1.47.0
 	go.opentelemetry.io/collector/consumer v1.47.0
 	go.opentelemetry.io/collector/exporter v1.47.0
