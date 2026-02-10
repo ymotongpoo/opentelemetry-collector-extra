@@ -2,7 +2,7 @@ module github.com/ymotongpoo/opentelemetry-collector-extra/exporter/s3tablesexpo
 
 go 1.24.9
 
-toolchain go1.24.11
+toolchain go1.26.0
 
 require (
 	github.com/aws/aws-sdk-go-v2 v1.41.0
