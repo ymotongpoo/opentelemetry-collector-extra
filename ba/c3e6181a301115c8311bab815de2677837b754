@@ -1,0 +1,44 @@
+receiver/slackreceiver/documentation.md
+  s_b87970ad20b667::t_89968eeea2b22d 17,19-21,25-27,31,33-35,39-41
+README.md
+  s_b87970ad20b667::t_08c9e31fed0efb 3,7-11,13-14,16,18-26,28-68
+  s_b87970ad20b667::t_f6c0b593c530ee 27
+receiver/slackreceiver/README.md
+  s_b87970ad20b667::t_08c9e31fed0efb 1,3,5,7-15,19-26,28-30,32-37,39-44,46-47,49-57,60-64
+  s_b87970ad20b667::t_f9047633d7d45d 58-59
+receiver/discordreceiver/README.md
+  s_b87970ad20b667::t_f9047633d7d45d 59-61
+  s_b87970ad20b667::t_08c9e31fed0efb 1,3,5,7-15,19-43,45-46,48,50-53,55-57,62-63
+receiver/discordreceiver/documentation.md
+  s_b87970ad20b667::t_89968eeea2b22d 17,19-21,25-27,31,33-35,39-41
+examples/export-metrics.yaml
+  s_b87970ad20b667::t_08c9e31fed0efb 1-25
+IMPLEMENTATION_PLAN.md
+  s_b87970ad20b667::t_9ab2c5106502bd 65
+  s_b87970ad20b667::t_f4a6fe113c0a44 64
+  s_b87970ad20b667::t_4351176c8bd398 1-42,44-46,48-51
+  s_b87970ad20b667::t_f6c0b593c530ee 43,47
+  s_b87970ad20b667::t_cf709e88c2a897 52-63,66-68
+exporter/discordexporter/README.md
+  s_b87970ad20b667::t_08c9e31fed0efb 3,5,7-10,17-20,22-48
+exporter/slackexporter/README.md
+  s_b87970ad20b667::t_08c9e31fed0efb 1-47
+otel-config.yaml
+  s_b87970ad20b667::t_08c9e31fed0efb 3-5,7-10,14,19-20
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "bac3e6181a301115c8311bab815de2677837b754",
+  "prompts": {},
+  "sessions": {
+    "s_b87970ad20b667": {
+      "agent_id": {
+        "tool": "codex",
+        "id": "01a16634-ce17-7700-b4ba-1c78eac1aec5",
+        "model": "gpt-6-astra"
+      },
+      "human_author": "Yoshi Yamaguchi <ymotongpoo@gmail.com>"
+    }
+  }
+}
