@@ -1,9 +1,9 @@
 steps:
-  - name: golang:1.26
+  - name: golang:1.27
     entrypoint: make
     args: [build, validate]
     id: BUILD_COLLECTOR
-  - name: golang:1.26
+  - name: golang:1.27
     entrypoint: go
     args: [build, -o, otelcol-custom-macos, .]
     env: [GOOS=darwin, GOARCH=arm64, CGO_ENABLED=0]
