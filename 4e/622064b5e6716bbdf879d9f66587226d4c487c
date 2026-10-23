@@ -1,0 +1,48 @@
+exporter/slackexporter/factory.go
+  s_b87970ad20b667::t_b30b264989bebd 1-3
+  s_b87970ad20b667::t_b37d50b2df25e1 4-34
+exporter/slackexporter/exporter_test.go
+  s_b87970ad20b667::t_70e2272478f46c 4-67,69-211
+  s_b87970ad20b667::t_b30b264989bebd 1-3
+  s_b87970ad20b667::t_5416da653d4e5f 68
+  s_b87970ad20b667::t_5f6d705d026d7e 212-260
+exporter/slackexporter/generated_component_test.go
+  s_b87970ad20b667::t_b37d50b2df25e1 1-124
+exporter/slackexporter/generated_package_test.go
+  s_b87970ad20b667::t_b37d50b2df25e1 1-13
+exporter/slackexporter/config.go
+  s_b87970ad20b667::t_b30b264989bebd 1-3
+  s_b87970ad20b667::t_b37d50b2df25e1 4-44
+exporter/slackexporter/metadata.yaml
+  s_b87970ad20b667::t_a8f22235c86080 10-11
+  s_b87970ad20b667::t_b37d50b2df25e1 1-7
+  s_b87970ad20b667::t_2fb461c2aad4cf 8-9,12-14
+exporter/slackexporter/exporter.go
+  s_b87970ad20b667::t_b37d50b2df25e1 4-83,87-107,109-204
+  s_b87970ad20b667::t_5416da653d4e5f 108
+  s_b87970ad20b667::t_70e2272478f46c 84-86
+  s_b87970ad20b667::t_b30b264989bebd 1-3
+exporter/slackexporter/go.mod
+  s_b87970ad20b667::t_b37d50b2df25e1 1-5,69
+  s_b87970ad20b667::t_fbf22fe3842cf6 6-68
+exporter/slackexporter/internal/metadata/generated_status.go
+  s_b87970ad20b667::t_b37d50b2df25e1 1-18
+exporter/slackexporter/go.sum
+  s_b87970ad20b667::t_664daab1335265 1-151
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "4e622064b5e6716bbdf879d9f66587226d4c487c",
+  "prompts": {},
+  "sessions": {
+    "s_b87970ad20b667": {
+      "agent_id": {
+        "tool": "codex",
+        "id": "01a16634-ce17-7700-b4ba-1c78eac1aec5",
+        "model": "gpt-6-astra"
+      },
+      "human_author": "Yoshi Yamaguchi <ymotongpoo@gmail.com>"
+    }
+  }
+}
