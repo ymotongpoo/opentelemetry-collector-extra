@@ -28,7 +28,7 @@ import (
 // NewFactory returns a new factory for the Discord receiver.
 func NewFactory() receiver.Factory {
 	return receiver.NewFactory(
-		component.MustNewType(metadata.Type),
+		metadata.Type,
 		createDefaultConfig,
 		receiver.WithMetrics(createMetricsReceiver, metadata.MetricsStability),
 	)

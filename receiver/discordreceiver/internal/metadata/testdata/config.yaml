@@ -3,11 +3,23 @@ all_set:
   metrics:
     discord.messages.count:
       enabled: true
+      attributes: ["discord.channel.id"]
     discord.messages.length:
       enabled: true
+      attributes: ["discord.channel.id"]
+reaggregate_set:
+  metrics:
+    discord.messages.count:
+      enabled: true
+      attributes: []
+    discord.messages.length:
+      enabled: true
+      attributes: []
 none_set:
   metrics:
     discord.messages.count:
       enabled: false
+      attributes: ["discord.channel.id"]
     discord.messages.length:
       enabled: false
+      attributes: ["discord.channel.id"]

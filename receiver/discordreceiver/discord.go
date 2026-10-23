@@ -16,113 +16,110 @@ package discordreceiver
 
 import (
 	"context"
+	"errors"
+	"net"
+	"net/http"
 	"time"
 
-	"go.opentelemetry.io/collector/consumer"
-	"go.opentelemetry.io/collector/pdata/pcommon"
-	"go.opentelemetry.io/collector/receiver"
-	"go.opentelemetry.io/collector/receiver/receiverhelper"
-
 	"github.com/bwmarrin/discordgo"
-	"github.com/ymotongpoo/opentelemetry-collector-extra/receiver/discordreceiver/internal/metadata"
+	"github.com/gorilla/websocket"
 )
 
-type discordHandler struct {
-	session  *discordgo.Session
-	consumer consumer.Metrics
-	cancel   context.CancelFunc
-	config   *Config
-	obsrecv  *receiverhelper.ObsReport
-	mb       *metadata.MetricsBuilder
-	mcCh     chan messageCreateEvent
+type gatewaySession interface {
+	AddHandler(any) func()
+	Open(context.Context) error
+	Close() error
 }
 
-func newDiscordHandler(consumer consumer.Metrics, cfg *Config, settings receiver.Settings, obsrecv *receiverhelper.ObsReport) (*discordHandler, error) {
-	s, err := discordgo.New("Bot " + cfg.Token)
+type discordGateway struct {
+	*discordgo.Session
+	nextOpen time.Time
+}
+
+type startupTransport struct{ ctx context.Context }
+
+func (t startupTransport) RoundTrip(request *http.Request) (*http.Response, error) {
+	return http.DefaultTransport.RoundTrip(request.WithContext(t.ctx))
+}
+
+func newGatewaySession(cfg *Config) (*discordGateway, error) {
+	session, err := discordgo.New("Bot " + string(cfg.Token))
 	if err != nil {
 		return nil, err
 	}
-
-	dh := &discordHandler{
-		session:  s,
-		consumer: consumer,
-		config:   cfg,
-		obsrecv:  obsrecv,
-		mb:       metadata.NewMetricsBuilder(cfg.MetricsBuilderConfig, settings.TelemetrySettings),
-		mcCh:     make(chan messageCreateEvent, 1000),
-	}
-	return dh, nil
+	session.Identify.Intents = discordgo.IntentsGuildMessages | discordgo.IntentMessageContent
+	// Own reconnects: DiscordGo's built-in retry sleeps cannot be canceled.
+	session.ShouldReconnectOnError = false
+	session.ShouldRetryOnRateLimit = false
+	session.MaxRestRetries = 0
+	session.SyncEvents = true
+	return &discordGateway{Session: session}, nil
 }
 
-const (
-	dataFormat = "discord"
-)
-
-type messageCreateEvent struct {
-	s *discordgo.Session
-	m *discordgo.MessageCreate
-}
-
-func (dh *discordHandler) messageCreateFunc(ctx context.Context) func(s *discordgo.Session, m *discordgo.MessageCreate) {
-	return func(s *discordgo.Session, m *discordgo.MessageCreate) {
-		dh.mcCh <- messageCreateEvent{
-			s: s,
-			m: m,
-		}
-	}
-}
-
-func (dh *discordHandler) run(ctx context.Context) error {
-	dh.session.AddHandler(dh.messageCreateFunc(ctx))
-	if err := dh.session.Open(); err != nil {
-		return err
-	}
-	defer dh.session.Close()
-
-	d, err := time.ParseDuration(dh.config.BufferInterval)
-	if err != nil {
-		return err
-	}
-	ticker := time.NewTicker(d)
-TICK:
-	for {
+// Open bounds both gateway discovery and the WebSocket HELLO/READY exchange.
+// DiscordGo accepts no context here, so cancellation closes the underlying socket.
+func (g *discordGateway) Open(ctx context.Context) error {
+	ctx, cancel := context.WithTimeout(ctx, 15*time.Second)
+	defer cancel()
+	// Wait before entering DiscordGo's non-cancellable REST bucket lock.
+	delay := max(time.Until(g.nextOpen), g.Ratelimiter.GetWaitTime(g.Ratelimiter.GetBucket(discordgo.EndpointGateway), 1))
+	if delay > 0 {
+		timer := time.NewTimer(delay)
+		defer timer.Stop()
 		select {
-		case e := <-dh.mcCh:
-			dh.messageCreateToMetrics(e)
-		case <-ticker.C:
-			metrics := dh.mb.Emit()
-			dh.obsrecv.StartMetricsOp(ctx)
-			err := dh.consumer.ConsumeMetrics(ctx, metrics)
-			dh.obsrecv.EndMetricsOp(ctx, dataFormat, metrics.DataPointCount(), err)
+		case <-timer.C:
 		case <-ctx.Done():
-			break TICK
+			return ctx.Err()
 		}
 	}
-
-	return nil
+	if err := ctx.Err(); err != nil {
+		return err
+	}
+	g.Client = &http.Client{Timeout: 10 * time.Second, Transport: startupTransport{ctx}}
+	var conn net.Conn
+	var stop func() bool
+	g.Dialer = &websocket.Dialer{
+		Proxy:            http.ProxyFromEnvironment,
+		HandshakeTimeout: 10 * time.Second,
+		NetDialContext: func(_ context.Context, network, address string) (net.Conn, error) {
+			c, err := (&net.Dialer{}).DialContext(ctx, network, address)
+			if err != nil {
+				return nil, err
+			}
+			conn = c
+			stop = context.AfterFunc(ctx, func() { _ = c.Close() })
+			if deadline, ok := ctx.Deadline(); ok {
+				_ = c.SetDeadline(deadline)
+			}
+			return c, nil
+		},
+	}
+	err := g.Session.Open()
+	var limited *discordgo.RateLimitError
+	if errors.As(err, &limited) {
+		g.nextOpen = time.Now().Add(limited.RetryAfter)
+	}
+	if stop != nil {
+		stop()
+	}
+	if ctx.Err() != nil {
+		return ctx.Err()
+	}
+	if err == nil && conn != nil {
+		_ = conn.SetDeadline(time.Time{})
+	}
+	return err
 }
 
-func (dh *discordHandler) messageCreateToMetrics(e messageCreateEvent) {
-	now := pcommon.NewTimestampFromTime(time.Now())
-	channelID := e.m.ChannelID
-	matched := false
-	switch {
-	case dh.config.ServerWide:
-		channelID = "@all@"
-		matched = true
-	case len(dh.config.Channels) == 0:
-		matched = true
-	default:
-		for _, ch := range dh.config.Channels {
-			if ch == channelID {
-				matched = true
-				break
-			}
-		}
-	}
-	if !matched {
+func (r *discordReceiver) messageCreate(_ *discordgo.Session, event *discordgo.MessageCreate) {
+	if event == nil || event.Message == nil || event.GuildID == "" {
 		return
 	}
-	dh.mb.RecordDiscordMessagesCountDataPoint(now, 1, channelID)
-	dh.mb.RecordDiscordMessagesLengthDataPoint(now, int64(len(e.m.Content)), channelID)
+	if !r.config.IncludeBots && (event.WebhookID != "" || (event.Author != nil && event.Author.Bot)) {
+		return
+	}
+	if event.Type != discordgo.MessageTypeDefault && event.Type != discordgo.MessageTypeReply {
+		return
+	}
+	r.stats.record(r.config, event.GuildID, event.ChannelID, event.ID, event.Content)
 }

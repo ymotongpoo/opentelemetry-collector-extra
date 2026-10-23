@@ -12,7 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-//go:generate mdatagen metadata.yaml
+// Regenerate component metadata with make generate from the repository root.
 
 // Package discordreceiver implements a receiver that can be used by the
 // Opentelemetry collector to receive and make statistics of Discord messages

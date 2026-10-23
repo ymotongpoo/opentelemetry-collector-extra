@@ -28,20 +28,28 @@ attributes:
 
 metrics:
   discord.messages.count:
-    description: "The number of messages sent to the channel"
+    description: "Cumulative number of observed messages since receiver startup"
     unit: "{messages}"
     sum:
       monotonic: true
       aggregation_temporality: cumulative
       value_type: int
     enabled: true
+    stability: development
     attributes: [discord.channel.id]
   discord.messages.length:
-    description: "The length of message sent to the channel"
+    description: "Cumulative number of Unicode code points in observed message content"
     unit: "{characters}"
     sum:
       monotonic: true
       aggregation_temporality: cumulative
       value_type: int
     enabled: true
+    stability: development
     attributes: [discord.channel.id]
+
+# Network lifecycle coverage uses fake/local servers in receiver_test.go.
+tests:
+  skip_lifecycle: true
+  config:
+    token: test

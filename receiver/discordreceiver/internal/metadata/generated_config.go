@@ -2,40 +2,125 @@
 
 package metadata
 
-import "go.opentelemetry.io/collector/confmap"
+import (
+	"fmt"
 
-// MetricConfig provides common config for a particular metric.
-type MetricConfig struct {
-	Enabled bool `mapstructure:"enabled"`
+	"go.opentelemetry.io/collector/confmap"
+)
 
+// DiscordMessagesCountMetricAttributeKey specifies the key of an attribute for the discord.messages.count metric.
+type DiscordMessagesCountMetricAttributeKey string
+
+const (
+	DiscordMessagesCountMetricAttributeKeyDiscordChannelID DiscordMessagesCountMetricAttributeKey = "discord.channel.id"
+)
+
+// DiscordMessagesCountMetricConfig provides config for the discord.messages.count metric.
+type DiscordMessagesCountMetricConfig struct {
+	Enabled          bool `mapstructure:"enabled"`
 	enabledSetByUser bool
+
+	AggregationStrategy string                                   `mapstructure:"aggregation_strategy"`
+	EnabledAttributes   []DiscordMessagesCountMetricAttributeKey `mapstructure:"attributes"`
 }
 
-func (ms *MetricConfig) Unmarshal(parser *confmap.Conf) error {
+func (ms *DiscordMessagesCountMetricConfig) Unmarshal(parser *confmap.Conf) error {
 	if parser == nil {
 		return nil
 	}
-	err := parser.Unmarshal(ms, )
+
+	err := parser.Unmarshal(ms)
 	if err != nil {
 		return err
 	}
+
 	ms.enabledSetByUser = parser.IsSet("enabled")
+	return nil
+}
+
+func (ms *DiscordMessagesCountMetricConfig) Validate() error {
+	for _, val := range ms.EnabledAttributes {
+		switch val {
+		case DiscordMessagesCountMetricAttributeKeyDiscordChannelID:
+		default:
+			return fmt.Errorf("metric discord.messages.count doesn't have an attribute %v, valid attributes: [discord.channel.id]", val)
+		}
+	}
+
+	switch ms.AggregationStrategy {
+	case AggregationStrategySum, AggregationStrategyAvg, AggregationStrategyMin, AggregationStrategyMax:
+	default:
+		return fmt.Errorf("invalid aggregation strategy %q, valid strategies: [%s, %s, %s, %s]", ms.AggregationStrategy, AggregationStrategySum, AggregationStrategyAvg, AggregationStrategyMin, AggregationStrategyMax)
+	}
+
+	return nil
+}
+
+// DiscordMessagesLengthMetricAttributeKey specifies the key of an attribute for the discord.messages.length metric.
+type DiscordMessagesLengthMetricAttributeKey string
+
+const (
+	DiscordMessagesLengthMetricAttributeKeyDiscordChannelID DiscordMessagesLengthMetricAttributeKey = "discord.channel.id"
+)
+
+// DiscordMessagesLengthMetricConfig provides config for the discord.messages.length metric.
+type DiscordMessagesLengthMetricConfig struct {
+	Enabled          bool `mapstructure:"enabled"`
+	enabledSetByUser bool
+
+	AggregationStrategy string                                    `mapstructure:"aggregation_strategy"`
+	EnabledAttributes   []DiscordMessagesLengthMetricAttributeKey `mapstructure:"attributes"`
+}
+
+func (ms *DiscordMessagesLengthMetricConfig) Unmarshal(parser *confmap.Conf) error {
+	if parser == nil {
+		return nil
+	}
+
+	err := parser.Unmarshal(ms)
+	if err != nil {
+		return err
+	}
+
+	ms.enabledSetByUser = parser.IsSet("enabled")
+	return nil
+}
+
+func (ms *DiscordMessagesLengthMetricConfig) Validate() error {
+	for _, val := range ms.EnabledAttributes {
+		switch val {
+		case DiscordMessagesLengthMetricAttributeKeyDiscordChannelID:
+		default:
+			return fmt.Errorf("metric discord.messages.length doesn't have an attribute %v, valid attributes: [discord.channel.id]", val)
+		}
+	}
+
+	switch ms.AggregationStrategy {
+	case AggregationStrategySum, AggregationStrategyAvg, AggregationStrategyMin, AggregationStrategyMax:
+	default:
+		return fmt.Errorf("invalid aggregation strategy %q, valid strategies: [%s, %s, %s, %s]", ms.AggregationStrategy, AggregationStrategySum, AggregationStrategyAvg, AggregationStrategyMin, AggregationStrategyMax)
+	}
+
 	return nil
 }
 
 // MetricsConfig provides config for discord metrics.
 type MetricsConfig struct {
-	DiscordMessagesCount  MetricConfig `mapstructure:"discord.messages.count"`
-	DiscordMessagesLength MetricConfig `mapstructure:"discord.messages.length"`
+	DiscordMessagesCount  DiscordMessagesCountMetricConfig  `mapstructure:"discord.messages.count"`
+	DiscordMessagesLength DiscordMessagesLengthMetricConfig `mapstructure:"discord.messages.length"`
 }
 
 func DefaultMetricsConfig() MetricsConfig {
 	return MetricsConfig{
-		DiscordMessagesCount: MetricConfig{
-			Enabled: true,
+		DiscordMessagesCount: DiscordMessagesCountMetricConfig{
+			Enabled:             true,
+			AggregationStrategy: AggregationStrategySum,
+			EnabledAttributes:   []DiscordMessagesCountMetricAttributeKey{DiscordMessagesCountMetricAttributeKeyDiscordChannelID},
 		},
-		DiscordMessagesLength: MetricConfig{
-			Enabled: true,
+		DiscordMessagesLength: DiscordMessagesLengthMetricConfig{
+			Enabled:             true,
+			AggregationStrategy: AggregationStrategySum,
+			EnabledAttributes:   []DiscordMessagesLengthMetricAttributeKey{DiscordMessagesLengthMetricAttributeKeyDiscordChannelID},
 		},
 	}
 }
@@ -45,7 +130,7 @@ type MetricsBuilderConfig struct {
 	Metrics MetricsConfig `mapstructure:"metrics"`
 }
 
-func DefaultMetricsBuilderConfig() MetricsBuilderConfig {
+func NewDefaultMetricsBuilderConfig() MetricsBuilderConfig {
 	return MetricsBuilderConfig{
 		Metrics: DefaultMetricsConfig(),
 	}

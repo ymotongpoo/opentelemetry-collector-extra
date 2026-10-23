@@ -9,7 +9,7 @@ import (
 	"github.com/google/go-cmp/cmp"
 	"github.com/google/go-cmp/cmp/cmpopts"
 	"github.com/stretchr/testify/require"
-	"go.opentelemetry.io/collector/component"
+	"go.opentelemetry.io/collector/confmap"
 	"go.opentelemetry.io/collector/confmap/confmaptest"
 )
 
@@ -20,14 +20,22 @@ func TestMetricsBuilderConfig(t *testing.T) {
 	}{
 		{
 			name: "default",
-			want: DefaultMetricsBuilderConfig(),
+			want: NewDefaultMetricsBuilderConfig(),
 		},
 		{
 			name: "all_set",
 			want: MetricsBuilderConfig{
 				Metrics: MetricsConfig{
-					DiscordMessagesCount:  MetricConfig{Enabled: true},
-					DiscordMessagesLength: MetricConfig{Enabled: true},
+					DiscordMessagesCount: DiscordMessagesCountMetricConfig{
+						Enabled:             true,
+						AggregationStrategy: AggregationStrategySum,
+						EnabledAttributes:   []DiscordMessagesCountMetricAttributeKey{DiscordMessagesCountMetricAttributeKeyDiscordChannelID},
+					},
+					DiscordMessagesLength: DiscordMessagesLengthMetricConfig{
+						Enabled:             true,
+						AggregationStrategy: AggregationStrategySum,
+						EnabledAttributes:   []DiscordMessagesLengthMetricAttributeKey{DiscordMessagesLengthMetricAttributeKeyDiscordChannelID},
+					},
 				},
 			},
 		},
@@ -35,8 +43,16 @@ func TestMetricsBuilderConfig(t *testing.T) {
 			name: "none_set",
 			want: MetricsBuilderConfig{
 				Metrics: MetricsConfig{
-					DiscordMessagesCount:  MetricConfig{Enabled: false},
-					DiscordMessagesLength: MetricConfig{Enabled: false},
+					DiscordMessagesCount: DiscordMessagesCountMetricConfig{
+						Enabled:             false,
+						AggregationStrategy: AggregationStrategySum,
+						EnabledAttributes:   []DiscordMessagesCountMetricAttributeKey{DiscordMessagesCountMetricAttributeKeyDiscordChannelID},
+					},
+					DiscordMessagesLength: DiscordMessagesLengthMetricConfig{
+						Enabled:             false,
+						AggregationStrategy: AggregationStrategySum,
+						EnabledAttributes:   []DiscordMessagesLengthMetricAttributeKey{DiscordMessagesLengthMetricAttributeKeyDiscordChannelID},
+					},
 				},
 			},
 		},
@@ -44,11 +60,33 @@ func TestMetricsBuilderConfig(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			cfg := loadMetricsBuilderConfig(t, tt.name)
-			if diff := cmp.Diff(tt.want, cfg, cmpopts.IgnoreUnexported(MetricConfig{})); diff != "" {
-				t.Errorf("Config mismatch (-expected +actual):\n%s", diff)
-			}
+			diff := cmp.Diff(tt.want, cfg, cmpopts.IgnoreUnexported(DiscordMessagesCountMetricConfig{}, DiscordMessagesLengthMetricConfig{}))
+			require.Emptyf(t, diff, "Config mismatch (-expected +actual):\n%s", diff)
 		})
 	}
+}
+func TestDiscordMessagesCountMetricsConfig_Validate(t *testing.T) {
+	cfg := DefaultMetricsConfig().DiscordMessagesCount
+	require.NoError(t, cfg.Validate())
+
+	cfg.EnabledAttributes = []DiscordMessagesCountMetricAttributeKey{"invalid"}
+	require.ErrorContains(t, cfg.Validate(), "metric discord.messages.count doesn't have an attribute invalid, valid attributes: [discord.channel.id]")
+
+	cfg = DefaultMetricsConfig().DiscordMessagesCount
+	cfg.AggregationStrategy = "invalid"
+	require.ErrorContains(t, cfg.Validate(), "invalid aggregation strategy")
+}
+
+func TestDiscordMessagesLengthMetricsConfig_Validate(t *testing.T) {
+	cfg := DefaultMetricsConfig().DiscordMessagesLength
+	require.NoError(t, cfg.Validate())
+
+	cfg.EnabledAttributes = []DiscordMessagesLengthMetricAttributeKey{"invalid"}
+	require.ErrorContains(t, cfg.Validate(), "metric discord.messages.length doesn't have an attribute invalid, valid attributes: [discord.channel.id]")
+
+	cfg = DefaultMetricsConfig().DiscordMessagesLength
+	cfg.AggregationStrategy = "invalid"
+	require.ErrorContains(t, cfg.Validate(), "invalid aggregation strategy")
 }
 
 func loadMetricsBuilderConfig(t *testing.T, name string) MetricsBuilderConfig {
@@ -56,7 +94,7 @@ func loadMetricsBuilderConfig(t *testing.T, name string) MetricsBuilderConfig {
 	require.NoError(t, err)
 	sub, err := cm.Sub(name)
 	require.NoError(t, err)
-	cfg := DefaultMetricsBuilderConfig()
-	require.NoError(t, component.UnmarshalConfig(sub, &cfg))
+	cfg := NewDefaultMetricsBuilderConfig()
+	require.NoError(t, sub.Unmarshal(&cfg, confmap.WithIgnoreUnused()))
 	return cfg
 }
