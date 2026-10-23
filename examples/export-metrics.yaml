@@ -1,0 +1,25 @@
+receivers:
+  otlp:
+    protocols:
+      grpc:
+        endpoint: 127.0.0.1:4317
+      http:
+        endpoint: 127.0.0.1:4318
+
+exporters:
+  discord:
+    token: ${env:DISCORD_BOT_TOKEN}
+    channel: ${env:DISCORD_CHANNEL_ID}
+    timeout: 30s
+    max_retries: 3
+  slack:
+    bot_token: ${env:SLACK_BOT_TOKEN}
+    channel: ${env:SLACK_CHANNEL_ID}
+    timeout: 30s
+    max_retries: 3
+
+service:
+  pipelines:
+    metrics:
+      receivers: [otlp]
+      exporters: [discord, slack]

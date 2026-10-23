@@ -14,28 +14,28 @@ metrics:
 
 ### discord.messages.count
 
-The number of messages sent to the channel
+Cumulative number of observed messages since receiver startup
 
-| Unit | Metric Type | Value Type | Aggregation Temporality | Monotonic |
-| ---- | ----------- | ---------- | ----------------------- | --------- |
-| {messages} | Sum | Int | Cumulative | true |
+| Unit | Metric Type | Value Type | Aggregation Temporality | Monotonic | Stability |
+| ---- | ----------- | ---------- | ----------------------- | --------- | --------- |
+| {messages} | Sum | Int | Cumulative | true | Development |
 
 #### Attributes
 
-| Name | Description | Values |
-| ---- | ----------- | ------ |
-| discord.channel.id | The ID of the channel | Any Str |
+| Name | Description | Values | Requirement Level | Semantic Convention |
+| ---- | ----------- | ------ | ----------------- | ------------------- |
+| discord.channel.id | The ID of the channel | Any Str | Recommended | - |
 
 ### discord.messages.length
 
-The length of message sent to the channel
+Cumulative number of Unicode code points in observed message content
 
-| Unit | Metric Type | Value Type | Aggregation Temporality | Monotonic |
-| ---- | ----------- | ---------- | ----------------------- | --------- |
-| {characters} | Sum | Int | Cumulative | true |
+| Unit | Metric Type | Value Type | Aggregation Temporality | Monotonic | Stability |
+| ---- | ----------- | ---------- | ----------------------- | --------- | --------- |
+| {characters} | Sum | Int | Cumulative | true | Development |
 
 #### Attributes
 
-| Name | Description | Values |
-| ---- | ----------- | ------ |
-| discord.channel.id | The ID of the channel | Any Str |
+| Name | Description | Values | Requirement Level | Semantic Convention |
+| ---- | ----------- | ------ | ----------------- | ------------------- |
+| discord.channel.id | The ID of the channel | Any Str | Recommended | - |
