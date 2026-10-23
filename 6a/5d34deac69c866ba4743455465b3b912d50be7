@@ -1,0 +1,45 @@
+exporter/discordexporter/exporter.go
+  s_b87970ad20b667::t_b37d50b2df25e1 18,20-26,28,33-43,46-55,57-66,68-80,83-94,98-106,109-111,113,115-120,122-127,129-142,144-155,158-203
+  s_b87970ad20b667::t_70e2272478f46c 95-97,143
+  s_b87970ad20b667::t_13857585ac311e 121
+exporter/discordexporter/generated_package_test.go
+  s_b87970ad20b667::t_b37d50b2df25e1 1-13
+exporter/discordexporter/metadata.yaml
+  s_b87970ad20b667::t_a8f22235c86080 25-26
+  s_b87970ad20b667::t_2fb461c2aad4cf 23-24,27-29
+exporter/discordexporter/exporter_test.go
+  s_b87970ad20b667::t_5f6d705d026d7e 208-241
+  s_b87970ad20b667::t_13857585ac311e 69
+  s_b87970ad20b667::t_70e2272478f46c 4-68,70-207
+  s_b87970ad20b667::t_b30b264989bebd 1-3
+exporter/discordexporter/internal/metadata/generated_status.go
+  s_b87970ad20b667::t_b37d50b2df25e1 3-4,11-15
+exporter/discordexporter/go.mod
+  s_b87970ad20b667::t_009d614bfff0c4 3,7,13,15-16,18
+  s_b87970ad20b667::t_fbf22fe3842cf6 6,8-12,14,17,19,23-27,29-31,33-35,40-61,63-68
+exporter/discordexporter/config.go
+  s_b87970ad20b667::t_b37d50b2df25e1 19-20,23,26,28-33,36,39,42,45-53
+exporter/discordexporter/generated_component_test.go
+  s_b87970ad20b667::t_b37d50b2df25e1 1-124
+exporter/discordexporter/factory.go
+  s_b87970ad20b667::t_b30b264989bebd 1-3
+  s_b87970ad20b667::t_b37d50b2df25e1 4-34
+exporter/discordexporter/go.sum
+  s_b87970ad20b667::t_5ddb5aaec00b6f 1-4,7-9,12-13,23-26,29-34,48-49,52-131,136-151
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "6a5d34deac69c866ba4743455465b3b912d50be7",
+  "prompts": {},
+  "sessions": {
+    "s_b87970ad20b667": {
+      "agent_id": {
+        "tool": "codex",
+        "id": "01a16634-ce17-7700-b4ba-1c78eac1aec5",
+        "model": "gpt-6-astra"
+      },
+      "human_author": "Yoshi Yamaguchi <ymotongpoo@gmail.com>"
+    }
+  }
+}
