@@ -8,6 +8,7 @@
 *.so
 *.dylib
 otelcol-custom
+otelcol-custom-*
 
 # Test binary, built with `go test -c`
 *.test
