@@ -1,0 +1,14 @@
+type: slack
+status:
+  class: exporter
+  stability:
+    development: [metrics]
+  codeowners:
+    active: [ymotongpoo]
+
+tests:
+  # Delivery lifecycle uses local HTTP servers in exporter_test.go.
+  skip_lifecycle: true
+  config:
+    bot_token: xoxb-test
+    channel: C1
