@@ -19,123 +19,76 @@ import (
 	"errors"
 	"time"
 
-	"go.opentelemetry.io/collector/consumer"
-	"go.opentelemetry.io/collector/pdata/pcommon"
-	"go.opentelemetry.io/collector/receiver"
-	"go.opentelemetry.io/collector/receiver/receiverhelper"
-
-	"github.com/slack-go/slack"
 	"github.com/slack-go/slack/slackevents"
 	"github.com/slack-go/slack/socketmode"
-
-	metadata "github.com/ymotongpoo/opentelemetry-collector-extra/receiver/slackreceiver/internal/metadata"
+	"go.uber.org/zap"
 )
 
-type slackHandler struct {
-	client   *socketmode.Client
-	consumer consumer.Metrics
-	cancel   context.CancelFunc
-	config   *Config
-	obsrecv  *receiverhelper.ObsReport
-	mb       *metadata.MetricsBuilder
-	meCh     chan *slackevents.MessageEvent
+type socketClient interface {
+	RunContext(context.Context) error
+	AckCtx(context.Context, string, any) error
+	events() <-chan socketmode.Event
 }
 
-var errSlackClient = errors.New("failed to create slack client")
+type socketAdapter struct{ *socketmode.Client }
 
-func newSlackHandler(consumer consumer.Metrics, cfg *Config, settings receiver.Settings, obsrecv *receiverhelper.ObsReport) (*slackHandler, error) {
-	api := slack.New(cfg.BotToken, slack.OptionAppLevelToken(cfg.AppToken))
-	cli := socketmode.New(api)
-	if cli == nil {
-		return nil, errSlackClient
-	}
-	_, err := api.AuthTest()
-	if err != nil {
-		return nil, err
-	}
+func (c *socketAdapter) events() <-chan socketmode.Event { return c.Events }
 
-	sh := &slackHandler{
-		client:   cli,
-		consumer: consumer,
-		config:   cfg,
-		obsrecv:  obsrecv,
-		mb:       metadata.NewMetricsBuilder(cfg.MetricsBuilderConfig, settings.TelemetrySettings),
-		meCh:     make(chan *slackevents.MessageEvent, 1000),
-	}
-	return sh, nil
-}
-
-const (
-	dataFormat = "slack"
-)
-
-func (sh *slackHandler) run(ctx context.Context) error {
-	ctx, sh.cancel = context.WithCancel(ctx)
-	d, err := time.ParseDuration(sh.config.BufferInterval)
-	if err != nil {
-		return err
-	}
-	go sh.eventsLoop()
-
-	ticker := time.NewTicker(d)
-TICK:
+func (r *slackReceiver) eventsLoop(ctx context.Context, ready chan<- error) error {
 	for {
 		select {
-		case e := <-sh.meCh:
-			sh.messageEventToMetrics(e)
-		case <-ticker.C:
-			metrics := sh.mb.Emit()
-			sh.obsrecv.StartMetricsOp(ctx)
-			err := sh.consumer.ConsumeMetrics(ctx, metrics)
-			sh.obsrecv.EndMetricsOp(ctx, dataFormat, metrics.DataPointCount(), err)
 		case <-ctx.Done():
-			break TICK
-		}
-	}
-
-	return nil
-}
-
-func (sh *slackHandler) eventsLoop() {
-	go func() {
-		for env := range sh.client.Events {
-			switch env.Type {
-			case socketmode.EventTypeEventsAPI:
-				sh.client.Ack(*env.Request)
-				payload, _ := env.Data.(slackevents.EventsAPIEvent)
-				switch e := payload.InnerEvent.Data.(type) {
-				case *slackevents.MessageEvent:
-					sh.meCh <- e
+			return ctx.Err()
+		case event, ok := <-r.client.events():
+			if !ok {
+				return errors.New("Slack event channel closed unexpectedly")
+			}
+			if event.Type == socketmode.EventTypeConnected {
+				select {
+				case ready <- nil:
+				default:
+				}
+			}
+			if event.Type == socketmode.EventTypeEventsAPI {
+				if payload, ok := event.Data.(slackevents.EventsAPIEvent); ok {
+					if message, ok := payload.InnerEvent.Data.(*slackevents.MessageEvent); ok {
+						team := payload.TeamID
+						if team == "" {
+							team = r.teamID
+						}
+						r.messageEvent(team, message)
+					}
+				}
+			}
+			// Acknowledge after recording, including ignored and duplicate events.
+			// Keep the ack independent of downstream metric delivery.
+			if event.Request != nil && event.Request.EnvelopeID != "" {
+				ackCtx, cancel := context.WithTimeout(ctx, 2*time.Second)
+				err := r.client.AckCtx(ackCtx, event.Request.EnvelopeID, nil)
+				cancel()
+				if err != nil && ctx.Err() == nil {
+					r.settings.Logger.Warn("Failed to acknowledge Slack event", zap.Error(err))
 				}
 			}
 		}
-	}()
-	if err := sh.client.Run(); err != nil {
-		return
 	}
 }
 
-func (sh *slackHandler) messageEventToMetrics(e *slackevents.MessageEvent) {
-	now := pcommon.NewTimestampFromTime(time.Now())
-	channelID := e.Channel
-	matched := false
-	switch {
-	case sh.config.ServerWide:
-		channelID = "@all@"
-		matched = true
-	case len(sh.config.Channels) == 0:
-		matched = true
-	default:
-		for _, ch := range sh.config.Channels {
-			if ch == channelID {
-				matched = true
-				break
-			}
-		}
-	}
-	if !matched {
+func (r *slackReceiver) messageEvent(team string, event *slackevents.MessageEvent) {
+	if event == nil {
 		return
 	}
-	sh.mb.RecordSlackMessagesCountDataPoint(now, 1, channelID)
-	sh.mb.RecordSlackMessagesLengthDataPoint(now, int64(len(e.Text)), channelID)
+	switch event.SubType {
+	case "", "file_share", "me_message", "thread_broadcast", "bot_message":
+	default:
+		return // Edits, deletes, and channel administration do not add messages.
+	}
+	if !r.config.IncludeBots && (event.BotID != "" || event.SubType == "bot_message") {
+		return
+	}
+	id := ""
+	if event.TimeStamp != "" {
+		id = team + ":" + event.Channel + ":" + event.TimeStamp
+	}
+	r.stats.record(r.config, team, event.Channel, id, event.Text)
 }

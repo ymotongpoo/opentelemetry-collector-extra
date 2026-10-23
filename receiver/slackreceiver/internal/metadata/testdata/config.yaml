@@ -3,11 +3,23 @@ all_set:
   metrics:
     slack.messages.count:
       enabled: true
+      attributes: ["slack.channel.id"]
     slack.messages.length:
       enabled: true
+      attributes: ["slack.channel.id"]
+reaggregate_set:
+  metrics:
+    slack.messages.count:
+      enabled: true
+      attributes: []
+    slack.messages.length:
+      enabled: true
+      attributes: []
 none_set:
   metrics:
     slack.messages.count:
       enabled: false
+      attributes: ["slack.channel.id"]
     slack.messages.length:
       enabled: false
+      attributes: ["slack.channel.id"]

@@ -2,40 +2,125 @@
 
 package metadata
 
-import "go.opentelemetry.io/collector/confmap"
+import (
+	"fmt"
 
-// MetricConfig provides common config for a particular metric.
-type MetricConfig struct {
-	Enabled bool `mapstructure:"enabled"`
+	"go.opentelemetry.io/collector/confmap"
+)
 
+// SlackMessagesCountMetricAttributeKey specifies the key of an attribute for the slack.messages.count metric.
+type SlackMessagesCountMetricAttributeKey string
+
+const (
+	SlackMessagesCountMetricAttributeKeySlackChannelID SlackMessagesCountMetricAttributeKey = "slack.channel.id"
+)
+
+// SlackMessagesCountMetricConfig provides config for the slack.messages.count metric.
+type SlackMessagesCountMetricConfig struct {
+	Enabled          bool `mapstructure:"enabled"`
 	enabledSetByUser bool
+
+	AggregationStrategy string                                 `mapstructure:"aggregation_strategy"`
+	EnabledAttributes   []SlackMessagesCountMetricAttributeKey `mapstructure:"attributes"`
 }
 
-func (ms *MetricConfig) Unmarshal(parser *confmap.Conf) error {
+func (ms *SlackMessagesCountMetricConfig) Unmarshal(parser *confmap.Conf) error {
 	if parser == nil {
 		return nil
 	}
-	err := parser.Unmarshal(ms, )
+
+	err := parser.Unmarshal(ms)
 	if err != nil {
 		return err
 	}
+
 	ms.enabledSetByUser = parser.IsSet("enabled")
+	return nil
+}
+
+func (ms *SlackMessagesCountMetricConfig) Validate() error {
+	for _, val := range ms.EnabledAttributes {
+		switch val {
+		case SlackMessagesCountMetricAttributeKeySlackChannelID:
+		default:
+			return fmt.Errorf("metric slack.messages.count doesn't have an attribute %v, valid attributes: [slack.channel.id]", val)
+		}
+	}
+
+	switch ms.AggregationStrategy {
+	case AggregationStrategySum, AggregationStrategyAvg, AggregationStrategyMin, AggregationStrategyMax:
+	default:
+		return fmt.Errorf("invalid aggregation strategy %q, valid strategies: [%s, %s, %s, %s]", ms.AggregationStrategy, AggregationStrategySum, AggregationStrategyAvg, AggregationStrategyMin, AggregationStrategyMax)
+	}
+
+	return nil
+}
+
+// SlackMessagesLengthMetricAttributeKey specifies the key of an attribute for the slack.messages.length metric.
+type SlackMessagesLengthMetricAttributeKey string
+
+const (
+	SlackMessagesLengthMetricAttributeKeySlackChannelID SlackMessagesLengthMetricAttributeKey = "slack.channel.id"
+)
+
+// SlackMessagesLengthMetricConfig provides config for the slack.messages.length metric.
+type SlackMessagesLengthMetricConfig struct {
+	Enabled          bool `mapstructure:"enabled"`
+	enabledSetByUser bool
+
+	AggregationStrategy string                                  `mapstructure:"aggregation_strategy"`
+	EnabledAttributes   []SlackMessagesLengthMetricAttributeKey `mapstructure:"attributes"`
+}
+
+func (ms *SlackMessagesLengthMetricConfig) Unmarshal(parser *confmap.Conf) error {
+	if parser == nil {
+		return nil
+	}
+
+	err := parser.Unmarshal(ms)
+	if err != nil {
+		return err
+	}
+
+	ms.enabledSetByUser = parser.IsSet("enabled")
+	return nil
+}
+
+func (ms *SlackMessagesLengthMetricConfig) Validate() error {
+	for _, val := range ms.EnabledAttributes {
+		switch val {
+		case SlackMessagesLengthMetricAttributeKeySlackChannelID:
+		default:
+			return fmt.Errorf("metric slack.messages.length doesn't have an attribute %v, valid attributes: [slack.channel.id]", val)
+		}
+	}
+
+	switch ms.AggregationStrategy {
+	case AggregationStrategySum, AggregationStrategyAvg, AggregationStrategyMin, AggregationStrategyMax:
+	default:
+		return fmt.Errorf("invalid aggregation strategy %q, valid strategies: [%s, %s, %s, %s]", ms.AggregationStrategy, AggregationStrategySum, AggregationStrategyAvg, AggregationStrategyMin, AggregationStrategyMax)
+	}
+
 	return nil
 }
 
 // MetricsConfig provides config for slack metrics.
 type MetricsConfig struct {
-	SlackMessagesCount  MetricConfig `mapstructure:"slack.messages.count"`
-	SlackMessagesLength MetricConfig `mapstructure:"slack.messages.length"`
+	SlackMessagesCount  SlackMessagesCountMetricConfig  `mapstructure:"slack.messages.count"`
+	SlackMessagesLength SlackMessagesLengthMetricConfig `mapstructure:"slack.messages.length"`
 }
 
 func DefaultMetricsConfig() MetricsConfig {
 	return MetricsConfig{
-		SlackMessagesCount: MetricConfig{
-			Enabled: true,
+		SlackMessagesCount: SlackMessagesCountMetricConfig{
+			Enabled:             true,
+			AggregationStrategy: AggregationStrategySum,
+			EnabledAttributes:   []SlackMessagesCountMetricAttributeKey{SlackMessagesCountMetricAttributeKeySlackChannelID},
 		},
-		SlackMessagesLength: MetricConfig{
-			Enabled: true,
+		SlackMessagesLength: SlackMessagesLengthMetricConfig{
+			Enabled:             true,
+			AggregationStrategy: AggregationStrategySum,
+			EnabledAttributes:   []SlackMessagesLengthMetricAttributeKey{SlackMessagesLengthMetricAttributeKeySlackChannelID},
 		},
 	}
 }
@@ -45,7 +130,7 @@ type MetricsBuilderConfig struct {
 	Metrics MetricsConfig `mapstructure:"metrics"`
 }
 
-func DefaultMetricsBuilderConfig() MetricsBuilderConfig {
+func NewDefaultMetricsBuilderConfig() MetricsBuilderConfig {
 	return MetricsBuilderConfig{
 		Metrics: DefaultMetricsConfig(),
 	}

@@ -3,39 +3,112 @@
 package metadata
 
 import (
-	"time"
-
 	"go.opentelemetry.io/collector/component"
 	"go.opentelemetry.io/collector/pdata/pcommon"
 	"go.opentelemetry.io/collector/pdata/pmetric"
+	"go.opentelemetry.io/collector/pdata/xpdata/xhash"
+	"go.opentelemetry.io/collector/receiver"
+	"slices"
+	"time"
 )
 
+const (
+	AggregationStrategySum = "sum"
+	AggregationStrategyAvg = "avg"
+	AggregationStrategyMin = "min"
+	AggregationStrategyMax = "max"
+)
+
+// dataPointKey hashes dp's attributes and timestamps for O(1) dedup lookup.
+func dataPointKey(dp pmetric.NumberDataPoint) uint64 {
+	return xhash.Hash64(
+		xhash.WithMap(dp.Attributes()),
+		xhash.WithValue(pcommon.NewValueInt(int64(dp.StartTimestamp()))),
+		xhash.WithValue(pcommon.NewValueInt(int64(dp.Timestamp()))),
+	)
+}
+
+var MetricsInfo = metricsInfo{
+	SlackMessagesCount: metricInfo{
+		Name:       "slack.messages.count",
+		Attributes: []string{"slack.channel.id"},
+	},
+	SlackMessagesLength: metricInfo{
+		Name:       "slack.messages.length",
+		Attributes: []string{"slack.channel.id"},
+	},
+}
+
+type metricsInfo struct {
+	SlackMessagesCount  metricInfo
+	SlackMessagesLength metricInfo
+}
+
+type metricInfo struct {
+	Name       string
+	Attributes []string
+}
+
 type metricSlackMessagesCount struct {
-	data     pmetric.Metric // data buffer for generated metric.
-	config   MetricConfig   // metric config provided by user.
-	capacity int            // max observed number of data points added to the metric.
+	data          pmetric.Metric                 // data buffer for generated metric.
+	config        SlackMessagesCountMetricConfig // metric config provided by user.
+	capacity      int                            // max observed number of data points added to the metric.
+	aggDataPoints []int64                        // slice containing number of aggregated datapoints at each index
+	dpIndex       map[uint64]int                 // maps a data point's hash to its index, for O(1) dedup lookup.
 }
 
 // init fills slack.messages.count metric with initial data.
 func (m *metricSlackMessagesCount) init() {
 	m.data.SetName("slack.messages.count")
-	m.data.SetDescription("The number of messages sent to the channel")
+	m.data.SetDescription("Cumulative number of observed messages since receiver startup")
 	m.data.SetUnit("{messages}")
 	m.data.SetEmptySum()
 	m.data.Sum().SetIsMonotonic(true)
 	m.data.Sum().SetAggregationTemporality(pmetric.AggregationTemporalityCumulative)
 	m.data.Sum().DataPoints().EnsureCapacity(m.capacity)
+	m.aggDataPoints = m.aggDataPoints[:0]
+	m.dpIndex = make(map[uint64]int, m.capacity)
 }
 
 func (m *metricSlackMessagesCount) recordDataPoint(start pcommon.Timestamp, ts pcommon.Timestamp, val int64, slackChannelIDAttributeValue string) {
 	if !m.config.Enabled {
 		return
 	}
-	dp := m.data.Sum().DataPoints().AppendEmpty()
+
+	dp := pmetric.NewNumberDataPoint()
 	dp.SetStartTimestamp(start)
 	dp.SetTimestamp(ts)
+	if slices.Contains(m.config.EnabledAttributes, SlackMessagesCountMetricAttributeKeySlackChannelID) {
+		dp.Attributes().PutStr("slack.channel.id", slackChannelIDAttributeValue)
+	}
+
+	var s string
+	key := dataPointKey(dp)
+	dps := m.data.Sum().DataPoints()
+	if i, ok := m.dpIndex[key]; ok {
+		dpi := dps.At(i)
+		switch s = m.config.AggregationStrategy; s {
+		case AggregationStrategySum, AggregationStrategyAvg:
+			dpi.SetIntValue(dpi.IntValue() + val)
+			m.aggDataPoints[i] += 1
+			return
+		case AggregationStrategyMin:
+			if dpi.IntValue() > val {
+				dpi.SetIntValue(val)
+			}
+			return
+		case AggregationStrategyMax:
+			if dpi.IntValue() < val {
+				dpi.SetIntValue(val)
+			}
+			return
+		}
+	}
+
 	dp.SetIntValue(val)
-	dp.Attributes().PutStr("slack.channel.id", slackChannelIDAttributeValue)
+	m.aggDataPoints = append(m.aggDataPoints, 1)
+	m.dpIndex[key] = dps.Len()
+	dp.MoveTo(dps.AppendEmpty())
 }
 
 // updateCapacity saves max length of data point slices that will be used for the slice capacity.
@@ -48,14 +121,20 @@ func (m *metricSlackMessagesCount) updateCapacity() {
 // emit appends recorded metric data to a metrics slice and prepares it for recording another set of data points.
 func (m *metricSlackMessagesCount) emit(metrics pmetric.MetricSlice) {
 	if m.config.Enabled && m.data.Sum().DataPoints().Len() > 0 {
+		if m.config.AggregationStrategy == AggregationStrategyAvg {
+			for i, aggCount := range m.aggDataPoints {
+				m.data.Sum().DataPoints().At(i).SetIntValue(m.data.Sum().DataPoints().At(i).IntValue() / aggCount)
+			}
+		}
 		m.updateCapacity()
 		m.data.MoveTo(metrics.AppendEmpty())
 		m.init()
 	}
 }
 
-func newMetricSlackMessagesCount(cfg MetricConfig) metricSlackMessagesCount {
+func newMetricSlackMessagesCount(cfg SlackMessagesCountMetricConfig) metricSlackMessagesCount {
 	m := metricSlackMessagesCount{config: cfg}
+
 	if cfg.Enabled {
 		m.data = pmetric.NewMetric()
 		m.init()
@@ -64,31 +143,65 @@ func newMetricSlackMessagesCount(cfg MetricConfig) metricSlackMessagesCount {
 }
 
 type metricSlackMessagesLength struct {
-	data     pmetric.Metric // data buffer for generated metric.
-	config   MetricConfig   // metric config provided by user.
-	capacity int            // max observed number of data points added to the metric.
+	data          pmetric.Metric                  // data buffer for generated metric.
+	config        SlackMessagesLengthMetricConfig // metric config provided by user.
+	capacity      int                             // max observed number of data points added to the metric.
+	aggDataPoints []int64                         // slice containing number of aggregated datapoints at each index
+	dpIndex       map[uint64]int                  // maps a data point's hash to its index, for O(1) dedup lookup.
 }
 
 // init fills slack.messages.length metric with initial data.
 func (m *metricSlackMessagesLength) init() {
 	m.data.SetName("slack.messages.length")
-	m.data.SetDescription("The length of message sent to the channel")
+	m.data.SetDescription("Cumulative number of Unicode code points in observed message content")
 	m.data.SetUnit("{characters}")
 	m.data.SetEmptySum()
 	m.data.Sum().SetIsMonotonic(true)
 	m.data.Sum().SetAggregationTemporality(pmetric.AggregationTemporalityCumulative)
 	m.data.Sum().DataPoints().EnsureCapacity(m.capacity)
+	m.aggDataPoints = m.aggDataPoints[:0]
+	m.dpIndex = make(map[uint64]int, m.capacity)
 }
 
 func (m *metricSlackMessagesLength) recordDataPoint(start pcommon.Timestamp, ts pcommon.Timestamp, val int64, slackChannelIDAttributeValue string) {
 	if !m.config.Enabled {
 		return
 	}
-	dp := m.data.Sum().DataPoints().AppendEmpty()
+
+	dp := pmetric.NewNumberDataPoint()
 	dp.SetStartTimestamp(start)
 	dp.SetTimestamp(ts)
+	if slices.Contains(m.config.EnabledAttributes, SlackMessagesLengthMetricAttributeKeySlackChannelID) {
+		dp.Attributes().PutStr("slack.channel.id", slackChannelIDAttributeValue)
+	}
+
+	var s string
+	key := dataPointKey(dp)
+	dps := m.data.Sum().DataPoints()
+	if i, ok := m.dpIndex[key]; ok {
+		dpi := dps.At(i)
+		switch s = m.config.AggregationStrategy; s {
+		case AggregationStrategySum, AggregationStrategyAvg:
+			dpi.SetIntValue(dpi.IntValue() + val)
+			m.aggDataPoints[i] += 1
+			return
+		case AggregationStrategyMin:
+			if dpi.IntValue() > val {
+				dpi.SetIntValue(val)
+			}
+			return
+		case AggregationStrategyMax:
+			if dpi.IntValue() < val {
+				dpi.SetIntValue(val)
+			}
+			return
+		}
+	}
+
 	dp.SetIntValue(val)
-	dp.Attributes().PutStr("slack.channel.id", slackChannelIDAttributeValue)
+	m.aggDataPoints = append(m.aggDataPoints, 1)
+	m.dpIndex[key] = dps.Len()
+	dp.MoveTo(dps.AppendEmpty())
 }
 
 // updateCapacity saves max length of data point slices that will be used for the slice capacity.
@@ -101,14 +214,20 @@ func (m *metricSlackMessagesLength) updateCapacity() {
 // emit appends recorded metric data to a metrics slice and prepares it for recording another set of data points.
 func (m *metricSlackMessagesLength) emit(metrics pmetric.MetricSlice) {
 	if m.config.Enabled && m.data.Sum().DataPoints().Len() > 0 {
+		if m.config.AggregationStrategy == AggregationStrategyAvg {
+			for i, aggCount := range m.aggDataPoints {
+				m.data.Sum().DataPoints().At(i).SetIntValue(m.data.Sum().DataPoints().At(i).IntValue() / aggCount)
+			}
+		}
 		m.updateCapacity()
 		m.data.MoveTo(metrics.AppendEmpty())
 		m.init()
 	}
 }
 
-func newMetricSlackMessagesLength(cfg MetricConfig) metricSlackMessagesLength {
+func newMetricSlackMessagesLength(cfg SlackMessagesLengthMetricConfig) metricSlackMessagesLength {
 	m := metricSlackMessagesLength{config: cfg}
+
 	if cfg.Enabled {
 		m.data = pmetric.NewMetric()
 		m.init()
@@ -128,27 +247,35 @@ type MetricsBuilder struct {
 	metricSlackMessagesLength metricSlackMessagesLength
 }
 
-// metricBuilderOption applies changes to default metrics builder.
-type metricBuilderOption func(*MetricsBuilder)
-
-// WithStartTime sets startTime on the metrics builder.
-func WithStartTime(startTime pcommon.Timestamp) metricBuilderOption {
-	return func(mb *MetricsBuilder) {
-		mb.startTime = startTime
-	}
+// MetricBuilderOption applies changes to default metrics builder.
+type MetricBuilderOption interface {
+	apply(*MetricsBuilder)
 }
 
-func NewMetricsBuilder(mbc MetricsBuilderConfig, settings component.TelemetrySettings, options ...metricBuilderOption) *MetricsBuilder {
+type metricBuilderOptionFunc func(mb *MetricsBuilder)
+
+func (mbof metricBuilderOptionFunc) apply(mb *MetricsBuilder) {
+	mbof(mb)
+}
+
+// WithStartTime sets startTime on the metrics builder.
+func WithStartTime(startTime pcommon.Timestamp) MetricBuilderOption {
+	return metricBuilderOptionFunc(func(mb *MetricsBuilder) {
+		mb.startTime = startTime
+	})
+}
+func NewMetricsBuilder(mbc MetricsBuilderConfig, settings receiver.Settings, options ...MetricBuilderOption) *MetricsBuilder {
 	mb := &MetricsBuilder{
 		config:                    mbc,
 		startTime:                 pcommon.NewTimestampFromTime(time.Now()),
 		metricsBuffer:             pmetric.NewMetrics(),
-		buildInfo:                 component.NewDefaultBuildInfo(),
+		buildInfo:                 settings.BuildInfo,
 		metricSlackMessagesCount:  newMetricSlackMessagesCount(mbc.Metrics.SlackMessagesCount),
 		metricSlackMessagesLength: newMetricSlackMessagesLength(mbc.Metrics.SlackMessagesLength),
 	}
+
 	for _, op := range options {
-		op(mb)
+		op.apply(mb)
 	}
 	return mb
 }
@@ -161,20 +288,28 @@ func (mb *MetricsBuilder) updateCapacity(rm pmetric.ResourceMetrics) {
 }
 
 // ResourceMetricsOption applies changes to provided resource metrics.
-type ResourceMetricsOption func(pmetric.ResourceMetrics)
+type ResourceMetricsOption interface {
+	apply(pmetric.ResourceMetrics)
+}
+
+type resourceMetricsOptionFunc func(pmetric.ResourceMetrics)
+
+func (rmof resourceMetricsOptionFunc) apply(rm pmetric.ResourceMetrics) {
+	rmof(rm)
+}
 
 // WithResource sets the provided resource on the emitted ResourceMetrics.
 // It's recommended to use ResourceBuilder to create the resource.
 func WithResource(res pcommon.Resource) ResourceMetricsOption {
-	return func(rm pmetric.ResourceMetrics) {
+	return resourceMetricsOptionFunc(func(rm pmetric.ResourceMetrics) {
 		res.CopyTo(rm.Resource())
-	}
+	})
 }
 
 // WithStartTimeOverride overrides start time for all the resource metrics data points.
 // This option should be only used if different start time has to be set on metrics coming from different resources.
 func WithStartTimeOverride(start pcommon.Timestamp) ResourceMetricsOption {
-	return func(rm pmetric.ResourceMetrics) {
+	return resourceMetricsOptionFunc(func(rm pmetric.ResourceMetrics) {
 		var dps pmetric.NumberDataPointSlice
 		metrics := rm.ScopeMetrics().At(0).Metrics()
 		for i := 0; i < metrics.Len(); i++ {
@@ -188,7 +323,7 @@ func WithStartTimeOverride(start pcommon.Timestamp) ResourceMetricsOption {
 				dps.At(j).SetStartTimestamp(start)
 			}
 		}
-	}
+	})
 }
 
 // EmitForResource saves all the generated metrics under a new resource and updates the internal state to be ready for
@@ -196,18 +331,19 @@ func WithStartTimeOverride(start pcommon.Timestamp) ResourceMetricsOption {
 // needs to emit metrics from several resources. Otherwise calling this function is not required,
 // just `Emit` function can be called instead.
 // Resource attributes should be provided as ResourceMetricsOption arguments.
-func (mb *MetricsBuilder) EmitForResource(rmo ...ResourceMetricsOption) {
+func (mb *MetricsBuilder) EmitForResource(options ...ResourceMetricsOption) {
 	rm := pmetric.NewResourceMetrics()
 	ils := rm.ScopeMetrics().AppendEmpty()
-	ils.Scope().SetName("otelcol/slackreceiver")
+	ils.Scope().SetName(ScopeName)
 	ils.Scope().SetVersion(mb.buildInfo.Version)
 	ils.Metrics().EnsureCapacity(mb.metricsCapacity)
 	mb.metricSlackMessagesCount.emit(ils.Metrics())
 	mb.metricSlackMessagesLength.emit(ils.Metrics())
 
-	for _, op := range rmo {
-		op(rm)
+	for _, op := range options {
+		op.apply(rm)
 	}
+
 	if ils.Metrics().Len() > 0 {
 		mb.updateCapacity(rm)
 		rm.MoveTo(mb.metricsBuffer.ResourceMetrics().AppendEmpty())
@@ -217,8 +353,8 @@ func (mb *MetricsBuilder) EmitForResource(rmo ...ResourceMetricsOption) {
 // Emit returns all the metrics accumulated by the metrics builder and updates the internal state to be ready for
 // recording another set of metrics. This function will be responsible for applying all the transformations required to
 // produce metric representation defined in metadata and user config, e.g. delta or cumulative.
-func (mb *MetricsBuilder) Emit(rmo ...ResourceMetricsOption) pmetric.Metrics {
-	mb.EmitForResource(rmo...)
+func (mb *MetricsBuilder) Emit(options ...ResourceMetricsOption) pmetric.Metrics {
+	mb.EmitForResource(options...)
 	metrics := mb.metricsBuffer
 	mb.metricsBuffer = pmetric.NewMetrics()
 	return metrics
@@ -236,9 +372,9 @@ func (mb *MetricsBuilder) RecordSlackMessagesLengthDataPoint(ts pcommon.Timestam
 
 // Reset resets metrics builder to its initial state. It should be used when external metrics source is restarted,
 // and metrics builder should update its startTime and reset it's internal state accordingly.
-func (mb *MetricsBuilder) Reset(options ...metricBuilderOption) {
+func (mb *MetricsBuilder) Reset(options ...MetricBuilderOption) {
 	mb.startTime = pcommon.NewTimestampFromTime(time.Now())
 	for _, op := range options {
-		op(mb)
+		op.apply(mb)
 	}
 }
