@@ -1,6 +1,6 @@
 module github.com/ymotongpoo/opentelemetry-collector-extra/exporter/s3tablesexporter
 
-go 1.26.0
+go 1.27.3
 
 require (
 	github.com/aws/aws-sdk-go-v2 v1.41.0

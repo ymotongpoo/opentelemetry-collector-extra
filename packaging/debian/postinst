@@ -1,10 +1,31 @@
 #!/bin/sh
 set -eu
 if [ "$1" = configure ]; then
-    /usr/sbin/discord-otelcol-set-token --migrate
+    state=/var/lib/otelcol-extra-migration
+    if ! /usr/sbin/otelcol-extra-set-credentials --migrate; then
+        if [ -f "$state/state" ] && grep -qx 'active=1' "$state/state" && [ -d /run/systemd/system ]; then
+            systemctl daemon-reload
+            systemctl start discord-otelcol.service || true
+        fi
+        exit 1
+    fi
 fi
 if [ "$1" = configure ] && [ -d /run/systemd/system ]; then
     systemctl daemon-reload
-    # Preserve the administrator's enablement choice. A fresh install needs a token.
-    systemctl try-restart discord-otelcol.service || true
+    if [ -f "$state/state" ] && [ ! -e "$state/complete" ]; then
+        systemctl disable discord-otelcol.service 2>/dev/null || true
+        runtime=''
+        if grep -qx 'runtime=1' "$state/state"; then runtime=--runtime; fi
+        if grep -qx 'masked=1' "$state/state"; then
+            systemctl mask $runtime otelcol-extra.service
+        else
+            if grep -qx 'enabled=1' "$state/state"; then systemctl enable $runtime otelcol-extra.service; fi
+            if grep -qx 'active=1' "$state/state"; then systemctl start otelcol-extra.service; fi
+        fi
+    else
+        if systemctl is-active --quiet otelcol-extra.service; then systemctl try-restart otelcol-extra.service; fi
+    fi
+fi
+if [ "$1" = configure ] && [ -f "$state/state" ]; then
+    touch "$state/complete"
 fi

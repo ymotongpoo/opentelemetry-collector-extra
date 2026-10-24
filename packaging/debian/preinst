@@ -1,0 +1,27 @@
+#!/bin/sh
+set -eu
+# This is also the transitional package's preinst: either unpack order retains
+# the old service state before its unit file is removed.
+state=/var/lib/otelcol-extra-migration
+if [ -d /etc/discord-otelcol ] && [ ! -e "$state/complete" ] && [ ! -e "$state/state" ]; then
+    install -d -m 0700 "$state"
+    active=0
+    enabled=0
+    masked=0
+    runtime=0
+    if [ -d /run/systemd/system ]; then
+        if systemctl is-active --quiet discord-otelcol.service; then active=1; fi
+        mode="$(systemctl is-enabled discord-otelcol.service 2>/dev/null || true)"
+        case "$mode" in
+            enabled) enabled=1 ;; enabled-runtime) enabled=1; runtime=1 ;;
+            masked) masked=1 ;; masked-runtime) masked=1; runtime=1 ;;
+        esac
+        # A transitional unpack may already have removed the old unit file.
+        if [ -L /etc/systemd/system/multi-user.target.wants/discord-otelcol.service ]; then enabled=1; fi
+    fi
+    umask 077
+    printf 'active=%s\nenabled=%s\nmasked=%s\nruntime=%s\n' "$active" "$enabled" "$masked" "$runtime" > "$state/state"
+fi
+if [ -f "$state/state" ] && [ ! -e "$state/complete" ] && [ -d /run/systemd/system ] && systemctl is-active --quiet discord-otelcol.service; then
+    systemctl stop discord-otelcol.service
+fi

@@ -9,6 +9,8 @@
 *.dylib
 otelcol-custom
 otelcol-custom-*
+/otelcol-extra
+/otelcol-extra-*
 /build/
 /dist/
 
@@ -30,3 +32,7 @@ go.work
 # Kiro configs
 .kiro
 
+
+# Python packaging test caches
+__pycache__/
+*.pyc

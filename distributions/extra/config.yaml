@@ -1,9 +1,10 @@
+# All custom components are compiled in. Only configured components run.
+# Copy optional receiver snippets from /usr/share/otelcol-extra/examples/ to conf.d/.
 receivers:
-  discord:
-    token: ${file:${env:CREDENTIALS_DIRECTORY}/discord_bot_token}
-    buffer_interval: 30s
-    include_bots: false
-
+  otlp:
+    protocols:
+      http:
+        endpoint: 127.0.0.1:4319
 exporters:
   otlp_http/alloy:
     endpoint: http://127.0.0.1:4318
@@ -11,7 +12,6 @@ exporters:
       enabled: true
     retry_on_failure:
       enabled: true
-
 service:
   telemetry:
     metrics:
@@ -23,5 +23,5 @@ service:
                 port: 8889
   pipelines:
     metrics:
-      receivers: [discord]
+      receivers: [otlp]
       exporters: [otlp_http/alloy]

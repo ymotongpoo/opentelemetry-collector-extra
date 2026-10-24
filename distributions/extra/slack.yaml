@@ -1,0 +1,7 @@
+receivers:
+  slack: ${file:${env:CREDENTIALS_DIRECTORY}/slack_receiver}
+service:
+  pipelines:
+    metrics/slack:
+      receivers: [slack]
+      exporters: [otlp_http/alloy]

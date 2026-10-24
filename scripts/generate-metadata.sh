@@ -11,6 +11,9 @@ trap 'rm -rf "$tool_dir"' EXIT HUP INT TERM
   go get go.opentelemetry.io/collector/cmd/mdatagen@v0.163.0
   go build -o "$tool_dir/mdatagen" go.opentelemetry.io/collector/cmd/mdatagen
 )
-for component in receiver/discordreceiver receiver/slackreceiver exporter/discordexporter exporter/slackexporter; do
+if [ "$#" -eq 0 ]; then
+    set -- receiver/discordreceiver receiver/slackreceiver receiver/switchbotreceiver exporter/discordexporter exporter/slackexporter
+fi
+for component in "$@"; do
   "$tool_dir/mdatagen" "$component/metadata.yaml"
 done

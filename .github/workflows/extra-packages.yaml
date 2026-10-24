@@ -1,0 +1,104 @@
+name: Collector Extra Debian packages
+
+on:
+  push:
+    branches: [main]
+    tags: ['otelcol-extra/v*']
+    paths:
+      - '.github/workflows/extra-packages.yaml'
+      - 'distributions/extra/**'
+      - 'packaging/debian/**'
+      - 'receiver/**'
+      - 'exporter/**'
+      - 'otelcol-builder.yaml'
+      - 'go.mod'
+      - 'Makefile'
+      - 'scripts/build-*.sh'
+      - 'scripts/test-deb.sh'
+      - 'scripts/test-systemd.sh'
+      - 'scripts/test-credentials.py'
+  pull_request:
+    paths:
+      - '.github/workflows/extra-packages.yaml'
+      - 'distributions/extra/**'
+      - 'packaging/debian/**'
+      - 'receiver/**'
+      - 'exporter/**'
+      - 'otelcol-builder.yaml'
+      - 'go.mod'
+      - 'Makefile'
+      - 'scripts/build-*.sh'
+      - 'scripts/test-deb.sh'
+      - 'scripts/test-systemd.sh'
+      - 'scripts/test-credentials.py'
+
+permissions:
+  contents: read
+
+jobs:
+  package:
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    env:
+      GOMAXPROCS: "3"
+      GOFLAGS: -p=3
+    strategy:
+      fail-fast: false
+      matrix:
+        arch: [amd64, arm64]
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+          cache-dependency-path: '**/go.sum'
+      - name: Select the package version
+        shell: bash
+        run: |
+          version=0.2.0
+          if [[ "$GITHUB_REF" == refs/tags/otelcol-extra/v* ]]; then
+            version="${GITHUB_REF_NAME#otelcol-extra/v}"
+          fi
+          echo "PACKAGE_VERSION=$version" >> "$GITHUB_ENV"
+      - run: make test vet
+      - run: python3 scripts/test-credentials.py
+      - name: Build the Debian package
+        run: make deb VERSION="$PACKAGE_VERSION" ARCH="${{ matrix.arch }}"
+      - name: Validate and install the amd64 package
+        if: matrix.arch == 'amd64'
+        run: ./scripts/test-deb.sh "dist/otelcol-extra_${PACKAGE_VERSION}_amd64.deb"
+      - name: Verify credentials with systemd and a dynamic user
+        env:
+          OTELCOL_EXTRA_SYSTEMD_TEST: "1"
+        if: matrix.arch == 'amd64'
+        run: ./scripts/test-systemd.sh "dist/otelcol-extra_${PACKAGE_VERSION}_amd64.deb"
+      - uses: actions/upload-artifact@v4
+        with:
+          name: otelcol-extra-${{ matrix.arch }}
+          path: dist/*.deb
+          if-no-files-found: error
+
+  release:
+    if: startsWith(github.ref, 'refs/tags/otelcol-extra/v')
+    needs: package
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          pattern: otelcol-extra-*
+          path: dist
+          merge-multiple: true
+      - name: Publish the Debian packages
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -eu
+          cd dist
+          sha256sum -- *.deb > SHA256SUMS
+          gh release create "$GITHUB_REF_NAME" --repo "$GITHUB_REPOSITORY" \
+            --verify-tag --title "Collector Extra ${GITHUB_REF_NAME#otelcol-extra/v}" \
+            --generate-notes --latest ./*.deb SHA256SUMS
