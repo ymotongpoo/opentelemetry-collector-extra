@@ -1,0 +1,99 @@
+cloudbuild.yaml
+  s_e8e040ab098906::t_830f7dfbac3847 2,6,8,16-17
+scripts/build-deb.sh
+  s_e8e040ab098906::t_6e6d536070f4cc 9-10,19,56-60
+  s_e8e040ab098906::t_4ff91190adf200 1-8,11-18,20-55
+.github/workflows/otelcol-build.yaml
+  s_e8e040ab098906::t_dc99d506092c01 19,35-37,46,48,53
+packaging/debian/run
+  s_e8e040ab098906::t_ba7c333a696420 1-7
+packaging/debian/postrm
+  s_e8e040ab098906::t_47ce87cf86665c 4-7
+scripts/test-deb.sh
+  s_e8e040ab098906::t_4a85d535f4968b 73-74,81,84,89,91,104,146-147
+  s_e8e040ab098906::t_821272e6e1feb0 37,47,50,61,183
+  s_e8e040ab098906::t_7dd62d9ed99db5 1-24,26-36,38-46,48-49,51-60,62-72,75-80,82-83,85-87,90,92-103,105,108-112,117,124,127-145,148-161,184
+  s_e8e040ab098906::t_75004881029ddb 25,162-182
+  s_e8e040ab098906::t_a6163cdfa7fc06 113-114
+  s_e8e040ab098906::t_932a73fcd2fff9 88,106-107,115-116,118-123,125-126
+.github/workflows/extra-packages.yaml
+  s_e8e040ab098906::t_dc99d506092c01 1-104
+scripts/test-credentials.py
+  s_e8e040ab098906::t_c99e87ef067ef6 1-79
+distributions/extra/discord.yaml
+  s_e8e040ab098906::t_f5e01df41b4190 1-10
+scripts/test-collector-integration.py
+  s_e8e040ab098906::t_2d454132103542 1-127
+distributions/extra/config.yaml
+  s_e8e040ab098906::t_f5e01df41b4190 1-27
+.gitignore
+  s_e8e040ab098906::t_9761f32f6ee1ca 35-38
+  s_e8e040ab098906::t_dc99d506092c01 12-13
+packaging/debian/otelcol-extra-set-credentials
+  s_e8e040ab098906::t_47ce87cf86665c 1-12,14-17,19-24,27-142,146-178,182-194,196-202
+  s_e8e040ab098906::t_c405b86642efd6 13,18,25-26,143-145,179-181,195
+scripts/test-systemd.sh
+  s_e8e040ab098906::t_7dd62d9ed99db5 1-5,13-15
+  s_e8e040ab098906::t_65b2bccfc73f25 6-12,16-30
+exporter/s3tablesexporter/go.mod
+  s_e8e040ab098906::t_f5e01df41b4190 3
+receiver/discordreceiver/go.mod
+  s_e8e040ab098906::t_f5e01df41b4190 3
+exporter/discordexporter/go.mod
+  s_e8e040ab098906::t_f5e01df41b4190 3
+packaging/debian/postinst
+  s_e8e040ab098906::t_c405b86642efd6 26
+  s_e8e040ab098906::t_0f99a1cdcdf29d 17-18,20,22
+  s_e8e040ab098906::t_47ce87cf86665c 4-11,15-16,19,21,23-25,27-30
+otelcol-builder.yaml
+  s_e8e040ab098906::t_f5e01df41b4190 17-18,20,28-29,34,46
+receiver/slackreceiver/go.mod
+  s_e8e040ab098906::t_f5e01df41b4190 3
+packaging/debian/preinst
+  s_e8e040ab098906::t_0f99a1cdcdf29d 11,15-18,23
+  s_e8e040ab098906::t_47ce87cf86665c 1-10,12-14,19-22,27
+  s_e8e040ab098906::t_c405b86642efd6 24-26
+packaging/debian/prerm
+  s_e8e040ab098906::t_47ce87cf86665c 4-5
+packaging/debian/otelcol-extra.service
+  s_e8e040ab098906::t_ba7c333a696420 1-27
+scripts/check-modules.sh
+  s_e8e040ab098906::t_f5e01df41b4190 8
+exporter/slackexporter/go.mod
+  s_e8e040ab098906::t_f5e01df41b4190 3
+scripts/build-collector.sh
+  s_e8e040ab098906::t_ba7c333a696420 1-8,13
+  s_e8e040ab098906::t_484e56d6726b72 9-12,14
+distributions/extra/switchbot.yaml
+  s_e8e040ab098906::t_f5e01df41b4190 1-10
+scripts/generate-metadata.sh
+  s_e8e040ab098906::t_9b073f4cfc6353 14-17
+Makefile
+  s_e8e040ab098906::t_ba7c333a696420 2,4,6-8,10-11,26-27
+components.go
+  s_e8e040ab098906::t_7385715f37bbb0 14,24,60,70,74,84
+distributions/extra/slack.yaml
+  s_e8e040ab098906::t_6642791cf85ba5 1-7
+go.mod
+  s_e8e040ab098906::t_b8772557ad094b 5,14,25,379-380
+go.sum
+  s_e8e040ab098906::t_e32d6fb1cf40d5 731-732
+main.go
+  s_e8e040ab098906::t_90d70735fcd254 3,21-23
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "9291a203e727a160e590b6b292edd4a78f8ddab5",
+  "prompts": {},
+  "sessions": {
+    "s_e8e040ab098906": {
+      "agent_id": {
+        "tool": "codex",
+        "id": "01a16cc5-e396-76e1-84b8-83e572917b16",
+        "model": "gpt-6.1-sol"
+      },
+      "human_author": "Yoshi Yamaguchi <ymotongpoo@gmail.com>"
+    }
+  }
+}
