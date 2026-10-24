@@ -13,6 +13,9 @@ Experimental OpenTelemetry Collector components for community projects and perso
 The Discord and Slack components support **metrics**. Receivers observe new messages while running; they do not fetch message history.
 Exporters suit small volumes of metrics that you want to inspect in chat.
 
+For a Discord-only service that forwards to an existing Alloy installation, use the
+[dedicated Debian package](distributions/discord/README.md).
+
 ## Build and test
 
 Use Go 1.26 or later. The distribution uses Collector `v0.163.0` and its stable API modules at `v1.69.0`.
