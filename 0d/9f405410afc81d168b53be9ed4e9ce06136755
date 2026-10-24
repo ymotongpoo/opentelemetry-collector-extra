@@ -1,0 +1,22 @@
+receiver/switchbotreceiver/README.md
+  s_e8e040ab098906::t_10d52a22e0bbde 72-75
+examples/grafana/README.md
+  s_e8e040ab098906::t_10d52a22e0bbde 1-13,16-44
+  s_e8e040ab098906::t_f28b41ddc1c091 14-15
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "0d9f405410afc81d168b53be9ed4e9ce06136755",
+  "prompts": {},
+  "sessions": {
+    "s_e8e040ab098906": {
+      "agent_id": {
+        "tool": "codex",
+        "id": "01a16cc5-e396-76e1-84b8-83e572917b16",
+        "model": "gpt-6.1-sol"
+      },
+      "human_author": "Yoshi Yamaguchi <ymotongpoo@gmail.com>"
+    }
+  }
+}
