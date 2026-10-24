@@ -1,0 +1,37 @@
+scripts/test-credentials.py
+  s_e8e040ab098906::t_95ccc282bd16cc 134-136
+  s_e8e040ab098906::t_94330d4381e003 2-3,6,8,10-14,16,27-133,137-148
+  s_e8e040ab098906::t_b1688691af15c3 149-150
+otelcol-builder.yaml
+  s_e8e040ab098906::t_95ccc282bd16cc 20
+main.go
+  s_e8e040ab098906::t_f491a39aa27f15 23
+scripts/build-deb.sh
+  s_e8e040ab098906::t_95ccc282bd16cc 4
+scripts/test-deb.sh
+  s_e8e040ab098906::t_56d658d04e82c9 41-43
+scripts/build-collector.sh
+  s_e8e040ab098906::t_95ccc282bd16cc 5
+.github/workflows/extra-packages.yaml
+  s_e8e040ab098906::t_95ccc282bd16cc 60
+Makefile
+  s_e8e040ab098906::t_95ccc282bd16cc 2
+packaging/debian/otelcol-extra-set-credentials
+  s_e8e040ab098906::t_b66854a3fcde89 30-33,81-88,92-103,182,187,198,205,211,220-232
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "2902849f90ca9e2163ff37b60d13414ddecadfa3",
+  "prompts": {},
+  "sessions": {
+    "s_e8e040ab098906": {
+      "agent_id": {
+        "tool": "codex",
+        "id": "01a16cc5-e396-76e1-84b8-83e572917b16",
+        "model": "gpt-6.1-sol"
+      },
+      "human_author": "Yoshi Yamaguchi <ymotongpoo@gmail.com>"
+    }
+  }
+}
