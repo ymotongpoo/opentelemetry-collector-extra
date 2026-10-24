@@ -33,6 +33,8 @@ sudo systemctl enable --now otelcol-extra.service
 ```
 
 Enable only the snippets you need. Registering SwitchBot asks for both Token and Secret; it saves one encrypted JSON credential atomically.
+Paste each value at its hidden prompt, then press Enter. Empty values, whitespace, and non-ASCII characters produce an input error and up to three attempts per value; the value is never printed or silently trimmed.
+Input failures do not invoke encryption or change an existing credential. Errors from terminal access, input validation, and encryption are reported separately.
 For Slack, run `sudo otelcol-extra-set-credentials slack` and copy `slack.yaml` instead.
 Unused components need no credentials. Additional receiver/exporter settings can be added to these snippets.
 The launcher merges the main configuration and all `conf.d/*.yaml` files.
@@ -83,9 +85,9 @@ make build validate
 make test vet
 python3 scripts/test-credentials.py
 python3 scripts/test-collector-integration.py
-make deb VERSION=0.2.0 ARCH=amd64
-./scripts/test-deb.sh dist/otelcol-extra_0.2.0_amd64.deb
-make deb VERSION=0.2.0 ARCH=arm64
+make deb VERSION=0.2.1 ARCH=amd64
+./scripts/test-deb.sh dist/otelcol-extra_0.2.1_amd64.deb
+make deb VERSION=0.2.1 ARCH=arm64
 ```
 
 `test-deb.sh` uses a disposable Docker container and pinned published 0.1.0/0.1.1 packages.
