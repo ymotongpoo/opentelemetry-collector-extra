@@ -8,17 +8,19 @@ Experimental OpenTelemetry Collector components for community projects and perso
 - [Slack receiver](receiver/slackreceiver): cumulative message counts and character totals from Slack Socket Mode events.
 - [Discord exporter](exporter/discordexporter): posts OTLP metrics JSON to a Discord channel.
 - [Slack exporter](exporter/slackexporter): posts OTLP metrics JSON to a Slack channel.
+- [SwitchBot receiver](receiver/switchbotreceiver): environmental measurements and battery levels through the cloud API and optional Matter Server.
 - [S3 Tables exporter](exporter/s3tablesexporter): an unfinished experiment, included in the custom distribution.
 
 The Discord and Slack components support **metrics**. Receivers observe new messages while running; they do not fetch message history.
 Exporters suit small volumes of metrics that you want to inspect in chat.
 
-For a Discord-only service that forwards to an existing Alloy installation, use the
-[dedicated Debian package](distributions/discord/README.md).
+The `otelcol-extra` distribution includes every component in this repository. Only components selected in the configuration run.
+The [Debian package](distributions/extra/README.md) can run Discord and SwitchBot in one process and forward to an existing Alloy installation.
+Slack and S3 Tables credentials are unnecessary when those components are disabled.
 
 ## Build and test
 
-Use Go 1.26 or later. The distribution uses Collector `v0.163.0` and its stable API modules at `v1.69.0`.
+Use Go **1.27.3**. `make` selects this toolchain without changing the global Go installation. The distribution uses Collector `v0.163.0` and its stable API modules at `v1.69.0`.
 
 ```sh
 make build
@@ -26,18 +28,18 @@ make test
 make vet
 ```
 
-`make build` runs the pinned Collector Builder and writes `otelcol-custom` in this directory.
+`make build` runs the pinned Collector Builder and writes `otelcol-extra` in this directory.
 `make test` runs race tests in each component module, including S3 Tables.
-The chat tests use local HTTP/WebSocket servers and fake clients. They require no service credentials.
+The receiver tests use local HTTP/WebSocket servers and fake clients. SwitchBot tests include anonymized device responses, cloud request limits, Matter reconnects, and source fallback. They require no service credentials.
 
 To build the checked-in generated sources without regenerating them:
 
 ```sh
-go build -o otelcol-custom .
+GOTOOLCHAIN=go1.27.3 go build -o otelcol-extra .
 ```
 
-`make generate` regenerates the four chat components' metadata with the pinned generator.
-The implementation plan and verification results are in [IMPLEMENTATION_PLAN.md](IMPLEMENTATION_PLAN.md).
+`make generate` regenerates the chat and SwitchBot components' metadata with the pinned generator.
+
 
 ## Receive message statistics
 
@@ -50,8 +52,8 @@ Create the Discord and Slack apps using the component READMEs. Provide their tok
 Run the example pipeline:
 
 ```sh
-./otelcol-custom validate --config=otel-config.yaml
-./otelcol-custom --config=otel-config.yaml
+./otelcol-extra validate --config=otel-config.yaml
+./otelcol-extra --config=otel-config.yaml
 ```
 
 The example writes metrics through the debug exporter. Each receiver README includes a configuration for using that service alone.

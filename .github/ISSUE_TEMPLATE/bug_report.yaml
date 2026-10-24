@@ -55,7 +55,7 @@ body:
       placeholder: |
         dist:
           module: github.com/ymotongpoo/opentelemetry-collector-extra/builder
-          name: otelcol-custom
+          name: otelcol-extra
           description: Custom OpenTelemetry Collector binary
           output_path: .
 
