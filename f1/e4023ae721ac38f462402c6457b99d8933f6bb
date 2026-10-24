@@ -1,0 +1,37 @@
+scripts/build-discord-collector.sh
+  s_b87970ad20b667::t_c3e97c01d3443f 5
+packaging/debian/postinst
+  s_b87970ad20b667::t_c3e97c01d3443f 3-5
+packaging/debian/postrm
+  s_b87970ad20b667::t_c3e97c01d3443f 3-5
+packaging/debian/discord-otelcol-set-token
+  s_b87970ad20b667::t_acd7c36706b296 74,81,97,137-139
+  s_b87970ad20b667::t_c3e97c01d3443f 1-73,75-80,82-96,98-136,140-150
+packaging/debian/discord-otelcol.service
+  s_b87970ad20b667::t_f671565db2e4b9 20
+  s_b87970ad20b667::t_c3e97c01d3443f 12-14
+distributions/discord/config.yaml
+  s_b87970ad20b667::t_c3e97c01d3443f 3
+scripts/build-discord-deb.sh
+  s_b87970ad20b667::t_c3e97c01d3443f 4,10,14,20,30,35-36
+distributions/discord/otelcol-builder.yaml
+  s_b87970ad20b667::t_c3e97c01d3443f 6
+Makefile
+  s_b87970ad20b667::t_c3e97c01d3443f 2
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "f1e4023ae721ac38f462402c6457b99d8933f6bb",
+  "prompts": {},
+  "sessions": {
+    "s_b87970ad20b667": {
+      "agent_id": {
+        "tool": "codex",
+        "id": "01a16634-ce17-7700-b4ba-1c78eac1aec5",
+        "model": "gpt-6.1-sol"
+      },
+      "human_author": "Yoshi Yamaguchi <ymotongpoo@gmail.com>"
+    }
+  }
+}
