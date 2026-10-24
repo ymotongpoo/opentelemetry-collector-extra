@@ -5,7 +5,6 @@ set -eu
 cd "$(dirname "$0")/.."
 package="$(realpath "${1:?usage: test-deb.sh otelcol-extra.deb}")"
 version="$(dpkg-deb -f "$package" Version)"
-transition="$(realpath "dist/discord-otelcol_${version}_all.deb")"
 mkdir -p build/fixtures
 for old in 0.1.0 0.1.1; do
     file="build/fixtures/discord-otelcol_${old}_amd64.deb"
@@ -13,9 +12,17 @@ for old in 0.1.0 0.1.1; do
         curl -fsSL --retry 3 "https://github.com/ymotongpoo/opentelemetry-collector-extra/releases/download/discord-otelcol%2Fv${old}/discord-otelcol_${old}_amd64.deb" -o "$file"
     fi
 done
+# This archived package is a fixture for installations that already migrated.
+# Current builds and releases must never produce another package under this name.
+transition=build/fixtures/discord-otelcol_0.2.1_all.deb
+if [ ! -f "$transition" ]; then
+    curl -fsSL --retry 3 'https://github.com/ymotongpoo/opentelemetry-collector-extra/releases/download/otelcol-extra%2Fv0.2.1/discord-otelcol_0.2.1_all.deb' -o "$transition"
+fi
+transition="$(realpath "$transition")"
 printf '%s\n' \
     'cc6aa73a63545b1aa7c4efc317ea6345c7fc865271e1a14447debe80a2759982  build/fixtures/discord-otelcol_0.1.0_amd64.deb' \
-    '0f78f13b4cc242c9b9676394463876b4c672a04cbfc6187eccbd23f01babcfaf  build/fixtures/discord-otelcol_0.1.1_amd64.deb' | sha256sum --check
+    '0f78f13b4cc242c9b9676394463876b4c672a04cbfc6187eccbd23f01babcfaf  build/fixtures/discord-otelcol_0.1.1_amd64.deb' \
+    'bb8d6e284236b2e8b962f1058d336a75b62b0df52f06902c49914bd5c2fafb40  build/fixtures/discord-otelcol_0.2.1_all.deb' | sha256sum --check
 test "$(dpkg-deb -f "$package" Package)" = otelcol-extra
 docker run --rm -i -v "$package:/tmp/extra.deb:ro" -v "$transition:/tmp/transition.deb:ro" \
     -v "$PWD/build/fixtures:/fixtures:ro" ubuntu:24.04 sh -s <<'EOF'
@@ -104,11 +111,10 @@ for scenario in plaintext active stopped active-disabled masked enabled-runtime 
     mkdir -p /var/lib/discord-otelcol
     printf '%s' 'old-state' > /var/lib/discord-otelcol/fixture
     case "$scenario" in active) touch /tmp/old-active /tmp/old-enabled ;; stopped) touch /tmp/old-enabled ;; active-disabled) touch /tmp/old-active ;; masked) touch /tmp/old-masked ;; enabled-runtime) touch /tmp/old-enabled-runtime ;; masked-runtime) touch /tmp/old-masked-runtime ;; esac
-    case "$scenario" in
-        stopped|masked-runtime) dpkg --auto-deconfigure --unpack /tmp/transition.deb /tmp/extra.deb ;;
-        *) dpkg --auto-deconfigure --unpack /tmp/extra.deb /tmp/transition.deb ;;
-    esac
+    dpkg --auto-deconfigure --unpack /tmp/extra.deb
     test ! -e /tmp/old-active
+    # Removal retains legacy configuration and credentials for the new postinst.
+    dpkg --remove discord-otelcol
     if [ "$scenario" = plaintext ]; then
         if otelcol-extra-set-credentials --migrate --with-key=tpm2; then exit 1; fi
         grep -q 'DISCORD_BOT_TOKEN=' /etc/discord-otelcol/environment
@@ -127,7 +133,7 @@ CREDS
         cmp /etc/otelcol-extra/config.yaml /usr/share/otelcol-extra/config.default.yaml
         rm /tmp/fail-encryption
     fi
-    dpkg --force-confold --configure otelcol-extra discord-otelcol
+    dpkg --force-confold --configure otelcol-extra
     grep -q 'keep old custom configuration' /etc/otelcol-extra/config.yaml
     grep -Fq '${file:${env:CREDENTIALS_DIRECTORY}/discord_bot_token}' /etc/otelcol-extra/config.yaml
     test "$(cat /var/lib/otelcol-extra/fixture)" = old-state
@@ -149,7 +155,7 @@ CREDS
         masked-runtime) test -e /tmp/new-masked-runtime; test ! -e /tmp/new-masked; test ! -e /tmp/new-active ;;
         plaintext) test ! -e /tmp/new-active; test ! -e /tmp/new-enabled ;;
     esac
-    # Removing the transitional package must leave the working new installation.
+    # The old package is no longer installed; purging its conffiles is safe.
     dpkg --purge discord-otelcol
     test -f /etc/credstore.encrypted/otelcol-extra.discord
     dpkg -r otelcol-extra
@@ -161,20 +167,34 @@ CREDS
     rm -rf /etc/discord-otelcol /var/lib/discord-otelcol /var/lib/otelcol-extra
     rm -f /etc/credstore.encrypted/discord-otelcol.token
 done
-# Exercise APT's dependency solver with the real Architecture: all transition.
+# Reproduce an already migrated installation using the last archived transition.
+# Its removal through APT must leave credentials, configuration and service state.
 rm -f /tmp/old-active /tmp/old-enabled /tmp/old-masked /tmp/old-enabled-runtime /tmp/old-masked-runtime
 rm -f /tmp/new-active /tmp/new-enabled /tmp/new-masked /tmp/new-enabled-runtime /tmp/new-masked-runtime
 mkdir -p /tmp/extra-apt
-cp /tmp/extra.deb /tmp/transition.deb /fixtures/discord-otelcol_0.1.1_amd64.deb /tmp/extra-apt/
+cp /tmp/extra.deb /tmp/extra-apt/
 (cd /tmp/extra-apt && apt-ftparchive packages . > Packages)
-grep -q 'Architecture: all' /tmp/extra-apt/Packages
+if grep -q '^Package: discord-otelcol$' /tmp/extra-apt/Packages; then exit 1; fi
 printf '%s\n' 'deb [trusted=yes] file:/tmp/extra-apt ./' > /etc/apt/sources.list.d/extra-test.list
 apt-get update -qq
-apt-get install -y -qq discord-otelcol=0.1.1
+dpkg -i /fixtures/discord-otelcol_0.1.1_amd64.deb
 printf '%s' 'apt-upgrade-fixture' | discord-otelcol-set-token --stdin --with-key=host
 touch /tmp/old-active /tmp/old-enabled
-apt-get install -y -qq discord-otelcol
-test "$(dpkg-query -W -f='${Version}' discord-otelcol)" = "$(dpkg-query -W -f='${Version}' otelcol-extra)"
+dpkg --auto-deconfigure --unpack /tmp/transition.deb /tmp/extra.deb
+dpkg --force-confold --configure otelcol-extra discord-otelcol
+printf '\n# keep migrated config\n' >> /etc/otelcol-extra/config.yaml
+cp /etc/otelcol-extra/config.yaml /tmp/retirement-config
+cp /etc/credstore.encrypted/otelcol-extra.discord /tmp/retirement-credential
+printf '%s\n' 'keep-switchbot-token' 'keep-switchbot-secret' | otelcol-extra-set-credentials switchbot --stdin --with-key=host
+cp /etc/credstore.encrypted/otelcol-extra.switchbot /tmp/retirement-switchbot
+events="$(wc -l < /tmp/systemctl-events)"
+apt-get install -y -qq otelcol-extra discord-otelcol-
+test "$(dpkg-query -W -f='${db:Status-Status}' discord-otelcol)" != installed
+apt-mark showmanual | grep -qx otelcol-extra
+cmp /tmp/retirement-config /etc/otelcol-extra/config.yaml
+cmp /tmp/retirement-credential /etc/credstore.encrypted/otelcol-extra.discord
+cmp /tmp/retirement-switchbot /etc/credstore.encrypted/otelcol-extra.switchbot
+test "$events" = "$(wc -l < /tmp/systemctl-events)"
 test -e /tmp/new-active
 test -e /tmp/new-enabled
 test ! -e /tmp/old-active
@@ -182,5 +202,5 @@ rm -f /run/extra-credentials/discord_bot_token
 systemd-creds decrypt --name=discord_bot_token /etc/credstore.encrypted/otelcol-extra.discord /run/extra-credentials/discord_bot_token
 printf '%s' 'apt-upgrade-fixture' | cmp - /run/extra-credentials/discord_bot_token
 dpkg --purge discord-otelcol otelcol-extra
-echo 'Fresh install, encrypted credentials, both legacy upgrades, failure recovery, service state, APT transition, and purge checks passed'
+echo 'Fresh install, credentials, legacy data migration, failure recovery, service state, APT retirement, and purge checks passed'
 EOF

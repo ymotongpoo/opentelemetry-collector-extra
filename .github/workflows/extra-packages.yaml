@@ -77,7 +77,7 @@ jobs:
       - uses: actions/upload-artifact@v4
         with:
           name: otelcol-extra-${{ matrix.arch }}
-          path: dist/*.deb
+          path: dist/otelcol-extra_${{ env.PACKAGE_VERSION }}_${{ matrix.arch }}.deb
           if-no-files-found: error
 
   release:
@@ -98,7 +98,11 @@ jobs:
         run: |
           set -eu
           cd dist
-          sha256sum -- *.deb > SHA256SUMS
+          version="${GITHUB_REF_NAME#otelcol-extra/v}"
+          printf '%s\n' "otelcol-extra_${version}_amd64.deb" "otelcol-extra_${version}_arm64.deb" | sort > expected
+          find . -maxdepth 1 -name '*.deb' -printf '%f\n' | sort > actual
+          diff -u expected actual
+          sha256sum -- "otelcol-extra_${version}_amd64.deb" "otelcol-extra_${version}_arm64.deb" > SHA256SUMS
           gh release create "$GITHUB_REF_NAME" --repo "$GITHUB_REPOSITORY" \
             --verify-tag --title "Collector Extra ${GITHUB_REF_NAME#otelcol-extra/v}" \
-            --generate-notes --latest ./*.deb SHA256SUMS
+            --generate-notes --latest "otelcol-extra_${version}_amd64.deb" "otelcol-extra_${version}_arm64.deb" SHA256SUMS

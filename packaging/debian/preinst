@@ -1,7 +1,6 @@
 #!/bin/sh
 set -eu
-# This is also the transitional package's preinst: either unpack order retains
-# the old service state before its unit file is removed.
+# Retain legacy service state when its unit is still present before unpacking.
 state=/var/lib/otelcol-extra-migration
 if [ -d /etc/discord-otelcol ] && [ ! -e "$state/complete" ] && [ ! -e "$state/state" ]; then
     install -d -m 0700 "$state"
@@ -16,7 +15,7 @@ if [ -d /etc/discord-otelcol ] && [ ! -e "$state/complete" ] && [ ! -e "$state/s
             enabled) enabled=1 ;; enabled-runtime) enabled=1; runtime=1 ;;
             masked) masked=1 ;; masked-runtime) masked=1; runtime=1 ;;
         esac
-        # A transitional unpack may already have removed the old unit file.
+        # Retain an enablement link even if its target unit is no longer present.
         if [ -L /etc/systemd/system/multi-user.target.wants/discord-otelcol.service ]; then enabled=1; fi
     fi
     umask 077
