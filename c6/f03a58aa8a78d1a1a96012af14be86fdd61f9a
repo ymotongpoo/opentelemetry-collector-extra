@@ -1,0 +1,20 @@
+distributions/discord/README.md
+  s_b87970ad20b667::t_321673a338a2e6 29,35-38,42,52-56,59-84,86-90,103-105,108-110,113
+  s_b87970ad20b667::t_acd7c36706b296 85
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "c6f03a58aa8a78d1a1a96012af14be86fdd61f9a",
+  "prompts": {},
+  "sessions": {
+    "s_b87970ad20b667": {
+      "agent_id": {
+        "tool": "codex",
+        "id": "01a16634-ce17-7700-b4ba-1c78eac1aec5",
+        "model": "gpt-6.1-sol"
+      },
+      "human_author": "Yoshi Yamaguchi <ymotongpoo@gmail.com>"
+    }
+  }
+}
