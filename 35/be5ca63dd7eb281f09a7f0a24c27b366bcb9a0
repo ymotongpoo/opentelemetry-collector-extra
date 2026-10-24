@@ -1,0 +1,25 @@
+scripts/test-deb.sh
+  s_e8e040ab098906::t_fa2b14a108f888 15-21,24-25,114,116-117,136,158,170-171,175,177,180,183-197,205
+.github/workflows/extra-packages.yaml
+  s_e8e040ab098906::t_fa2b14a108f888 80,101-105,108
+packaging/debian/preinst
+  s_e8e040ab098906::t_fa2b14a108f888 3,18
+scripts/build-deb.sh
+  s_e8e040ab098906::t_fa2b14a108f888 9,41
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "35be5ca63dd7eb281f09a7f0a24c27b366bcb9a0",
+  "prompts": {},
+  "sessions": {
+    "s_e8e040ab098906": {
+      "agent_id": {
+        "tool": "codex",
+        "id": "01a16cc5-e396-76e1-84b8-83e572917b16",
+        "model": "gpt-6.1-sol"
+      },
+      "human_author": "Yoshi Yamaguchi <ymotongpoo@gmail.com>"
+    }
+  }
+}
