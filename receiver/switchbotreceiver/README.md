@@ -69,6 +69,10 @@ Missing, null, invalid, and expired measurements are not filled with zero. A rep
 Bots in press mode do not report appliance power or the physical position of a shutter or lock.
 IR remotes do not provide observed appliance state. Unknown camera models are probed for a battery field at the battery interval, without assuming support.
 
+## Grafana dashboard
+
+The [importable dashboard example](../../examples/grafana/README.md) visualizes environmental measurements, batteries, device measurement status, and observation ages. Select your Prometheus data source and devices after importing its JSON into Grafana.
+
 ## Optional Matter source
 
 Run Matter Server as a separate process and commission or share the bridge with that controller first.
