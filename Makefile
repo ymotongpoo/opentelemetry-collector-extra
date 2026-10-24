@@ -1,5 +1,5 @@
 OCB_VERSION := v0.163.0
-VERSION ?= 0.2.0
+VERSION ?= 0.2.1
 ARCH ?= $(shell dpkg --print-architecture)
 export GOTOOLCHAIN := go1.27.3
 
