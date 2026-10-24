@@ -74,7 +74,7 @@ jobs:
           OTELCOL_EXTRA_SYSTEMD_TEST: "1"
         if: matrix.arch == 'amd64'
         run: ./scripts/test-systemd.sh "dist/otelcol-extra_${PACKAGE_VERSION}_amd64.deb"
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v7
         with:
           name: otelcol-extra-${{ matrix.arch }}
           path: dist/*.deb
@@ -87,7 +87,7 @@ jobs:
     permissions:
       contents: write
     steps:
-      - uses: actions/download-artifact@v4
+      - uses: actions/download-artifact@v8
         with:
           pattern: otelcol-extra-*
           path: dist
