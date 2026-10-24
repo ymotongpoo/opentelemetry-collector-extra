@@ -1,0 +1,1161 @@
+{
+  "id": null,
+  "uid": null,
+  "title": "SwitchBot · 環境と電池",
+  "description": "SwitchBot receiver: 温湿度、CO₂、明るさ、電池残量と観測の鮮度。",
+  "tags": [
+    "switchbot",
+    "iot",
+    "opentelemetry",
+    "otelcol-extra"
+  ],
+  "timezone": "browser",
+  "editable": true,
+  "schemaVersion": 42,
+  "version": 0,
+  "refresh": "1m",
+  "time": {
+    "from": "now-6h",
+    "to": "now"
+  },
+  "timepicker": {
+    "refresh_intervals": [
+      "1m",
+      "5m",
+      "15m",
+      "30m",
+      "1h"
+    ]
+  },
+  "graphTooltip": 1,
+  "annotations": {
+    "list": []
+  },
+  "links": [],
+  "templating": {
+    "list": [
+      {
+        "name": "datasource",
+        "label": "Prometheus",
+        "type": "datasource",
+        "query": "prometheus",
+        "refresh": 1,
+        "options": []
+      },
+      {
+        "name": "device_type",
+        "label": "機種",
+        "type": "query",
+        "datasource": {
+          "type": "prometheus",
+          "uid": "${datasource}"
+        },
+        "query": {
+          "query": "label_values(switchbot_device_available_ratio, switchbot_device_type)",
+          "refId": "StandardVariableQuery"
+        },
+        "definition": "label_values(switchbot_device_available_ratio, switchbot_device_type)",
+        "refresh": 2,
+        "includeAll": true,
+        "multi": true,
+        "allValue": ".*",
+        "sort": 1,
+        "current": {
+          "selected": true,
+          "text": "All",
+          "value": "$__all"
+        },
+        "options": []
+      },
+      {
+        "name": "device",
+        "label": "デバイス",
+        "type": "query",
+        "datasource": {
+          "type": "prometheus",
+          "uid": "${datasource}"
+        },
+        "query": {
+          "query": "query_result(label_join(max by (switchbot_device_id, switchbot_device_name) (switchbot_device_available_ratio{switchbot_device_type=~\"${device_type}\"}), \"switchbot_device_label\", \" | \", \"switchbot_device_name\", \"switchbot_device_id\"))",
+          "refId": "StandardVariableQuery"
+        },
+        "definition": "query_result(label_join(max by (switchbot_device_id, switchbot_device_name) (switchbot_device_available_ratio{switchbot_device_type=~\"${device_type}\"}), \"switchbot_device_label\", \" | \", \"switchbot_device_name\", \"switchbot_device_id\"))",
+        "regex": "/switchbot_device_id=\"(?<value>[^\"]+)\".*switchbot_device_label=\"(?<text>[^\"]+)\"/",
+        "refresh": 2,
+        "includeAll": true,
+        "multi": true,
+        "allValue": ".*",
+        "sort": 1,
+        "current": {
+          "selected": true,
+          "text": "All",
+          "value": "$__all"
+        },
+        "options": []
+      }
+    ]
+  },
+  "panels": [
+    {
+      "id": 1,
+      "title": "表示値と更新間隔",
+      "type": "text",
+      "description": "観測と受信の時刻、欠測、電池の段階値を区別します。",
+      "gridPos": {
+        "x": 0,
+        "y": 0,
+        "w": 24,
+        "h": 4
+      },
+      "transparent": false,
+      "options": {
+        "mode": "markdown",
+        "content": "**環境：クラウド5分 / Matter1分 · 電池：既定3時間 · 表示更新：1分**  \n「観測値あり」は有効な測定値が1つ以上ある状態です。「なし」にはAPI未対応・取得失敗・期限切れを含みます。  \n電池は機種によって段階値です。**0%はAPIの報告値**として表示し、欠測は空欄のまま扱います。観測経過時間は下段で確認できます。"
+      }
+    },
+    {
+      "id": 2,
+      "title": "観測値あり（台）",
+      "type": "stat",
+      "description": "有効な測定値が1つ以上ある物理デバイス数。IRリモコンは対象外です。",
+      "gridPos": {
+        "x": 0,
+        "y": 4,
+        "w": 6,
+        "h": 4
+      },
+      "transparent": false,
+      "datasource": {
+        "type": "prometheus",
+        "uid": "${datasource}"
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${datasource}"
+          },
+          "expr": "sum(max by (switchbot_device_id) (switchbot_device_available_ratio{switchbot_device_type=~\"${device_type}\",switchbot_device_id=~\"${device}\"}))",
+          "editorMode": "code",
+          "legendFormat": "{{switchbot_device_name}} [{{switchbot_device_id}}]",
+          "format": "time_series",
+          "instant": true,
+          "range": false
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "decimals": 0,
+          "noValue": "—",
+          "color": {
+            "mode": "fixed",
+            "fixedColor": "blue"
+          },
+          "mappings": []
+        },
+        "overrides": []
+      },
+      "options": {
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
+        },
+        "orientation": "horizontal",
+        "textMode": "value",
+        "colorMode": "value",
+        "graphMode": "none",
+        "justifyMode": "center"
+      }
+    },
+    {
+      "id": 3,
+      "title": "観測値なし（台）",
+      "type": "stat",
+      "description": "API未対応・取得失敗・期限切れなどにより、有効な測定値がないデバイス数。",
+      "gridPos": {
+        "x": 6,
+        "y": 4,
+        "w": 6,
+        "h": 4
+      },
+      "transparent": false,
+      "datasource": {
+        "type": "prometheus",
+        "uid": "${datasource}"
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${datasource}"
+          },
+          "expr": "sum(1 - max by (switchbot_device_id) (switchbot_device_available_ratio{switchbot_device_type=~\"${device_type}\",switchbot_device_id=~\"${device}\"}))",
+          "editorMode": "code",
+          "legendFormat": "{{switchbot_device_name}} [{{switchbot_device_id}}]",
+          "format": "time_series",
+          "instant": true,
+          "range": false
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "decimals": 0,
+          "noValue": "—",
+          "color": {
+            "mode": "fixed",
+            "fixedColor": "gray"
+          },
+          "mappings": []
+        },
+        "overrides": []
+      },
+      "options": {
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
+        },
+        "orientation": "horizontal",
+        "textMode": "value",
+        "colorMode": "value",
+        "graphMode": "none",
+        "justifyMode": "center"
+      }
+    },
+    {
+      "id": 4,
+      "title": "電池20%以下（台）",
+      "type": "stat",
+      "description": "電池残量が報告されているデバイスのうち20%以下の台数。電池データ自体がない場合は欠測です。",
+      "gridPos": {
+        "x": 12,
+        "y": 4,
+        "w": 6,
+        "h": 4
+      },
+      "transparent": false,
+      "datasource": {
+        "type": "prometheus",
+        "uid": "${datasource}"
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${datasource}"
+          },
+          "expr": "count(max by (switchbot_device_id, switchbot_device_name, switchbot_device_type) (switchbot_battery_percent{switchbot_device_type=~\"${device_type}\",switchbot_device_id=~\"${device}\"}) <= 20) or (count(max by (switchbot_device_id, switchbot_device_name, switchbot_device_type) (switchbot_battery_percent{switchbot_device_type=~\"${device_type}\",switchbot_device_id=~\"${device}\"})) * 0)",
+          "editorMode": "code",
+          "legendFormat": "{{switchbot_device_name}} [{{switchbot_device_id}}]",
+          "format": "time_series",
+          "instant": true,
+          "range": false
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "decimals": 0,
+          "noValue": "—",
+          "color": {
+            "mode": "thresholds"
+          },
+          "mappings": [],
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              },
+              {
+                "color": "orange",
+                "value": 1
+              }
+            ]
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
+        },
+        "orientation": "horizontal",
+        "textMode": "value",
+        "colorMode": "value",
+        "graphMode": "none",
+        "justifyMode": "center"
+      }
+    },
+    {
+      "id": 5,
+      "title": "最新受信からの経過",
+      "type": "stat",
+      "description": "Collectorが送った最新サンプルからの経過時間。実機の最終観測からの経過時間は下段に表示します。通常は約1分以内です。",
+      "gridPos": {
+        "x": 18,
+        "y": 4,
+        "w": 6,
+        "h": 4
+      },
+      "transparent": false,
+      "datasource": {
+        "type": "prometheus",
+        "uid": "${datasource}"
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${datasource}"
+          },
+          "expr": "time() - max(timestamp(switchbot_device_available_ratio{switchbot_device_type=~\"${device_type}\",switchbot_device_id=~\"${device}\"}))",
+          "editorMode": "code",
+          "legendFormat": "{{switchbot_device_name}} [{{switchbot_device_id}}]",
+          "format": "time_series",
+          "instant": true,
+          "range": false
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "s",
+          "decimals": 0,
+          "noValue": "—",
+          "color": {
+            "mode": "thresholds"
+          },
+          "mappings": [],
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              },
+              {
+                "color": "orange",
+                "value": 120
+              },
+              {
+                "color": "red",
+                "value": 300
+              }
+            ]
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
+        },
+        "orientation": "horizontal",
+        "textMode": "value",
+        "colorMode": "value",
+        "graphMode": "none",
+        "justifyMode": "center"
+      }
+    },
+    {
+      "id": 6,
+      "title": "温度",
+      "type": "timeseries",
+      "description": "デバイスごとの温度。欠測や期限切れの値は補間しません。",
+      "gridPos": {
+        "x": 0,
+        "y": 8,
+        "w": 12,
+        "h": 8
+      },
+      "transparent": false,
+      "datasource": {
+        "type": "prometheus",
+        "uid": "${datasource}"
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${datasource}"
+          },
+          "expr": "max by (switchbot_device_id, switchbot_device_name, switchbot_device_type) (switchbot_temperature_celsius{switchbot_device_type=~\"${device_type}\",switchbot_device_id=~\"${device}\"})",
+          "editorMode": "code",
+          "legendFormat": "{{switchbot_device_name}} [{{switchbot_device_id}}]",
+          "format": "time_series",
+          "instant": false,
+          "range": true
+        }
+      ],
+      "interval": "1m",
+      "maxDataPoints": 900,
+      "fieldConfig": {
+        "defaults": {
+          "unit": "celsius",
+          "decimals": 1,
+          "noValue": "—",
+          "color": {
+            "mode": "palette-classic"
+          },
+          "mappings": [],
+          "custom": {
+            "drawStyle": "line",
+            "lineInterpolation": "linear",
+            "lineWidth": 2,
+            "fillOpacity": 5,
+            "showPoints": "auto",
+            "pointSize": 4,
+            "spanNulls": false,
+            "axisPlacement": "auto",
+            "scaleDistribution": {
+              "type": "linear"
+            },
+            "stacking": {
+              "mode": "none",
+              "group": "A"
+            },
+            "thresholdsStyle": {
+              "mode": "off"
+            }
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "legend": {
+          "displayMode": "table",
+          "placement": "right",
+          "width": 340,
+          "calcs": [
+            "lastNotNull"
+          ],
+          "showLegend": true
+        },
+        "tooltip": {
+          "mode": "multi",
+          "sort": "desc"
+        }
+      }
+    },
+    {
+      "id": 7,
+      "title": "相対湿度",
+      "type": "timeseries",
+      "description": "デバイスごとの相対湿度。",
+      "gridPos": {
+        "x": 12,
+        "y": 8,
+        "w": 12,
+        "h": 8
+      },
+      "transparent": false,
+      "datasource": {
+        "type": "prometheus",
+        "uid": "${datasource}"
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${datasource}"
+          },
+          "expr": "max by (switchbot_device_id, switchbot_device_name, switchbot_device_type) (switchbot_humidity_percent{switchbot_device_type=~\"${device_type}\",switchbot_device_id=~\"${device}\"})",
+          "editorMode": "code",
+          "legendFormat": "{{switchbot_device_name}} [{{switchbot_device_id}}]",
+          "format": "time_series",
+          "instant": false,
+          "range": true
+        }
+      ],
+      "interval": "1m",
+      "maxDataPoints": 900,
+      "fieldConfig": {
+        "defaults": {
+          "unit": "percent",
+          "decimals": 0,
+          "noValue": "—",
+          "color": {
+            "mode": "palette-classic"
+          },
+          "mappings": [],
+          "min": 0,
+          "max": 100,
+          "custom": {
+            "drawStyle": "line",
+            "lineInterpolation": "linear",
+            "lineWidth": 2,
+            "fillOpacity": 5,
+            "showPoints": "auto",
+            "pointSize": 4,
+            "spanNulls": false,
+            "axisPlacement": "auto",
+            "scaleDistribution": {
+              "type": "linear"
+            },
+            "stacking": {
+              "mode": "none",
+              "group": "A"
+            },
+            "thresholdsStyle": {
+              "mode": "off"
+            }
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "legend": {
+          "displayMode": "table",
+          "placement": "right",
+          "width": 340,
+          "calcs": [
+            "lastNotNull"
+          ],
+          "showLegend": true
+        },
+        "tooltip": {
+          "mode": "multi",
+          "sort": "desc"
+        }
+      }
+    },
+    {
+      "id": 8,
+      "title": "CO₂濃度",
+      "type": "timeseries",
+      "description": "CO₂濃度（ppm）。対応するCO₂センサーの実測値を表示します。",
+      "gridPos": {
+        "x": 0,
+        "y": 16,
+        "w": 12,
+        "h": 8
+      },
+      "transparent": false,
+      "datasource": {
+        "type": "prometheus",
+        "uid": "${datasource}"
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${datasource}"
+          },
+          "expr": "max by (switchbot_device_id, switchbot_device_name, switchbot_device_type) (switchbot_co2_ppm_{switchbot_device_type=~\"${device_type}\",switchbot_device_id=~\"${device}\"})",
+          "editorMode": "code",
+          "legendFormat": "{{switchbot_device_name}} [{{switchbot_device_id}}]",
+          "format": "time_series",
+          "instant": false,
+          "range": true
+        }
+      ],
+      "interval": "1m",
+      "maxDataPoints": 900,
+      "fieldConfig": {
+        "defaults": {
+          "unit": "ppm",
+          "decimals": 0,
+          "noValue": "—",
+          "color": {
+            "mode": "palette-classic"
+          },
+          "mappings": [],
+          "min": 0,
+          "custom": {
+            "drawStyle": "line",
+            "lineInterpolation": "linear",
+            "lineWidth": 2,
+            "fillOpacity": 5,
+            "showPoints": "auto",
+            "pointSize": 4,
+            "spanNulls": false,
+            "axisPlacement": "auto",
+            "scaleDistribution": {
+              "type": "linear"
+            },
+            "stacking": {
+              "mode": "none",
+              "group": "A"
+            },
+            "thresholdsStyle": {
+              "mode": "off"
+            }
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "legend": {
+          "displayMode": "table",
+          "placement": "right",
+          "width": 340,
+          "calcs": [
+            "lastNotNull"
+          ],
+          "showLegend": true
+        },
+        "tooltip": {
+          "mode": "multi",
+          "sort": "desc"
+        }
+      }
+    },
+    {
+      "id": 9,
+      "title": "Hubの明るさ（1–20）",
+      "type": "timeseries",
+      "description": "Hub固有の1–20段階の明るさです。",
+      "gridPos": {
+        "x": 12,
+        "y": 16,
+        "w": 12,
+        "h": 8
+      },
+      "transparent": false,
+      "datasource": {
+        "type": "prometheus",
+        "uid": "${datasource}"
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${datasource}"
+          },
+          "expr": "max by (switchbot_device_id, switchbot_device_name, switchbot_device_type) (switchbot_light_level{switchbot_device_type=~\"${device_type}\",switchbot_device_id=~\"${device}\"})",
+          "editorMode": "code",
+          "legendFormat": "{{switchbot_device_name}} [{{switchbot_device_id}}]",
+          "format": "time_series",
+          "instant": false,
+          "range": true
+        }
+      ],
+      "interval": "1m",
+      "maxDataPoints": 900,
+      "fieldConfig": {
+        "defaults": {
+          "unit": "none",
+          "decimals": 0,
+          "noValue": "—",
+          "color": {
+            "mode": "palette-classic"
+          },
+          "mappings": [],
+          "min": 1,
+          "max": 20,
+          "custom": {
+            "drawStyle": "line",
+            "lineInterpolation": "stepAfter",
+            "lineWidth": 2,
+            "fillOpacity": 5,
+            "showPoints": "auto",
+            "pointSize": 4,
+            "spanNulls": false,
+            "axisPlacement": "auto",
+            "scaleDistribution": {
+              "type": "linear"
+            },
+            "stacking": {
+              "mode": "none",
+              "group": "A"
+            },
+            "thresholdsStyle": {
+              "mode": "off"
+            }
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "legend": {
+          "displayMode": "table",
+          "placement": "right",
+          "width": 340,
+          "calcs": [
+            "lastNotNull"
+          ],
+          "showLegend": true
+        },
+        "tooltip": {
+          "mode": "multi",
+          "sort": "desc"
+        }
+      }
+    },
+    {
+      "id": 10,
+      "title": "電池残量（最新）",
+      "type": "bargauge",
+      "description": "APIから報告された電池残量。低い順に表示します。機種により粗い段階値です。未対応・欠測・期限切れの機器には値を補いません。",
+      "gridPos": {
+        "x": 0,
+        "y": 24,
+        "w": 12,
+        "h": 14
+      },
+      "transparent": false,
+      "datasource": {
+        "type": "prometheus",
+        "uid": "${datasource}"
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${datasource}"
+          },
+          "expr": "sort(max by (switchbot_device_id, switchbot_device_name, switchbot_device_type) (switchbot_battery_percent{switchbot_device_type=~\"${device_type}\",switchbot_device_id=~\"${device}\"}))",
+          "editorMode": "code",
+          "legendFormat": "{{switchbot_device_name}} [{{switchbot_device_id}}]",
+          "format": "time_series",
+          "instant": true,
+          "range": false
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "percent",
+          "decimals": 0,
+          "noValue": "—",
+          "color": {
+            "mode": "thresholds"
+          },
+          "mappings": [],
+          "min": 0,
+          "max": 100,
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "red",
+                "value": null
+              },
+              {
+                "color": "orange",
+                "value": 20
+              },
+              {
+                "color": "green",
+                "value": 40
+              }
+            ]
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "orientation": "horizontal",
+        "displayMode": "basic",
+        "valueMode": "color",
+        "showUnfilled": true,
+        "minVizHeight": 20,
+        "minVizWidth": 0,
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
+        }
+      }
+    },
+    {
+      "id": 11,
+      "title": "デバイス別の観測状況",
+      "type": "table",
+      "description": "「観測値あり」は有効な測定値が1つ以上ある状態。「観測値なし」にはAPI未対応や取得失敗・期限切れを含みます。安定したIDで機器を区別します。",
+      "gridPos": {
+        "x": 12,
+        "y": 24,
+        "w": 12,
+        "h": 14
+      },
+      "transparent": false,
+      "datasource": {
+        "type": "prometheus",
+        "uid": "${datasource}"
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${datasource}"
+          },
+          "expr": "max by (switchbot_device_id, switchbot_device_name, switchbot_device_type) (switchbot_device_available_ratio{switchbot_device_type=~\"${device_type}\",switchbot_device_id=~\"${device}\"})",
+          "editorMode": "code",
+          "legendFormat": "{{switchbot_device_name}} [{{switchbot_device_id}}]",
+          "format": "table",
+          "instant": true,
+          "range": false
+        }
+      ],
+      "transformations": [
+        {
+          "id": "organize",
+          "options": {
+            "excludeByName": {
+              "Time": true,
+              "__name__": true
+            },
+            "indexByName": {
+              "switchbot_device_name": 0,
+              "switchbot_device_type": 1,
+              "Value": 2,
+              "switchbot_device_id": 3
+            },
+            "renameByName": {
+              "switchbot_device_name": "デバイス",
+              "switchbot_device_type": "機種",
+              "Value": "観測値",
+              "switchbot_device_id": "デバイスID"
+            }
+          }
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "noValue": "—",
+          "custom": {
+            "align": "auto",
+            "cellOptions": {
+              "type": "auto"
+            }
+          },
+          "mappings": []
+        },
+        "overrides": [
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "観測値"
+            },
+            "properties": [
+              {
+                "id": "mappings",
+                "value": [
+                  {
+                    "type": "value",
+                    "options": {
+                      "0": {
+                        "text": "なし",
+                        "color": "gray",
+                        "index": 0
+                      },
+                      "1": {
+                        "text": "あり",
+                        "color": "green",
+                        "index": 1
+                      }
+                    }
+                  }
+                ]
+              },
+              {
+                "id": "custom.cellOptions",
+                "value": {
+                  "type": "color-text"
+                }
+              },
+              {
+                "id": "custom.width",
+                "value": 85
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "デバイスID"
+            },
+            "properties": [
+              {
+                "id": "custom.width",
+                "value": 220
+              }
+            ]
+          }
+        ]
+      },
+      "options": {
+        "showHeader": true,
+        "cellHeight": "sm",
+        "footer": {
+          "show": false
+        }
+      }
+    },
+    {
+      "id": 12,
+      "title": "電池残量の推移",
+      "type": "timeseries",
+      "description": "実際の報告値の推移。毎分の表示更新の間も、再観測までは同じ報告値が送られます。",
+      "gridPos": {
+        "x": 0,
+        "y": 38,
+        "w": 24,
+        "h": 10
+      },
+      "transparent": false,
+      "datasource": {
+        "type": "prometheus",
+        "uid": "${datasource}"
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${datasource}"
+          },
+          "expr": "max by (switchbot_device_id, switchbot_device_name, switchbot_device_type) (switchbot_battery_percent{switchbot_device_type=~\"${device_type}\",switchbot_device_id=~\"${device}\"})",
+          "editorMode": "code",
+          "legendFormat": "{{switchbot_device_name}} [{{switchbot_device_id}}]",
+          "format": "time_series",
+          "instant": false,
+          "range": true
+        }
+      ],
+      "interval": "1m",
+      "maxDataPoints": 900,
+      "fieldConfig": {
+        "defaults": {
+          "unit": "percent",
+          "decimals": 0,
+          "noValue": "—",
+          "color": {
+            "mode": "palette-classic"
+          },
+          "mappings": [],
+          "min": 0,
+          "max": 100,
+          "custom": {
+            "drawStyle": "line",
+            "lineInterpolation": "stepAfter",
+            "lineWidth": 2,
+            "fillOpacity": 5,
+            "showPoints": "auto",
+            "pointSize": 4,
+            "spanNulls": false,
+            "axisPlacement": "auto",
+            "scaleDistribution": {
+              "type": "linear"
+            },
+            "stacking": {
+              "mode": "none",
+              "group": "A"
+            },
+            "thresholdsStyle": {
+              "mode": "off"
+            }
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "legend": {
+          "displayMode": "table",
+          "placement": "right",
+          "width": 340,
+          "calcs": [
+            "lastNotNull"
+          ],
+          "showLegend": true
+        },
+        "tooltip": {
+          "mode": "multi",
+          "sort": "desc"
+        }
+      }
+    },
+    {
+      "id": 13,
+      "title": "環境データの最終観測からの経過",
+      "type": "timeseries",
+      "description": "各デバイスで最も古い環境測定値の経過時間。既定ではクラウド5分、Matter1分ごとの実測でリセットされます。期限切れの観測履歴も表示します。",
+      "gridPos": {
+        "x": 0,
+        "y": 48,
+        "w": 12,
+        "h": 10
+      },
+      "transparent": false,
+      "datasource": {
+        "type": "prometheus",
+        "uid": "${datasource}"
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${datasource}"
+          },
+          "expr": "max by (switchbot_device_id, switchbot_device_name) (switchbot_observation_age_seconds{switchbot_device_type=~\"${device_type}\",switchbot_device_id=~\"${device}\",switchbot_metric=~\"temperature|humidity|co2|light_level\"})",
+          "editorMode": "code",
+          "legendFormat": "{{switchbot_device_name}} [{{switchbot_device_id}}]",
+          "format": "time_series",
+          "instant": false,
+          "range": true
+        }
+      ],
+      "interval": "1m",
+      "maxDataPoints": 900,
+      "fieldConfig": {
+        "defaults": {
+          "unit": "s",
+          "decimals": 1,
+          "noValue": "—",
+          "color": {
+            "mode": "palette-classic"
+          },
+          "mappings": [],
+          "min": 0,
+          "custom": {
+            "drawStyle": "line",
+            "lineInterpolation": "linear",
+            "lineWidth": 2,
+            "fillOpacity": 5,
+            "showPoints": "auto",
+            "pointSize": 4,
+            "spanNulls": false,
+            "axisPlacement": "auto",
+            "scaleDistribution": {
+              "type": "linear"
+            },
+            "stacking": {
+              "mode": "none",
+              "group": "A"
+            },
+            "thresholdsStyle": {
+              "mode": "off"
+            }
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "legend": {
+          "displayMode": "table",
+          "placement": "right",
+          "width": 340,
+          "calcs": [
+            "lastNotNull"
+          ],
+          "showLegend": true
+        },
+        "tooltip": {
+          "mode": "multi",
+          "sort": "desc"
+        }
+      }
+    },
+    {
+      "id": 14,
+      "title": "電池の最終観測からの経過",
+      "type": "timeseries",
+      "description": "実機の電池残量を最後に取得した時点からの経過時間。電池のみの機器は既定3時間ごと、環境測定に電池が含まれる機器はその都度更新されます。",
+      "gridPos": {
+        "x": 12,
+        "y": 48,
+        "w": 12,
+        "h": 10
+      },
+      "transparent": false,
+      "datasource": {
+        "type": "prometheus",
+        "uid": "${datasource}"
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${datasource}"
+          },
+          "expr": "max by (switchbot_device_id, switchbot_device_name) (switchbot_observation_age_seconds{switchbot_device_type=~\"${device_type}\",switchbot_device_id=~\"${device}\",switchbot_metric=\"battery\"})",
+          "editorMode": "code",
+          "legendFormat": "{{switchbot_device_name}} [{{switchbot_device_id}}]",
+          "format": "time_series",
+          "instant": false,
+          "range": true
+        }
+      ],
+      "interval": "1m",
+      "maxDataPoints": 900,
+      "fieldConfig": {
+        "defaults": {
+          "unit": "s",
+          "decimals": 1,
+          "noValue": "—",
+          "color": {
+            "mode": "palette-classic"
+          },
+          "mappings": [],
+          "min": 0,
+          "custom": {
+            "drawStyle": "line",
+            "lineInterpolation": "linear",
+            "lineWidth": 2,
+            "fillOpacity": 5,
+            "showPoints": "auto",
+            "pointSize": 4,
+            "spanNulls": false,
+            "axisPlacement": "auto",
+            "scaleDistribution": {
+              "type": "linear"
+            },
+            "stacking": {
+              "mode": "none",
+              "group": "A"
+            },
+            "thresholdsStyle": {
+              "mode": "off"
+            }
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "legend": {
+          "displayMode": "table",
+          "placement": "right",
+          "width": 340,
+          "calcs": [
+            "lastNotNull"
+          ],
+          "showLegend": true
+        },
+        "tooltip": {
+          "mode": "multi",
+          "sort": "desc"
+        }
+      }
+    }
+  ]
+}
