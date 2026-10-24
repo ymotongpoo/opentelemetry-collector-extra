@@ -1,0 +1,27 @@
+receivers:
+  discord:
+    token: ${env:DISCORD_BOT_TOKEN}
+    buffer_interval: 30s
+    include_bots: false
+
+exporters:
+  otlp_http/alloy:
+    endpoint: http://127.0.0.1:4318
+    sending_queue:
+      enabled: true
+    retry_on_failure:
+      enabled: true
+
+service:
+  telemetry:
+    metrics:
+      readers:
+        - pull:
+            exporter:
+              prometheus:
+                host: 127.0.0.1
+                port: 8889
+  pipelines:
+    metrics:
+      receivers: [discord]
+      exporters: [otlp_http/alloy]

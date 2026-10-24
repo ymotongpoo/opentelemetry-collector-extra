@@ -1,6 +1,14 @@
 OCB_VERSION := v0.163.0
+VERSION ?= 0.1.0
+ARCH ?= $(shell dpkg --print-architecture)
 
-.PHONY: build test vet generate validate
+.PHONY: build test vet generate validate discord-build discord-deb
+discord-build:
+	./scripts/build-discord-collector.sh "$(VERSION)" "$(ARCH)"
+
+discord-deb:
+	./scripts/build-discord-deb.sh "$(VERSION)" "$(ARCH)"
+
 build:
 	go run go.opentelemetry.io/collector/cmd/builder@$(OCB_VERSION) --config=otelcol-builder.yaml
 

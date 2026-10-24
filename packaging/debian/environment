@@ -1,0 +1,3 @@
+# Set the bot token before enabling discord-otelcol.service.
+# systemd reads this file before switching to the service's dynamic user.
+DISCORD_BOT_TOKEN=

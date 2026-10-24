@@ -1,0 +1,26 @@
+[Unit]
+Description=Discord metrics collector for Grafana Alloy
+Documentation=https://github.com/ymotongpoo/opentelemetry-collector-extra
+Wants=network-online.target
+After=network-online.target alloy.service
+
+[Service]
+Type=simple
+DynamicUser=true
+StateDirectory=discord-otelcol
+WorkingDirectory=/var/lib/discord-otelcol
+EnvironmentFile=/etc/discord-otelcol/environment
+ExecStart=/usr/bin/discord-otelcol --config=/etc/discord-otelcol/config.yaml
+Restart=on-failure
+RestartSec=5s
+TimeoutStopSec=30s
+UMask=0027
+NoNewPrivileges=true
+ProtectSystem=strict
+ProtectHome=true
+PrivateTmp=true
+CapabilityBoundingSet=
+RestrictAddressFamilies=AF_UNIX AF_INET AF_INET6
+
+[Install]
+WantedBy=multi-user.target

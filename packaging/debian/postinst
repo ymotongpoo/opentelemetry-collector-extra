@@ -1,0 +1,7 @@
+#!/bin/sh
+set -eu
+if [ "$1" = configure ] && [ -d /run/systemd/system ]; then
+    systemctl daemon-reload
+    # Preserve the administrator's enablement choice. A fresh install needs a token.
+    systemctl try-restart discord-otelcol.service || true
+fi

@@ -9,6 +9,8 @@
 *.dylib
 otelcol-custom
 otelcol-custom-*
+/build/
+/dist/
 
 # Test binary, built with `go test -c`
 *.test

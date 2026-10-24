@@ -1,0 +1,6 @@
+#!/bin/sh
+set -eu
+if [ "$1" = remove ] && [ -d /run/systemd/system ]; then
+    systemctl stop discord-otelcol.service || true
+    systemctl disable discord-otelcol.service || true
+fi
