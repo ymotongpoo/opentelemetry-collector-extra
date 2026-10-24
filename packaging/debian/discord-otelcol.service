@@ -9,12 +9,15 @@ Type=simple
 DynamicUser=true
 StateDirectory=discord-otelcol
 WorkingDirectory=/var/lib/discord-otelcol
-EnvironmentFile=/etc/discord-otelcol/environment
+# Retain optional non-secret environment settings from older installations.
+EnvironmentFile=-/etc/discord-otelcol/environment
+LoadCredentialEncrypted=discord_bot_token:/etc/credstore.encrypted/discord-otelcol.token
 ExecStart=/usr/bin/discord-otelcol --config=/etc/discord-otelcol/config.yaml
 Restart=on-failure
 RestartSec=5s
 TimeoutStopSec=30s
 UMask=0027
+LimitCORE=0
 NoNewPrivileges=true
 ProtectSystem=strict
 ProtectHome=true

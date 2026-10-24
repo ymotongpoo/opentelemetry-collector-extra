@@ -1,5 +1,8 @@
 #!/bin/sh
 set -eu
+if [ "$1" = purge ]; then
+    rm -f /etc/credstore.encrypted/discord-otelcol.token
+fi
 if [ -d /run/systemd/system ]; then
     systemctl daemon-reload
 fi

@@ -1,5 +1,5 @@
 OCB_VERSION := v0.163.0
-VERSION ?= 0.1.0
+VERSION ?= 0.1.1
 ARCH ?= $(shell dpkg --print-architecture)
 
 .PHONY: build test vet generate validate discord-build discord-deb

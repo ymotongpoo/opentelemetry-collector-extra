@@ -1,6 +1,6 @@
 receivers:
   discord:
-    token: ${env:DISCORD_BOT_TOKEN}
+    token: ${file:${env:CREDENTIALS_DIRECTORY}/discord_bot_token}
     buffer_interval: 30s
     include_bots: false
 

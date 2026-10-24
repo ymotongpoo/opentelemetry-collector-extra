@@ -1,5 +1,8 @@
 #!/bin/sh
 set -eu
+if [ "$1" = configure ]; then
+    /usr/sbin/discord-otelcol-set-token --migrate
+fi
 if [ "$1" = configure ] && [ -d /run/systemd/system ]; then
     systemctl daemon-reload
     # Preserve the administrator's enablement choice. A fresh install needs a token.

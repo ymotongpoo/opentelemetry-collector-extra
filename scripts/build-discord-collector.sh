@@ -2,7 +2,7 @@
 set -eu
 cd "$(dirname "$0")/.."
 
-version="${1:-0.1.0}"
+version="${1:-0.1.1}"
 arch="${2:-$(dpkg --print-architecture)}"
 case "$arch" in amd64|arm64) ;; *) echo "unsupported architecture: $arch" >&2; exit 1 ;; esac
 printf '%s\n' "$version" | LC_ALL=C grep -Eq '^[0-9]+\.[0-9]+\.[0-9]+$' || {
