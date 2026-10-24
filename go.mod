@@ -2,7 +2,7 @@
 
 module github.com/ymotongpoo/opentelemetry-collector-extra/builder
 
-go 1.26.0
+go 1.27.3
 
 require (
 	github.com/open-telemetry/opentelemetry-collector-contrib/receiver/prometheusreceiver v0.163.0
@@ -11,6 +11,7 @@ require (
 	github.com/ymotongpoo/opentelemetry-collector-extra/exporter/slackexporter v0.0.0
 	github.com/ymotongpoo/opentelemetry-collector-extra/receiver/discordreceiver v0.0.0
 	github.com/ymotongpoo/opentelemetry-collector-extra/receiver/slackreceiver v0.0.0
+	github.com/ymotongpoo/opentelemetry-collector-extra/receiver/switchbotreceiver v0.0.0
 	go.opentelemetry.io/collector/component v1.69.0
 	go.opentelemetry.io/collector/confmap v1.69.0
 	go.opentelemetry.io/collector/confmap/provider/envprovider v1.69.0
@@ -21,6 +22,7 @@ require (
 	go.opentelemetry.io/collector/connector v0.163.0
 	go.opentelemetry.io/collector/exporter v1.69.0
 	go.opentelemetry.io/collector/exporter/debugexporter v0.163.0
+	go.opentelemetry.io/collector/exporter/otlphttpexporter v0.163.0
 	go.opentelemetry.io/collector/extension v1.69.0
 	go.opentelemetry.io/collector/otelcol v0.163.0
 	go.opentelemetry.io/collector/processor v1.69.0
@@ -374,3 +376,5 @@ replace github.com/ymotongpoo/opentelemetry-collector-extra/exporter/discordexpo
 replace github.com/ymotongpoo/opentelemetry-collector-extra/exporter/s3tablesexporter => ./exporter/s3tablesexporter
 
 replace github.com/ymotongpoo/opentelemetry-collector-extra/exporter/slackexporter => ./exporter/slackexporter
+
+replace github.com/ymotongpoo/opentelemetry-collector-extra/receiver/switchbotreceiver => ./receiver/switchbotreceiver

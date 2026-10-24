@@ -1,5 +1,5 @@
 [Unit]
-Description=Discord metrics collector for Grafana Alloy
+Description=OpenTelemetry Collector Extra
 Documentation=https://github.com/ymotongpoo/opentelemetry-collector-extra
 Wants=network-online.target
 After=network-online.target alloy.service
@@ -7,12 +7,10 @@ After=network-online.target alloy.service
 [Service]
 Type=simple
 DynamicUser=true
-StateDirectory=discord-otelcol
-WorkingDirectory=/var/lib/discord-otelcol
-# Retain optional non-secret environment settings from older installations.
-EnvironmentFile=-/etc/discord-otelcol/environment
-LoadCredentialEncrypted=discord_bot_token:/etc/credstore.encrypted/discord-otelcol.token
-ExecStart=/usr/bin/discord-otelcol --config=/etc/discord-otelcol/config.yaml
+StateDirectory=otelcol-extra
+WorkingDirectory=/var/lib/otelcol-extra
+EnvironmentFile=-/etc/otelcol-extra/environment
+ExecStart=/usr/lib/otelcol-extra/run
 Restart=on-failure
 RestartSec=5s
 TimeoutStopSec=30s

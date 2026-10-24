@@ -1,7 +1,10 @@
 #!/bin/sh
 set -eu
 if [ "$1" = purge ]; then
-    rm -f /etc/credstore.encrypted/discord-otelcol.token
+    rm -f /etc/credstore.encrypted/otelcol-extra.discord /etc/credstore.encrypted/otelcol-extra.switchbot /etc/credstore.encrypted/otelcol-extra.slack
+    rm -f /etc/systemd/system/otelcol-extra.service.d/20-discord-credentials.conf /etc/systemd/system/otelcol-extra.service.d/20-switchbot-credentials.conf /etc/systemd/system/otelcol-extra.service.d/20-slack-credentials.conf
+    rm -f /etc/otelcol-extra/environment
+    rm -rf /var/lib/otelcol-extra-migration
 fi
 if [ -d /run/systemd/system ]; then
     systemctl daemon-reload

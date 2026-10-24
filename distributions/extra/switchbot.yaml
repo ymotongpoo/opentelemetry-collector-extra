@@ -1,0 +1,10 @@
+receivers:
+  switchbot:
+    cloud: ${file:${env:CREDENTIALS_DIRECTORY}/switchbot_cloud}
+    battery_interval: 3h
+    export_interval: 1m
+service:
+  pipelines:
+    metrics/switchbot:
+      receivers: [switchbot]
+      exporters: [otlp_http/alloy]

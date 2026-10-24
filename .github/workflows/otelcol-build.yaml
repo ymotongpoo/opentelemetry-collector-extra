@@ -16,6 +16,7 @@ jobs:
         module:
           - receiver/discordreceiver
           - receiver/slackreceiver
+          - receiver/switchbotreceiver
           - exporter/discordexporter
           - exporter/slackexporter
           - exporter/s3tablesexporter
@@ -31,6 +32,9 @@ jobs:
         working-directory: ${{ matrix.module }}
 
   build:
+    env:
+      GOMAXPROCS: "3"
+      GOFLAGS: -p=3
     runs-on: ubuntu-latest
     timeout-minutes: 30
     steps:
@@ -39,9 +43,11 @@ jobs:
         with:
           go-version-file: go.mod
           cache-dependency-path: '**/go.sum'
+      - run: python3 scripts/test-credentials.py
       - run: make build validate
+      - run: python3 scripts/test-collector-integration.py
       - run: go vet ./...
       - name: Check generated distribution
         run: git diff --exit-code -- components.go main.go main_others.go main_windows.go go.mod go.sum
       - name: Cross-compile macOS
-        run: GOOS=darwin GOARCH=arm64 CGO_ENABLED=0 go build -o /tmp/otelcol-custom-macos .
+        run: GOOS=darwin GOARCH=arm64 CGO_ENABLED=0 go build -o /tmp/otelcol-extra-macos .

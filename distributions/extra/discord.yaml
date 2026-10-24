@@ -1,0 +1,10 @@
+receivers:
+  discord:
+    token: ${file:${env:CREDENTIALS_DIRECTORY}/discord_bot_token}
+    buffer_interval: 30s
+    include_bots: false
+service:
+  pipelines:
+    metrics/discord:
+      receivers: [discord]
+      exporters: [otlp_http/alloy]

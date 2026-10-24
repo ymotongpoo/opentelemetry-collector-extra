@@ -1,0 +1,92 @@
+type: switchbot
+status:
+  class: receiver
+  stability:
+    development: [metrics]
+  codeowners:
+    active: [ymotongpoo]
+attributes:
+  switchbot.device.id:
+    description: Stable SwitchBot device ID
+    type: string
+  switchbot.device.name:
+    description: Configured device name
+    type: string
+  switchbot.device.type:
+    description: Reported device type
+    type: string
+  switchbot.metric:
+    description: The measurement whose observation age is reported
+    type: string
+metrics:
+  switchbot.battery:
+    description: "Reported battery level; some devices report coarse ranges"
+    unit: "%"
+    gauge:
+      value_type: double
+    enabled: true
+    stability: development
+    attributes: [switchbot.device.id, switchbot.device.name, switchbot.device.type]
+  switchbot.co2:
+    description: "Carbon dioxide concentration"
+    unit: "[ppm]"
+    gauge:
+      value_type: double
+    enabled: true
+    stability: development
+    attributes: [switchbot.device.id, switchbot.device.name, switchbot.device.type]
+  switchbot.device.available:
+    description: "Whether at least one device measurement is currently valid"
+    unit: "1"
+    gauge:
+      value_type: double
+    enabled: true
+    stability: development
+    attributes: [switchbot.device.id, switchbot.device.name, switchbot.device.type]
+  switchbot.humidity:
+    description: "Relative humidity"
+    unit: "%"
+    gauge:
+      value_type: double
+    enabled: true
+    stability: development
+    attributes: [switchbot.device.id, switchbot.device.name, switchbot.device.type]
+  switchbot.light_level:
+    description: "Device-specific ambient brightness level"
+    unit: "{level}"
+    gauge:
+      value_type: double
+    enabled: true
+    stability: development
+    attributes: [switchbot.device.id, switchbot.device.name, switchbot.device.type]
+  switchbot.observation.age:
+    description: "Seconds since a successful observation of a measurement"
+    unit: "s"
+    gauge:
+      value_type: double
+    enabled: true
+    stability: development
+    attributes: [switchbot.device.id, switchbot.device.name, switchbot.device.type, switchbot.metric]
+
+  switchbot.power:
+    description: "Bot switch-mode on/off state, not appliance state"
+    unit: "1"
+    gauge:
+      value_type: double
+    enabled: true
+    stability: development
+    attributes: [switchbot.device.id, switchbot.device.name, switchbot.device.type]
+  switchbot.temperature:
+    description: "Temperature in Celsius"
+    unit: "Cel"
+    gauge:
+      value_type: double
+    enabled: true
+    stability: development
+    attributes: [switchbot.device.id, switchbot.device.name, switchbot.device.type]
+tests:
+  skip_lifecycle: true
+  config:
+    cloud:
+      token: fixture-token
+      secret: fixture-secret

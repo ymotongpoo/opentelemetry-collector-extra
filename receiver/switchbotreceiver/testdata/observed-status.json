@@ -1,0 +1,165 @@
+[
+  {
+    "deviceId": "fixture-0",
+    "deviceName": "Fixture 0",
+    "deviceType": "MeterPro(CO2)",
+    "enableCloudService": false,
+    "statusCode": 100,
+    "status": {
+      "deviceType": "MeterPro(CO2)",
+      "battery": 100,
+      "temperature": 22.1,
+      "humidity": 56,
+      "CO2": 402,
+      "version": "V1.8"
+    }
+  },
+  {
+    "deviceId": "fixture-1",
+    "deviceName": "Fixture 1",
+    "deviceType": "Bot",
+    "enableCloudService": true,
+    "statusCode": 100,
+    "status": {
+      "deviceType": "Bot",
+      "battery": 100,
+      "power": "on",
+      "deviceMode": "pressMode",
+      "version": "V6.6"
+    }
+  },
+  {
+    "deviceId": "fixture-2",
+    "deviceName": "Fixture 2",
+    "deviceType": "Bot",
+    "enableCloudService": true,
+    "statusCode": 100,
+    "status": {
+      "deviceType": "Bot",
+      "battery": 0,
+      "power": "on",
+      "deviceMode": "pressMode",
+      "version": "V6.6"
+    }
+  },
+  {
+    "deviceId": "fixture-3",
+    "deviceName": "Fixture 3",
+    "deviceType": "Bot",
+    "enableCloudService": true,
+    "statusCode": 100,
+    "status": {
+      "deviceType": "Bot",
+      "battery": 0,
+      "power": "on",
+      "deviceMode": "pressMode",
+      "version": "V6.6"
+    }
+  },
+  {
+    "deviceId": "fixture-4",
+    "deviceName": "Fixture 4",
+    "deviceType": "Bot",
+    "enableCloudService": true,
+    "statusCode": 100,
+    "status": {
+      "deviceType": "Bot",
+      "battery": 100,
+      "power": "on",
+      "deviceMode": "pressMode",
+      "version": "V6.6"
+    }
+  },
+  {
+    "deviceId": "fixture-5",
+    "deviceName": "Fixture 5",
+    "deviceType": "Bot",
+    "enableCloudService": true,
+    "statusCode": 100,
+    "status": {
+      "deviceType": "Bot",
+      "battery": 100,
+      "power": "on",
+      "deviceMode": "pressMode",
+      "version": "V6.6"
+    }
+  },
+  {
+    "deviceId": "fixture-6",
+    "deviceName": "Fixture 6",
+    "deviceType": "Bot",
+    "enableCloudService": true,
+    "statusCode": 100,
+    "status": {
+      "deviceType": "Bot",
+      "battery": 0,
+      "power": "on",
+      "deviceMode": "pressMode",
+      "version": "V6.6"
+    }
+  },
+  {
+    "deviceId": "fixture-7",
+    "deviceName": "Fixture 7",
+    "deviceType": "Bot",
+    "enableCloudService": true,
+    "statusCode": 100,
+    "status": {
+      "deviceType": "Bot",
+      "battery": 0,
+      "power": "on",
+      "deviceMode": "pressMode",
+      "version": "V6.6"
+    }
+  },
+  {
+    "deviceId": "fixture-8",
+    "deviceName": "Fixture 8",
+    "deviceType": "Hub 2",
+    "enableCloudService": true,
+    "statusCode": 100,
+    "status": {
+      "deviceType": "Hub 2",
+      "temperature": 22.1,
+      "humidity": 58,
+      "lightLevel": 1,
+      "version": "V4.0-2.8"
+    }
+  },
+  {
+    "deviceId": "fixture-9",
+    "deviceName": "Fixture 9",
+    "deviceType": "WoIOSensor",
+    "enableCloudService": true,
+    "statusCode": 100,
+    "status": {
+      "deviceType": "WoIOSensor",
+      "battery": 20,
+      "temperature": 17.5,
+      "humidity": 90,
+      "version": "V0.9"
+    }
+  },
+  {
+    "deviceId": "fixture-10",
+    "deviceName": "Fixture 10",
+    "deviceType": "Hub 2",
+    "enableCloudService": true,
+    "statusCode": 100,
+    "status": {
+      "deviceType": "Hub 2",
+      "temperature": 24.6,
+      "humidity": 59,
+      "lightLevel": 11,
+      "version": "V4.0-2.8"
+    }
+  },
+  {
+    "deviceId": "fixture-11",
+    "deviceName": "Fixture 11",
+    "deviceType": "Outdoor Spotlight Cam",
+    "enableCloudService": true,
+    "statusCode": 100,
+    "status": {}
+  }
+]
