@@ -57,7 +57,7 @@ jobs:
       - name: Select the package version
         shell: bash
         run: |
-          version=0.2.0
+          version=0.2.1
           if [[ "$GITHUB_REF" == refs/tags/otelcol-extra/v* ]]; then
             version="${GITHUB_REF_NAME#otelcol-extra/v}"
           fi

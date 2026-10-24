@@ -38,7 +38,9 @@ printf '%s\n' 'xoxb-slack-fixture' 'xapp-slack-fixture' | otelcol-extra-set-cred
 test "$(stat -c '%a:%U:%G' /etc/credstore.encrypted/otelcol-extra.discord)" = 600:root:root
 test "$(stat -c '%a:%U:%G' /etc/credstore.encrypted/otelcol-extra.switchbot)" = 600:root:root
 before="$(sha256sum /etc/credstore.encrypted/otelcol-extra.discord)"
-if printf '%s' 'bad whitespace fixture' | otelcol-extra-set-credentials discord --stdin --with-key=host; then exit 1; fi
+if printf '%s' 'bad whitespace fixture' | otelcol-extra-set-credentials discord --stdin --with-key=host > /tmp/input-error 2>&1; then exit 1; fi
+grep -q 'spaces or line breaks are present' /tmp/input-error
+if grep -Eq 'TPM|bad whitespace fixture' /tmp/input-error; then exit 1; fi
 if printf '%s' 'new-fixture' | otelcol-extra-set-credentials discord --stdin --with-key=tpm2; then exit 1; fi
 test "$before" = "$(sha256sum /etc/credstore.encrypted/otelcol-extra.discord)"
 mkdir -m 0700 /run/extra-credentials
