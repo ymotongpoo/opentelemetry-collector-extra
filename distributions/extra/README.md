@@ -10,7 +10,7 @@ Collector self-metrics use `127.0.0.1:8889`. A fresh installation does not enabl
 
 ## Installation and credentials
 
-After the renamed release and shared APT repository have been published, install with:
+Install the combined Collector from the shared APT repository:
 
 ```sh
 sudo apt update
@@ -19,7 +19,6 @@ sudo apt install otelcol-extra
 
 The APT repository setup is documented in [activitylog](https://github.com/ymotongpoo/activitylog#readme).
 For local testing, build with `make deb` and install the resulting package on a disposable system.
-This source change does not publish a release or change a running installation.
 
 Register Discord and SwitchBot credentials in an interactive terminal. Values are entered without echo and are never passed as command arguments:
 
@@ -51,15 +50,20 @@ See the [receiver documentation](../../receiver/switchbotreceiver/README.md) for
 
 ## Upgrade from discord-otelcol
 
-The 0.2.0 `discord-otelcol` package is a transitional dependency on `otelcol-extra`.
-After both packages are present in APT, a normal upgrade installs the combined distribution:
+`otelcol-extra` is the only Collector package published to APT. The temporary `discord-otelcol` packages from releases 0.2.0 and 0.2.1 are retired; current builds do not generate them, and the APT index excludes the old package name. Historical GitHub release assets remain available for recovery.
+
+On an installation that already runs `otelcol-extra`, remove the transitional package through APT:
 
 ```sh
 sudo apt update
-sudo apt install discord-otelcol
+sudo apt install otelcol-extra discord-otelcol-
 ```
 
-The migration stops the old service before starting the new one, preserving whether it was enabled, active, stopped, or masked.
+The trailing `-` requests removal of the old package. Explicitly naming `otelcol-extra` also marks it as manually installed, protecting it from automatic removal. This operation retains the combined Collector's configuration, encrypted credentials, and service. Old conffiles remain available for recovery.
+
+For a remaining 0.1.x dedicated installation, back up its configuration and credentials and record whether its service is active, enabled, or masked before installing the new package. APT may remove the old service before the new package's pre-install script can inspect it. After validating the new configuration, restore the intended service state on `otelcol-extra`; never run both Collectors together.
+
+Legacy data migration remains supported.
 The old main configuration is copied when the new main configuration is still its packaged default. A customized new configuration takes precedence.
 Discord token file references are rewritten to the preserved `discord_bot_token` identity, and the old state directory is copied if the new one is empty.
 Other custom files and custom service drop-ins should be reviewed when migrating paths from `/etc/discord-otelcol` to `/etc/otelcol-extra`.
@@ -71,7 +75,7 @@ The old service cannot always be restarted automatically after its package files
 No SwitchBot or Slack credentials are required for a Discord-only upgrade.
 
 Inspect `/etc/otelcol-extra/config.yaml`, credential drop-ins, and `systemctl status otelcol-extra` after upgrading.
-The legacy encrypted blob and configuration are retained for recovery; the transitional package may then be removed.
+The legacy encrypted blob and configuration are retained for recovery.
 Removing `otelcol-extra` stops its service but retains configuration and encrypted credentials. Purging it deletes its own registered credential files and drop-ins.
 Legacy backups and user-created snippets are not deleted automatically.
 
@@ -91,11 +95,9 @@ make deb VERSION=0.2.1 ARCH=arm64
 ```
 
 `test-deb.sh` uses a disposable Docker container and pinned published 0.1.0/0.1.1 packages.
-It checks fresh installs, encryption, failed rotation, legacy migrations, failed migration recovery, service state, APT upgrades, remove, and purge.
+It checks fresh installs, encryption, failed rotation, legacy data migrations, failed migration recovery, service state, APT removal of the last archived transitional package, remove, and purge.
 `test-systemd.sh` installs a package on its host and requires `OTELCOL_EXTRA_SYSTEMD_TEST=1`; run it only on a disposable systemd CI runner.
 The Collector integration test uses local fake services and verifies that cloud authentication and Matter connection failures leave an unrelated metrics pipeline running.
 
-Release CI uses tags `otelcol-extra/vVERSION` and produces amd64 and arm64 packages, one architecture-independent transitional package, and `SHA256SUMS`.
-The shared APT importer accepts both old and new release names and validates checksums and Debian metadata before importing each release.
-Its index tests verify that the architecture-independent transitional package appears in both architecture indexes and that repository signatures verify.
-Publish the Collector packages before advertising the renamed APT install command.
+Release CI uses tags `otelcol-extra/vVERSION` and produces only `otelcol-extra_VERSION_amd64.deb`, `otelcol-extra_VERSION_arm64.deb`, and `SHA256SUMS`. An explicit file list prevents old artifacts from entering uploads or releases.
+The shared APT importer accepts only `otelcol-extra` packages, verifies checksums and Debian metadata, and ignores retired artifacts listed in historical manifests. It also removes old package files from a reused import pool before indexing.
