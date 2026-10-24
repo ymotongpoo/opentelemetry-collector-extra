@@ -1,0 +1,79 @@
+default:
+all_set:
+  metrics:
+    switchbot.battery:
+      enabled: true
+      attributes: ["switchbot.device.id","switchbot.device.name","switchbot.device.type"]
+    switchbot.co2:
+      enabled: true
+      attributes: ["switchbot.device.id","switchbot.device.name","switchbot.device.type"]
+    switchbot.device.available:
+      enabled: true
+      attributes: ["switchbot.device.id","switchbot.device.name","switchbot.device.type"]
+    switchbot.humidity:
+      enabled: true
+      attributes: ["switchbot.device.id","switchbot.device.name","switchbot.device.type"]
+    switchbot.light_level:
+      enabled: true
+      attributes: ["switchbot.device.id","switchbot.device.name","switchbot.device.type"]
+    switchbot.observation.age:
+      enabled: true
+      attributes: ["switchbot.device.id","switchbot.device.name","switchbot.device.type","switchbot.metric"]
+    switchbot.power:
+      enabled: true
+      attributes: ["switchbot.device.id","switchbot.device.name","switchbot.device.type"]
+    switchbot.temperature:
+      enabled: true
+      attributes: ["switchbot.device.id","switchbot.device.name","switchbot.device.type"]
+reaggregate_set:
+  metrics:
+    switchbot.battery:
+      enabled: true
+      attributes: []
+    switchbot.co2:
+      enabled: true
+      attributes: []
+    switchbot.device.available:
+      enabled: true
+      attributes: []
+    switchbot.humidity:
+      enabled: true
+      attributes: []
+    switchbot.light_level:
+      enabled: true
+      attributes: []
+    switchbot.observation.age:
+      enabled: true
+      attributes: []
+    switchbot.power:
+      enabled: true
+      attributes: []
+    switchbot.temperature:
+      enabled: true
+      attributes: []
+none_set:
+  metrics:
+    switchbot.battery:
+      enabled: false
+      attributes: ["switchbot.device.id","switchbot.device.name","switchbot.device.type"]
+    switchbot.co2:
+      enabled: false
+      attributes: ["switchbot.device.id","switchbot.device.name","switchbot.device.type"]
+    switchbot.device.available:
+      enabled: false
+      attributes: ["switchbot.device.id","switchbot.device.name","switchbot.device.type"]
+    switchbot.humidity:
+      enabled: false
+      attributes: ["switchbot.device.id","switchbot.device.name","switchbot.device.type"]
+    switchbot.light_level:
+      enabled: false
+      attributes: ["switchbot.device.id","switchbot.device.name","switchbot.device.type"]
+    switchbot.observation.age:
+      enabled: false
+      attributes: ["switchbot.device.id","switchbot.device.name","switchbot.device.type","switchbot.metric"]
+    switchbot.power:
+      enabled: false
+      attributes: ["switchbot.device.id","switchbot.device.name","switchbot.device.type"]
+    switchbot.temperature:
+      enabled: false
+      attributes: ["switchbot.device.id","switchbot.device.name","switchbot.device.type"]
