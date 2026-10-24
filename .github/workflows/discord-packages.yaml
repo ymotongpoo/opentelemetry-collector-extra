@@ -11,6 +11,7 @@ on:
       - 'receiver/discordreceiver/**'
       - 'scripts/build-discord-*.sh'
       - 'scripts/test-discord-deb.sh'
+      - 'scripts/test-discord-systemd.sh'
   pull_request:
     paths:
       - '.github/workflows/discord-packages.yaml'
@@ -19,6 +20,7 @@ on:
       - 'receiver/discordreceiver/**'
       - 'scripts/build-discord-*.sh'
       - 'scripts/test-discord-deb.sh'
+      - 'scripts/test-discord-systemd.sh'
 
 permissions:
   contents: read
@@ -42,7 +44,7 @@ jobs:
       - name: Select the package version
         shell: bash
         run: |
-          version=0.1.0
+          version=0.1.1
           if [[ "$GITHUB_REF" == refs/tags/discord-otelcol/v* ]]; then
             version="${GITHUB_REF_NAME#discord-otelcol/v}"
           fi
@@ -54,6 +56,9 @@ jobs:
       - name: Validate and install the amd64 package
         if: matrix.arch == 'amd64'
         run: ./scripts/test-discord-deb.sh "dist/discord-otelcol_${PACKAGE_VERSION}_amd64.deb"
+      - name: Verify credentials with systemd and a dynamic user
+        if: matrix.arch == 'amd64'
+        run: ./scripts/test-discord-systemd.sh "dist/discord-otelcol_${PACKAGE_VERSION}_amd64.deb"
       - uses: actions/upload-artifact@v4
         with:
           name: discord-otelcol-${{ matrix.arch }}
