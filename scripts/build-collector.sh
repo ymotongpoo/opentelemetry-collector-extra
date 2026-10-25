@@ -2,7 +2,7 @@
 set -eu
 cd "$(dirname "$0")/.."
 export GOTOOLCHAIN=go1.27.3
-version="${1:-0.2.1}"
+version="${1:-0.3.0}"
 arch="${2:-$(dpkg --print-architecture)}"
 case "$arch" in amd64|arm64) ;; *) echo 'unsupported architecture' >&2; exit 1 ;; esac
 printf '%s\n' "$version" | LC_ALL=C grep -Eq '^[0-9]+\.[0-9]+\.[0-9]+$' || exit 1
