@@ -1,0 +1,19 @@
+examples/grafana/smartheim-dashboard.json
+  s_7db6cfa1a4eea3::t_7748df63cff138 1-782
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "fba8c7176fce91caf4c1f46e8e987d49ce1da00a",
+  "prompts": {},
+  "sessions": {
+    "s_7db6cfa1a4eea3": {
+      "agent_id": {
+        "tool": "codex",
+        "id": "01a17068-3c52-75e0-9d32-18b0a03669ed",
+        "model": "gpt-6.1-sol"
+      },
+      "human_author": "Yoshi Yamaguchi <ymotongpoo@gmail.com>"
+    }
+  }
+}
