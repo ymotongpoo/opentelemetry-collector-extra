@@ -1,0 +1,16 @@
+receivers:
+  smartheim:
+    collection_interval: 30s
+    # Optional device number for identification across DHCP address changes:
+    # device_id: YOUR_DEVICE_NUMBER
+    # endpoint: http://192.168.0.98
+    # discovery:
+    #   networks: [192.168.0.0/24]
+exporters:
+  debug:
+    verbosity: detailed
+service:
+  pipelines:
+    metrics:
+      receivers: [smartheim]
+      exporters: [debug]

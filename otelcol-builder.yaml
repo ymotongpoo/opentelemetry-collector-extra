@@ -26,6 +26,7 @@ receivers:
   - gomod: github.com/ymotongpoo/opentelemetry-collector-extra/receiver/slackreceiver v0.0.0
 
   - gomod: github.com/ymotongpoo/opentelemetry-collector-extra/receiver/switchbotreceiver v0.0.0
+  - gomod: github.com/ymotongpoo/opentelemetry-collector-extra/receiver/smartheimreceiver v0.0.0
 
 processors:
   - gomod: go.opentelemetry.io/collector/processor/batchprocessor v0.163.0
@@ -44,3 +45,4 @@ replaces:
   - github.com/ymotongpoo/opentelemetry-collector-extra/exporter/s3tablesexporter => ./exporter/s3tablesexporter
   - github.com/ymotongpoo/opentelemetry-collector-extra/exporter/slackexporter => ./exporter/slackexporter
   - github.com/ymotongpoo/opentelemetry-collector-extra/receiver/switchbotreceiver => ./receiver/switchbotreceiver
+  - github.com/ymotongpoo/opentelemetry-collector-extra/receiver/smartheimreceiver => ./receiver/smartheimreceiver

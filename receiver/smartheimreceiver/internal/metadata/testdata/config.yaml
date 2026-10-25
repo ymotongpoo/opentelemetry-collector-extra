@@ -1,0 +1,61 @@
+default:
+all_set:
+  metrics:
+    smartheim.branch.power:
+      enabled: true
+      attributes: ["smartheim.branch.id","smartheim.branch.name"]
+    smartheim.consumption.power:
+      enabled: true
+    smartheim.grid.export.power:
+      enabled: true
+    smartheim.grid.import.power:
+      enabled: true
+    smartheim.solar.power:
+      enabled: true
+  resource_attributes:
+    smartheim.device.id:
+      enabled: true
+reaggregate_set:
+  metrics:
+    smartheim.branch.power:
+      enabled: true
+      attributes: []
+    smartheim.consumption.power:
+      enabled: true
+    smartheim.grid.export.power:
+      enabled: true
+    smartheim.grid.import.power:
+      enabled: true
+    smartheim.solar.power:
+      enabled: true
+  resource_attributes:
+    smartheim.device.id:
+      enabled: true
+none_set:
+  metrics:
+    smartheim.branch.power:
+      enabled: false
+      attributes: ["smartheim.branch.id","smartheim.branch.name"]
+    smartheim.consumption.power:
+      enabled: false
+    smartheim.grid.export.power:
+      enabled: false
+    smartheim.grid.import.power:
+      enabled: false
+    smartheim.solar.power:
+      enabled: false
+  resource_attributes:
+    smartheim.device.id:
+      enabled: false
+filter_set_include:
+  resource_attributes:
+    smartheim.device.id:
+      enabled: true
+      metrics_include:
+        - regexp: ".*"
+filter_set_exclude:
+  resource_attributes:
+    smartheim.device.id:
+      enabled: true
+      metrics_exclude:
+        - strict: "smartheim.device.id-val"

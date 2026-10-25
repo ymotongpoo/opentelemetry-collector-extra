@@ -17,6 +17,7 @@ jobs:
           - receiver/discordreceiver
           - receiver/slackreceiver
           - receiver/switchbotreceiver
+          - receiver/smartheimreceiver
           - exporter/discordexporter
           - exporter/slackexporter
           - exporter/s3tablesexporter

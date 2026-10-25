@@ -1,0 +1,16 @@
+receivers:
+  smartheim:
+    collection_interval: 30s
+    # Optional: pin the device number shown at the bottom of the CGI page.
+    # device_id: YOUR_DEVICE_NUMBER
+    # With endpoint omitted, discovery searches the connected private IPv4 LAN.
+    # For containers or larger subnets, select up to four /24-/30 networks:
+    # discovery:
+    #   networks: [192.168.0.0/24]
+    # To use a fixed address instead:
+    # endpoint: http://192.168.0.98
+service:
+  pipelines:
+    metrics/smartheim:
+      receivers: [smartheim]
+      exporters: [otlp_http/alloy]

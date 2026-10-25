@@ -15,7 +15,7 @@ install -m 0755 packaging/debian/run "$root/usr/lib/otelcol-extra/run"
 install -m 0644 packaging/debian/otelcol-extra.service "$root/usr/lib/systemd/system/otelcol-extra.service"
 install -m 0644 distributions/extra/config.yaml "$root/etc/otelcol-extra/config.yaml"
 install -m 0644 distributions/extra/config.yaml "$root/usr/share/otelcol-extra/config.default.yaml"
-install -m 0644 distributions/extra/discord.yaml distributions/extra/switchbot.yaml distributions/extra/slack.yaml "$root/usr/share/otelcol-extra/examples/"
+install -m 0644 distributions/extra/discord.yaml distributions/extra/switchbot.yaml distributions/extra/slack.yaml distributions/extra/smartheim.yaml "$root/usr/share/otelcol-extra/examples/"
 install -m 0644 LICENSE "$root/usr/share/doc/otelcol-extra/copyright"
 for script in preinst postinst prerm postrm; do install -m 0755 "packaging/debian/$script" "$root/DEBIAN/$script"; done
 printf '%s\n' /etc/otelcol-extra/config.yaml > "$root/DEBIAN/conffiles"
@@ -34,7 +34,8 @@ Breaks: discord-otelcol (<< 0.2.0)
 Replaces: discord-otelcol (<< 0.2.0)
 Homepage: https://github.com/ymotongpoo/opentelemetry-collector-extra
 Description: Extra OpenTelemetry Collector components
- Includes Discord, Slack and SwitchBot receivers, chat and S3 Tables exporters,
+ Includes Discord, Slack, SwitchBot and Smart Heim Navi receivers,
+ chat and S3 Tables exporters,
  OTLP and Prometheus receivers, and OTLP HTTP forwarding to Grafana Alloy.
  Includes a systemd service and encrypted credential registration.
 EOF

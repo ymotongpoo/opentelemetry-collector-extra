@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""An unavailable SwitchBot source must not stop another Collector pipeline."""
+"""Unavailable device sources must not stop another Collector pipeline."""
 import http.server
 import json
 from pathlib import Path
@@ -67,6 +67,10 @@ def main():
           node_id: 1
           attributes:
             temperature: 1/1026/0
+  smartheim:
+    endpoint: http://127.0.0.1:{unavailable}
+    timeout: 100ms
+    collection_interval: 100ms
 exporters:
   debug:
     verbosity: detailed
@@ -85,6 +89,9 @@ service:
       exporters: [debug]
     metrics/switchbot:
       receivers: [switchbot]
+      exporters: [debug]
+    metrics/smartheim:
+      receivers: [smartheim]
       exporters: [debug]
 ''')
             with (Path(folder) / 'output.log').open('w+') as log:
@@ -110,6 +117,7 @@ service:
                     log.seek(0)
                     text = log.read()
                     assert 'integration.pipeline.alive' in text
+                    assert 'Smart Heim Navi collection failed' in text
                     assert Cloud.status_requests == 1, '401 cooldown did not bound requests'
                     assert 'integration-token-fixture' not in text
                     assert 'integration-secret-fixture' not in text

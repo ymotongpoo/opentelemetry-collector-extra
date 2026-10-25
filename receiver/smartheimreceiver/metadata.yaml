@@ -1,0 +1,58 @@
+type: smartheim
+status:
+  class: receiver
+  stability:
+    development: [metrics]
+  codeowners:
+    active: [ymotongpoo]
+resource_attributes:
+  smartheim.device.id:
+    description: Device number reported by the information collection unit
+    type: string
+    enabled: true
+attributes:
+  smartheim.branch.id:
+    description: One-based slot position in the all-branch page, including unmeasured slots
+    type: string
+  smartheim.branch.name:
+    description: Circuit name configured on the device
+    type: string
+metrics:
+  smartheim.branch.power:
+    description: Instantaneous power consumption of a measured circuit
+    unit: W
+    gauge:
+      value_type: double
+    enabled: true
+    stability: development
+    attributes: [smartheim.branch.id, smartheim.branch.name]
+  smartheim.consumption.power:
+    description: Instantaneous total household power consumption reported by Smart Heim Navi
+    unit: W
+    gauge:
+      value_type: double
+    enabled: true
+    stability: development
+  smartheim.grid.export.power:
+    description: Instantaneous power sold to the grid, zero during import
+    unit: W
+    gauge:
+      value_type: double
+    enabled: true
+    stability: development
+  smartheim.grid.import.power:
+    description: Instantaneous power purchased from the grid, zero during export
+    unit: W
+    gauge:
+      value_type: double
+    enabled: true
+    stability: development
+  smartheim.solar.power:
+    description: Instantaneous solar generation reported by Smart Heim Navi
+    unit: W
+    gauge:
+      value_type: double
+    enabled: true
+    stability: development
+tests:
+  skip_lifecycle: true

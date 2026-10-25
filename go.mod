@@ -11,6 +11,7 @@ require (
 	github.com/ymotongpoo/opentelemetry-collector-extra/exporter/slackexporter v0.0.0
 	github.com/ymotongpoo/opentelemetry-collector-extra/receiver/discordreceiver v0.0.0
 	github.com/ymotongpoo/opentelemetry-collector-extra/receiver/slackreceiver v0.0.0
+	github.com/ymotongpoo/opentelemetry-collector-extra/receiver/smartheimreceiver v0.0.0
 	github.com/ymotongpoo/opentelemetry-collector-extra/receiver/switchbotreceiver v0.0.0
 	go.opentelemetry.io/collector/component v1.69.0
 	go.opentelemetry.io/collector/confmap v1.69.0
@@ -279,6 +280,7 @@ require (
 	go.opentelemetry.io/collector/extension/extensiontest v0.163.0 // indirect
 	go.opentelemetry.io/collector/extension/xextension v0.163.0 // indirect
 	go.opentelemetry.io/collector/featuregate v1.69.0 // indirect
+	go.opentelemetry.io/collector/filter v0.163.0 // indirect
 	go.opentelemetry.io/collector/internal/componentalias v0.163.0 // indirect
 	go.opentelemetry.io/collector/internal/fanoutconsumer v0.163.0 // indirect
 	go.opentelemetry.io/collector/internal/sharedcomponent v0.163.0 // indirect
@@ -378,3 +380,5 @@ replace github.com/ymotongpoo/opentelemetry-collector-extra/exporter/s3tablesexp
 replace github.com/ymotongpoo/opentelemetry-collector-extra/exporter/slackexporter => ./exporter/slackexporter
 
 replace github.com/ymotongpoo/opentelemetry-collector-extra/receiver/switchbotreceiver => ./receiver/switchbotreceiver
+
+replace github.com/ymotongpoo/opentelemetry-collector-extra/receiver/smartheimreceiver => ./receiver/smartheimreceiver
