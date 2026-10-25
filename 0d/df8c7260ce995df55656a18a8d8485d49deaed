@@ -1,0 +1,50 @@
+otelcol-builder.yaml
+  s_7db6cfa1a4eea3::t_4805ab423b9339 30-31,51-53
+  s_7db6cfa1a4eea3::t_380fdb98792cf4 20
+.github/workflows/extra-packages.yaml
+  s_7db6cfa1a4eea3::t_380fdb98792cf4 12,27,62
+scripts/build-collector.sh
+  s_7db6cfa1a4eea3::t_380fdb98792cf4 5
+scripts/check-modules.sh
+  s_7db6cfa1a4eea3::t_4805ab423b9339 8
+scripts/build-deb.sh
+  s_7db6cfa1a4eea3::t_380fdb98792cf4 4
+  s_7db6cfa1a4eea3::t_4805ab423b9339 18,37
+Makefile
+  s_7db6cfa1a4eea3::t_4805ab423b9339 27
+  s_7db6cfa1a4eea3::t_380fdb98792cf4 2
+  s_7db6cfa1a4eea3::t_387ce22c57b234 28
+main.go
+  s_7db6cfa1a4eea3::t_fce5c3636981b0 23
+scripts/test-systemd.sh
+  s_7db6cfa1a4eea3::t_4805ab423b9339 30
+scripts/generate-metadata.sh
+  s_7db6cfa1a4eea3::t_4805ab423b9339 15
+go.mod
+  s_7db6cfa1a4eea3::t_1c49d1e07630bc 13-14,250,388-393
+scripts/test-weather-integration.py
+  s_7db6cfa1a4eea3::t_e7eb06f7a5b4e0 1-16,19-38,41-51,53-102,113-127,129-141,143-145,147-165,171-181,183-186
+  s_7db6cfa1a4eea3::t_387ce22c57b234 17-18,39-40,52,103-112,128,142,146,166-170,182
+.github/workflows/otelcol-build.yaml
+  s_7db6cfa1a4eea3::t_4805ab423b9339 17,22-23,53
+components.go
+  s_7db6cfa1a4eea3::t_1c49d1e07630bc 26-27,65-66,78-79
+scripts/test-deb.sh
+  s_7db6cfa1a4eea3::t_4805ab423b9339 37,59-60
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "0ddf8c7260ce995df55656a18a8d8485d49deaed",
+  "prompts": {},
+  "sessions": {
+    "s_7db6cfa1a4eea3": {
+      "agent_id": {
+        "tool": "codex",
+        "id": "01a17068-3c52-75e0-9d32-18b0a03669ed",
+        "model": "gpt-6-astra"
+      },
+      "human_author": "Yoshi Yamaguchi <ymotongpoo@gmail.com>"
+    }
+  }
+}
