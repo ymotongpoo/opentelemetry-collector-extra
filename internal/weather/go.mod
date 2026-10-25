@@ -3,7 +3,7 @@ module github.com/ymotongpoo/opentelemetry-collector-extra/internal/weather
 go 1.27.3
 
 require (
-	github.com/gofrs/flock v0.13.0
+	github.com/gofrs/flock v0.13.1
 	go.opentelemetry.io/collector/component v1.69.0
 	go.opentelemetry.io/collector/consumer v1.69.0
 	go.opentelemetry.io/collector/pdata v1.69.0
