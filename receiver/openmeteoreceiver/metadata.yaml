@@ -1,0 +1,14 @@
+type: openmeteo
+status:
+  class: receiver
+  stability:
+    development: [logs]
+  codeowners:
+    active: [ymotongpoo]
+tests:
+  skip_lifecycle: true
+  config:
+    latitude: 35.6667
+    longitude: 138.55
+    location_id: fixture
+    state_file: testdata/unused-state.json

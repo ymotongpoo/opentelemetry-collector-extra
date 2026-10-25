@@ -1,0 +1,79 @@
+{
+  "latitude": 35.65,
+  "longitude": 138.5625,
+  "generationtime_ms": 0.13840198516845703,
+  "utc_offset_seconds": 32400,
+  "timezone": "Asia/Tokyo",
+  "timezone_abbreviation": "GMT+9",
+  "elevation": 275.0,
+  "hourly_units": {
+    "time": "unixtime",
+    "shortwave_radiation": "W/m²",
+    "sunshine_duration": "s",
+    "precipitation": "mm",
+    "temperature_2m": "°C",
+    "cloud_cover": "%",
+    "weather_code": "wmo code"
+  },
+  "hourly": {
+    "time": [
+      1792681200,
+      1792684800,
+      1792688400
+    ],
+    "shortwave_radiation": [
+      0.0,
+      0.0,
+      0.0
+    ],
+    "sunshine_duration": [
+      0.0,
+      0.0,
+      0.0
+    ],
+    "precipitation": [
+      0.0,
+      0.0,
+      0.0
+    ],
+    "temperature_2m": [
+      14.5,
+      14.1,
+      13.5
+    ],
+    "cloud_cover": [
+      60,
+      95,
+      99
+    ],
+    "weather_code": [
+      2,
+      3,
+      3
+    ]
+  },
+  "daily_units": {
+    "time": "unixtime",
+    "sunrise": "unixtime",
+    "sunset": "unixtime",
+    "daylight_duration": "s",
+    "sunshine_duration": "s"
+  },
+  "daily": {
+    "time": [
+      1792681200
+    ],
+    "sunrise": [
+      1792702734
+    ],
+    "sunset": [
+      1792742451
+    ],
+    "daylight_duration": [
+      39720.02
+    ],
+    "sunshine_duration": [
+      32358.04
+    ]
+  }
+}

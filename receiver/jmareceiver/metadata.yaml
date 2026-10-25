@@ -1,0 +1,13 @@
+type: jma
+status:
+  class: receiver
+  stability:
+    development: [logs]
+  codeowners:
+    active: [ymotongpoo]
+tests:
+  skip_lifecycle: true
+  config:
+    prec_no: "49"
+    block_no: "47638"
+    state_file: testdata/unused-state.json
