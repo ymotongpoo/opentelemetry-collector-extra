@@ -1,0 +1,104 @@
+receiver/smartheimreceiver/internal/metadata/generated_config.go
+  s_7db6cfa1a4eea3::t_9ab2a64cb1b06a 1-222
+receiver/smartheimreceiver/testdata/branches.html
+  s_7db6cfa1a4eea3::t_797ad8473a4fe7 1-11
+receiver/smartheimreceiver/internal/metadata/generated_metrics.go
+  s_7db6cfa1a4eea3::t_9ab2a64cb1b06a 1-549
+receiver/smartheimreceiver/discovery.go
+  s_7db6cfa1a4eea3::t_9ab2a64cb1b06a 20,23-31,33-40,42-51,54-57,61-64,72,74-78,84,94-101,107-112,116-118,120-125
+  s_7db6cfa1a4eea3::t_028685587dd7d8 1-19,21-22,32,41,52-53,58-60,65-71,73,79-83,85-93,102-106,113-115,119,126-127
+.github/workflows/otelcol-build.yaml
+  s_7db6cfa1a4eea3::t_5999371ef9d8cc 20
+receiver/smartheimreceiver/go.mod
+  s_7db6cfa1a4eea3::t_9ab2a64cb1b06a 13,21-22,31,58
+  s_7db6cfa1a4eea3::t_af41ec407bbb00 1-12,14-20,23-30,32-57,59-62
+receiver/smartheimreceiver/internal/metadata/generated_metrics_test.go
+  s_7db6cfa1a4eea3::t_9ab2a64cb1b06a 1-233
+receiver/smartheimreceiver/doc.go
+  s_7db6cfa1a4eea3::t_653d4f7a5d42fa 1-5
+examples/smartheim.yaml
+  s_7db6cfa1a4eea3::t_4e0b0a5d32e509 1-16
+scripts/build-deb.sh
+  s_7db6cfa1a4eea3::t_5999371ef9d8cc 18,37-38
+receiver/smartheimreceiver/client.go
+  s_7db6cfa1a4eea3::t_028685587dd7d8 1-25,27,29-33,45,57-58,64-65
+  s_7db6cfa1a4eea3::t_9ab2a64cb1b06a 26,28,34-44,46-56,59-63
+receiver/smartheimreceiver/receiver.go
+  s_7db6cfa1a4eea3::t_028685587dd7d8 1-23,29-31,38-39,46-47,52-53,60-64,68,76-82,85,89,96-98,116-119,131,136-137,139,144,147-148,155,162,166,168-169,175-176
+  s_7db6cfa1a4eea3::t_9ab2a64cb1b06a 24-28,32-37,40-45,48-51,54-59,65-67,69-75,83-84,86-88,90-95,99-115,120-130,132-135,138,140-143,145-146,149-154,156-161,163-165,167,170-174
+scripts/generate-metadata.sh
+  s_7db6cfa1a4eea3::t_5999371ef9d8cc 15
+receiver/smartheimreceiver/internal/metadata/generated_resource_test.go
+  s_7db6cfa1a4eea3::t_9ab2a64cb1b06a 1-39
+scripts/check-modules.sh
+  s_7db6cfa1a4eea3::t_5999371ef9d8cc 8
+receiver/smartheimreceiver/internal/metadata/testdata/config.yaml
+  s_7db6cfa1a4eea3::t_9ab2a64cb1b06a 1-61
+scripts/test-collector-integration.py
+  s_7db6cfa1a4eea3::t_ef2db594406b38 120
+  s_7db6cfa1a4eea3::t_584f1e9f8b6ceb 2,70-73,93-94
+  s_7db6cfa1a4eea3::t_45b8c8ac88b0c0 95
+receiver/smartheimreceiver/generated_component_test.go
+  s_7db6cfa1a4eea3::t_9ab2a64cb1b06a 1-60
+receiver/smartheimreceiver/internal/metadata/generated_status.go
+  s_7db6cfa1a4eea3::t_9ab2a64cb1b06a 1-18
+receiver/smartheimreceiver/factory.go
+  s_7db6cfa1a4eea3::t_653d4f7a5d42fa 1-20,24,28-29
+  s_7db6cfa1a4eea3::t_9ab2a64cb1b06a 21-23,25-27
+Makefile
+  s_7db6cfa1a4eea3::t_e36740194808ea 26
+receiver/smartheimreceiver/receiver_test.go
+  s_7db6cfa1a4eea3::t_9712b996bc2ab4 1-26,28,37-39,41,51-52,54-57,62-63,69,81-83,102,109,119-121,129-130,142-144,150-151,158,173-175,177,189,195,199-201,204,222-224,230,237-239,242-246,267-270,285,292-294
+  s_7db6cfa1a4eea3::t_9ab2a64cb1b06a 27,29-36,40,42-50,53,58-61,64-68,70-80,84-101,103-108,110-118,122-128,131-141,145-149,152-157,159-172,176,178-188,190-194,196-198,202-203,205-221,225-229,231-236,240-241,247-266,271-284,286-291
+receiver/smartheimreceiver/parser_test.go
+  s_7db6cfa1a4eea3::t_abd670509a4453 70-75
+  s_7db6cfa1a4eea3::t_797ad8473a4fe7 1-15,17,20-23,45-49,56,61-63,78-79,84-85
+  s_7db6cfa1a4eea3::t_9ab2a64cb1b06a 16,18-19,24-44,50-55,57-60,64-69,76-77,80-83
+receiver/smartheimreceiver/testdata/summary.html
+  s_7db6cfa1a4eea3::t_797ad8473a4fe7 1-10
+receiver/smartheimreceiver/metadata.yaml
+  s_7db6cfa1a4eea3::t_028685587dd7d8 1-20,23-27,29-35,38-42,45-49,52-58
+  s_7db6cfa1a4eea3::t_e91a80147c4ae3 21-22,28,36-37,43-44,50-51
+components.go
+  s_7db6cfa1a4eea3::t_e8c35d429457b1 25,62,73
+otelcol-builder.yaml
+  s_7db6cfa1a4eea3::t_5999371ef9d8cc 29,48
+distributions/extra/smartheim.yaml
+  s_7db6cfa1a4eea3::t_4e0b0a5d32e509 1-16
+go.mod
+  s_7db6cfa1a4eea3::t_58b053b7344a5c 14,283,383
+  s_7db6cfa1a4eea3::t_e8c35d429457b1 384
+receiver/smartheimreceiver/internal/metadata/generated_config_test.go
+  s_7db6cfa1a4eea3::t_9ab2a64cb1b06a 1-151
+receiver/smartheimreceiver/internal/metadata/generated_resource.go
+  s_7db6cfa1a4eea3::t_9ab2a64cb1b06a 1-36
+receiver/smartheimreceiver/config.go
+  s_7db6cfa1a4eea3::t_653d4f7a5d42fa 1-18,25-28,34-37,40-64,71-81
+  s_7db6cfa1a4eea3::t_9ab2a64cb1b06a 19-24,29-33,38-39,65-70
+receiver/smartheimreceiver/parser.go
+  s_7db6cfa1a4eea3::t_abd670509a4453 166-167
+  s_7db6cfa1a4eea3::t_9ab2a64cb1b06a 19,21-22,25-28,32-34,39-43,48-50,52-54,64-72,74-76,81-83,85-89,96-98,101,107-112,118-126,129,132-134,137-144,147,152-158,160,164,168-169,171-173,176-178,180-183,185-189,192-197,199
+  s_7db6cfa1a4eea3::t_653d4f7a5d42fa 1-18,20,23-24,29-31,35-38,44-47,51,55-63,73,77-80,84,90-95,99-100,102-106,113-117,127-128,130-131,135-136,145-146,148-151,159,161-163,165,170,174-175,179,184,190-191,198,200
+receiver/smartheimreceiver/generated_package_test.go
+  s_7db6cfa1a4eea3::t_9ab2a64cb1b06a 1-13
+go.sum
+  s_7db6cfa1a4eea3::t_6464906f2032fe 755-756
+receiver/smartheimreceiver/go.sum
+  s_7db6cfa1a4eea3::t_accd5fa46f6e85 1-129
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "c9c9361edb151fa7241857baaaaa73fba9ad74f2",
+  "prompts": {},
+  "sessions": {
+    "s_7db6cfa1a4eea3": {
+      "agent_id": {
+        "tool": "codex",
+        "id": "01a17068-3c52-75e0-9d32-18b0a03669ed",
+        "model": "gpt-6.1-sol"
+      },
+      "human_author": "Yoshi Yamaguchi <ymotongpoo@gmail.com>"
+    }
+  }
+}
