@@ -1,0 +1,20 @@
+# Five-digit block_no selects hourly_s1 (Kofu: 47638); four digits selects
+# hourly_a1 for AMeDAS (Katsunuma: "0433"). Use a separate state_file per station.
+receivers:
+  jma:
+    prec_no: "49"
+    block_no: "47638"
+    station_name: 甲府
+    state_file: /var/lib/otelcol-extra/weather/jma.json
+exporters:
+  otlp_http/weather:
+    endpoint: http://127.0.0.1:4318
+    sending_queue:
+      enabled: false
+    retry_on_failure:
+      enabled: false
+service:
+  pipelines:
+    logs/jma:
+      receivers: [jma]
+      exporters: [otlp_http/weather]

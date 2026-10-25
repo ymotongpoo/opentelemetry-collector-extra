@@ -1,0 +1,28 @@
+receivers:
+  openmeteo:
+    latitude: 35.6667
+    longitude: 138.55
+    location_id: kofu
+    timezone: Asia/Tokyo
+    collection_interval: 1h
+    state_file: ./build/weather-state/openmeteo.json
+  jma:
+    prec_no: "49"
+    block_no: "47638"
+    station_name: 甲府
+    state_file: ./build/weather-state/jma.json
+    recent_days: 7
+    revision_days: 30
+    revision_interval: 168h
+
+# Keep this pipeline synchronous so a receiver acknowledges its durable outbox
+# only after the exporter accepts the records. Do not add an in-memory batch
+# processor or sending queue here; see examples/weather-README.md.
+exporters:
+  debug:
+    verbosity: detailed
+service:
+  pipelines:
+    logs/weather:
+      receivers: [openmeteo, jma]
+      exporters: [debug]

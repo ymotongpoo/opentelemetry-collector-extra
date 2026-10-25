@@ -1,0 +1,18 @@
+# Standalone AMeDAS example. block_no is the four-digit historical-search ID,
+# including its leading zero, rather than the five-digit real-time AMeDAS ID.
+receivers:
+  jma/katsunuma:
+    prec_no: "49"
+    block_no: "0433"
+    station_name: 勝沼
+    state_file: ./build/weather-state/jma-katsunuma.json
+    recent_days: 7
+    revision_days: 30
+exporters:
+  debug:
+    verbosity: detailed
+service:
+  pipelines:
+    logs/amedas:
+      receivers: [jma/katsunuma]
+      exporters: [debug]

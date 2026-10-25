@@ -10,6 +10,8 @@ Experimental OpenTelemetry Collector components for community projects and perso
 - [Slack exporter](exporter/slackexporter): posts OTLP metrics JSON to a Slack channel.
 - [SwitchBot receiver](receiver/switchbotreceiver): environmental measurements and battery levels through the cloud API and optional Matter Server.
 - [Smart Heim Navi receiver](receiver/smartheimreceiver): local solar generation, household consumption, grid flow, and circuit power, with LAN discovery.
+- [Open-Meteo receiver](receiver/openmeteoreceiver): weather model revisions and solar times as logs, with a durable outbox.
+- [JMA receiver](receiver/jmareceiver): hourly weather-station observations and later corrections as logs.
 - [S3 Tables exporter](exporter/s3tablesexporter): an unfinished experiment, included in the custom distribution.
 
 The Discord and Slack components support **metrics**. Receivers observe new messages while running; they do not fetch message history.
@@ -18,6 +20,8 @@ Exporters suit small volumes of metrics that you want to inspect in chat.
 The `otelcol-extra` distribution includes every component in this repository. Only components selected in the configuration run.
 The [Debian package](distributions/extra/README.md) can run Discord and SwitchBot in one process and forward to an existing Alloy installation.
 Slack and S3 Tables credentials are unnecessary when those components are disabled.
+
+The [weather history example](examples/weather-README.md) combines the two weather receivers with Smart Heim data, including revision handling and Cloud retention requirements.
 
 ## Build and test
 

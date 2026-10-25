@@ -1,6 +1,6 @@
 # otelcol-extra distribution
 
-`otelcol-extra` includes all custom components in this repository: Discord, Slack, SwitchBot, and Smart Heim Navi receivers; Discord, Slack, and S3 Tables exporters.
+`otelcol-extra` includes all custom components in this repository: Discord, Slack, SwitchBot, Smart Heim Navi, Open-Meteo, and JMA receivers; Discord, Slack, and S3 Tables exporters.
 It also includes OTLP and Prometheus receivers, batch processing, and debug and OTLP HTTP exporters.
 Only configured components run. The S3 Tables exporter remains experimental.
 
@@ -91,6 +91,13 @@ Legacy backups and user-created snippets are not deleted automatically.
 
 ## Build and verification
 
+The optional `openmeteo.yaml` and `jma.yaml` snippets collect weather history
+as logs for solar comparisons. They require version 0.4.0 or later.
+Set the location and station before
+enabling the snippets. State is stored under `/var/lib/otelcol-extra/weather`.
+See the [weather guide](../../examples/weather-README.md) for delivery,
+correction handling, source attribution, and Cloud retention requirements.
+
 Use Go 1.27.3. Build scripts select it with `GOTOOLCHAIN` without changing the host's default Go.
 Collector modules remain at v0.163.0 / stable v1.69.0.
 
@@ -99,9 +106,10 @@ make build validate
 make test vet
 python3 scripts/test-credentials.py
 python3 scripts/test-collector-integration.py
-make deb VERSION=0.3.1 ARCH=amd64
-./scripts/test-deb.sh dist/otelcol-extra_0.3.1_amd64.deb
-make deb VERSION=0.3.1 ARCH=arm64
+python3 scripts/test-weather-integration.py
+make deb VERSION=0.4.0 ARCH=amd64
+./scripts/test-deb.sh dist/otelcol-extra_0.4.0_amd64.deb
+make deb VERSION=0.4.0 ARCH=arm64
 ```
 
 `test-deb.sh` uses a disposable Docker container and pinned published 0.1.0/0.1.1 packages.

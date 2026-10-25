@@ -1,0 +1,20 @@
+# Merge with /etc/otelcol-extra/config.yaml. No API key is needed for personal use.
+receivers:
+  openmeteo:
+    latitude: 35.6667
+    longitude: 138.55
+    location_id: kofu
+    timezone: Asia/Tokyo
+    state_file: /var/lib/otelcol-extra/weather/openmeteo.json
+exporters:
+  otlp_http/weather:
+    endpoint: http://127.0.0.1:4318
+    sending_queue:
+      enabled: false
+    retry_on_failure:
+      enabled: false
+service:
+  pipelines:
+    logs/openmeteo:
+      receivers: [openmeteo]
+      exporters: [otlp_http/weather]
