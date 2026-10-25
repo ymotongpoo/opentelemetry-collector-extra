@@ -15,7 +15,8 @@ import (
 	"sync"
 )
 
-// Discovery needs no raw sockets, multicast support, or external command.
+// Discovery needs no network-admin capabilities, multicast, or external command.
+// On Linux, net.Interfaces needs an AF_NETLINK socket for NETLINK_ROUTE queries.
 // A valid measurement page and device number identify the target.
 func discoveryNetworks(configured []string) ([]netip.Prefix, error) {
 	var networks []netip.Prefix

@@ -13,16 +13,21 @@ trap cleanup EXIT
 sudo apt-get install -y "$package"
 printf '%s\n' 'systemd-discord-fixture' | sudo otelcol-extra-set-credentials discord --stdin --with-key=host
 printf '%s\n' 'systemd-token-fixture' 'systemd-secret-fixture' | sudo otelcol-extra-set-credentials switchbot --stdin --with-key=host
-sudo tee /run/systemd/system/otelcol-extra-credential-check.service >/dev/null <<'UNIT'
+sed \
+    -e 's/^Type=simple$/Type=oneshot/' \
+    -e '/^ExecStart=/d' \
+    -e '/^Restart=/d' \
+    -e '/^RestartSec=/d' \
+    /usr/lib/systemd/system/otelcol-extra.service \
+    | sudo tee /run/systemd/system/otelcol-extra-credential-check.service >/dev/null
+# Keep the packaged service's full sandbox. NETLINK_ROUTE is required by Go's
+# net.Interfaces during automatic LAN discovery, even without network-admin caps.
+sudo tee -a /run/systemd/system/otelcol-extra-credential-check.service >/dev/null <<'UNIT'
 [Service]
-Type=oneshot
-DynamicUser=yes
-ProtectSystem=strict
-ProtectHome=yes
-LimitCORE=0
 LoadCredentialEncrypted=discord_bot_token:/etc/credstore.encrypted/otelcol-extra.discord
 LoadCredentialEncrypted=switchbot_cloud:/etc/credstore.encrypted/otelcol-extra.switchbot
-ExecStart=/usr/bin/otelcol-extra validate --config=/etc/otelcol-extra/config.yaml --config=/usr/share/otelcol-extra/examples/discord.yaml --config=/usr/share/otelcol-extra/examples/switchbot.yaml
+ExecStartPre=/usr/bin/python3 -c 'import socket; s = socket.socket(socket.AF_NETLINK, socket.SOCK_RAW, socket.NETLINK_ROUTE); s.close()'
+ExecStart=/usr/bin/otelcol-extra validate --config=/etc/otelcol-extra/config.yaml --config=/usr/share/otelcol-extra/examples/discord.yaml --config=/usr/share/otelcol-extra/examples/switchbot.yaml --config=/usr/share/otelcol-extra/examples/smartheim.yaml
 UNIT
 sudo systemctl daemon-reload
 sudo systemctl start otelcol-extra-credential-check.service

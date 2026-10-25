@@ -21,7 +21,8 @@ ProtectSystem=strict
 ProtectHome=true
 PrivateTmp=true
 CapabilityBoundingSet=
-RestrictAddressFamilies=AF_UNIX AF_INET AF_INET6
+# Go's net.Interfaces uses NETLINK_ROUTE to enumerate LAN addresses.
+RestrictAddressFamilies=AF_UNIX AF_INET AF_INET6 AF_NETLINK
 
 [Install]
 WantedBy=multi-user.target

@@ -69,7 +69,7 @@ jobs:
       - name: Validate and install the amd64 package
         if: matrix.arch == 'amd64'
         run: ./scripts/test-deb.sh "dist/otelcol-extra_${PACKAGE_VERSION}_amd64.deb"
-      - name: Verify credentials with systemd and a dynamic user
+      - name: Verify the systemd sandbox and encrypted credentials
         env:
           OTELCOL_EXTRA_SYSTEMD_TEST: "1"
         if: matrix.arch == 'amd64'
