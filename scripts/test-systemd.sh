@@ -27,7 +27,7 @@ sudo tee -a /run/systemd/system/otelcol-extra-credential-check.service >/dev/nul
 LoadCredentialEncrypted=discord_bot_token:/etc/credstore.encrypted/otelcol-extra.discord
 LoadCredentialEncrypted=switchbot_cloud:/etc/credstore.encrypted/otelcol-extra.switchbot
 ExecStartPre=/usr/bin/python3 -c 'import socket; s = socket.socket(socket.AF_NETLINK, socket.SOCK_RAW, socket.NETLINK_ROUTE); s.close()'
-ExecStart=/usr/bin/otelcol-extra validate --config=/etc/otelcol-extra/config.yaml --config=/usr/share/otelcol-extra/examples/discord.yaml --config=/usr/share/otelcol-extra/examples/switchbot.yaml --config=/usr/share/otelcol-extra/examples/smartheim.yaml
+ExecStart=/usr/bin/otelcol-extra validate --config=/etc/otelcol-extra/config.yaml --config=/usr/share/otelcol-extra/examples/discord.yaml --config=/usr/share/otelcol-extra/examples/switchbot.yaml --config=/usr/share/otelcol-extra/examples/smartheim.yaml --config=/usr/share/otelcol-extra/examples/openmeteo.yaml --config=/usr/share/otelcol-extra/examples/jma.yaml
 UNIT
 sudo systemctl daemon-reload
 sudo systemctl start otelcol-extra-credential-check.service

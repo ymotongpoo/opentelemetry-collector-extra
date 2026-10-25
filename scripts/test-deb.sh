@@ -34,7 +34,7 @@ dpkg -i /tmp/extra.deb
 otelcol-extra --version
 otelcol-extra validate --config=/etc/otelcol-extra/config.yaml
 otelcol-extra components > /tmp/components.txt
-for component in discord slack switchbot s3tables otlp prometheus batch debug otlp_http; do
+for component in discord slack switchbot smartheim openmeteo jma s3tables otlp prometheus batch debug otlp_http; do
     grep -q "name: $component" /tmp/components.txt
 done
 test ! -e /etc/systemd/system/multi-user.target.wants/otelcol-extra.service
@@ -56,7 +56,8 @@ systemd-creds decrypt --name=switchbot_cloud /etc/credstore.encrypted/otelcol-ex
 systemd-creds decrypt --name=slack_receiver /etc/credstore.encrypted/otelcol-extra.slack /run/extra-credentials/slack_receiver
 printf '%s' 'encryption-fixture' | cmp - /run/extra-credentials/discord_bot_token
 CREDENTIALS_DIRECTORY=/run/extra-credentials otelcol-extra validate --config=/etc/otelcol-extra/config.yaml \
-    --config=/usr/share/otelcol-extra/examples/discord.yaml --config=/usr/share/otelcol-extra/examples/switchbot.yaml --config=/usr/share/otelcol-extra/examples/slack.yaml
+    --config=/usr/share/otelcol-extra/examples/discord.yaml --config=/usr/share/otelcol-extra/examples/switchbot.yaml --config=/usr/share/otelcol-extra/examples/slack.yaml \
+    --config=/usr/share/otelcol-extra/examples/openmeteo.yaml --config=/usr/share/otelcol-extra/examples/jma.yaml
 if grep -aFq 'switchbot-secret-fixture' /etc/credstore.encrypted/otelcol-extra.switchbot; then exit 1; fi
 printf '\n# preserve new local config\n' >> /etc/otelcol-extra/config.yaml
 cp /etc/otelcol-extra/config.yaml /tmp/config-before

@@ -1,5 +1,5 @@
 OCB_VERSION := v0.163.0
-VERSION ?= 0.3.1
+VERSION ?= 0.4.0
 ARCH ?= $(shell dpkg --print-architecture)
 export GOTOOLCHAIN := go1.27.3
 
@@ -24,5 +24,7 @@ generate:
 
 validate:
 	./otelcol-extra validate --config=examples/smartheim.yaml
+	./otelcol-extra validate --config=examples/weather.yaml
+	./otelcol-extra validate --config=examples/jma-amedas.yaml
 	DISCORD_BOT_TOKEN=test SLACK_BOT_TOKEN=xoxb-test SLACK_APP_TOKEN=xapp-test ./otelcol-extra validate --config=otel-config.yaml
 	DISCORD_BOT_TOKEN=test SLACK_BOT_TOKEN=xoxb-test DISCORD_CHANNEL_ID=123456789012345678 SLACK_CHANNEL_ID=C0123456789 ./otelcol-extra validate --config=examples/export-metrics.yaml

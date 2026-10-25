@@ -23,6 +23,8 @@ import (
 	slackreceiver "github.com/ymotongpoo/opentelemetry-collector-extra/receiver/slackreceiver"
 	switchbotreceiver "github.com/ymotongpoo/opentelemetry-collector-extra/receiver/switchbotreceiver"
 	smartheimreceiver "github.com/ymotongpoo/opentelemetry-collector-extra/receiver/smartheimreceiver"
+	openmeteoreceiver "github.com/ymotongpoo/opentelemetry-collector-extra/receiver/openmeteoreceiver"
+	jmareceiver "github.com/ymotongpoo/opentelemetry-collector-extra/receiver/jmareceiver"
 )
 
 type aliasProvider interface{ DeprecatedAlias() component.Type }
@@ -60,6 +62,8 @@ func components() (otelcol.Factories, error) {
 		slackreceiver.NewFactory(),
 		switchbotreceiver.NewFactory(),
 		smartheimreceiver.NewFactory(),
+		openmeteoreceiver.NewFactory(),
+		jmareceiver.NewFactory(),
 	)
 	if err != nil {
 		return otelcol.Factories{}, err
@@ -71,6 +75,8 @@ func components() (otelcol.Factories, error) {
 		slackreceiver.NewFactory().Type(): "github.com/ymotongpoo/opentelemetry-collector-extra/receiver/slackreceiver v0.0.0",
 		switchbotreceiver.NewFactory().Type(): "github.com/ymotongpoo/opentelemetry-collector-extra/receiver/switchbotreceiver v0.0.0",
 		smartheimreceiver.NewFactory().Type(): "github.com/ymotongpoo/opentelemetry-collector-extra/receiver/smartheimreceiver v0.0.0",
+		openmeteoreceiver.NewFactory().Type(): "github.com/ymotongpoo/opentelemetry-collector-extra/receiver/openmeteoreceiver v0.0.0",
+		jmareceiver.NewFactory().Type(): "github.com/ymotongpoo/opentelemetry-collector-extra/receiver/jmareceiver v0.0.0",
 	})
 
 	factories.Exporters, err = otelcol.MakeFactoryMap[exporter.Factory](

@@ -10,6 +10,8 @@ require (
 	github.com/ymotongpoo/opentelemetry-collector-extra/exporter/s3tablesexporter v0.0.0
 	github.com/ymotongpoo/opentelemetry-collector-extra/exporter/slackexporter v0.0.0
 	github.com/ymotongpoo/opentelemetry-collector-extra/receiver/discordreceiver v0.0.0
+	github.com/ymotongpoo/opentelemetry-collector-extra/receiver/jmareceiver v0.0.0
+	github.com/ymotongpoo/opentelemetry-collector-extra/receiver/openmeteoreceiver v0.0.0
 	github.com/ymotongpoo/opentelemetry-collector-extra/receiver/slackreceiver v0.0.0
 	github.com/ymotongpoo/opentelemetry-collector-extra/receiver/smartheimreceiver v0.0.0
 	github.com/ymotongpoo/opentelemetry-collector-extra/receiver/switchbotreceiver v0.0.0
@@ -245,6 +247,7 @@ require (
 	github.com/tklauser/numcpus v0.12.0 // indirect
 	github.com/vultr/govultr/v3 v3.33.0 // indirect
 	github.com/x448/float16 v0.8.4 // indirect
+	github.com/ymotongpoo/opentelemetry-collector-extra/internal/weather v0.0.0 // indirect
 	github.com/youmark/pkcs8 v0.0.0-20240726163527-a2c0da244d78 // indirect
 	github.com/yusufpapurcu/wmi v1.2.4 // indirect
 	go.opentelemetry.io/auto/sdk v1.2.1 // indirect
@@ -382,3 +385,9 @@ replace github.com/ymotongpoo/opentelemetry-collector-extra/exporter/slackexport
 replace github.com/ymotongpoo/opentelemetry-collector-extra/receiver/switchbotreceiver => ./receiver/switchbotreceiver
 
 replace github.com/ymotongpoo/opentelemetry-collector-extra/receiver/smartheimreceiver => ./receiver/smartheimreceiver
+
+replace github.com/ymotongpoo/opentelemetry-collector-extra/receiver/openmeteoreceiver => ./receiver/openmeteoreceiver
+
+replace github.com/ymotongpoo/opentelemetry-collector-extra/receiver/jmareceiver => ./receiver/jmareceiver
+
+replace github.com/ymotongpoo/opentelemetry-collector-extra/internal/weather => ./internal/weather

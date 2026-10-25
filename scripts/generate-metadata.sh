@@ -12,7 +12,7 @@ trap 'rm -rf "$tool_dir"' EXIT HUP INT TERM
   go build -o "$tool_dir/mdatagen" go.opentelemetry.io/collector/cmd/mdatagen
 )
 if [ "$#" -eq 0 ]; then
-    set -- receiver/discordreceiver receiver/slackreceiver receiver/switchbotreceiver receiver/smartheimreceiver exporter/discordexporter exporter/slackexporter
+    set -- receiver/discordreceiver receiver/slackreceiver receiver/switchbotreceiver receiver/smartheimreceiver receiver/openmeteoreceiver receiver/jmareceiver exporter/discordexporter exporter/slackexporter
 fi
 for component in "$@"; do
   "$tool_dir/mdatagen" "$component/metadata.yaml"
