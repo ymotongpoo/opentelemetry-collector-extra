@@ -1,0 +1,45 @@
+receiver/jmareceiver/README.md
+  s_7db6cfa1a4eea3::t_387ce22c57b234 3-5,7-8,26-39,55,58,90-112,142-147
+  s_7db6cfa1a4eea3::t_626a871af987a5 1-2,6,9-25,40-54,56-57,59-89,113-141
+distributions/extra/README.md
+  s_7db6cfa1a4eea3::t_cfd1f9ae0a3538 3,94,97-100,109
+  s_7db6cfa1a4eea3::t_380fdb98792cf4 95-96,110-112
+examples/jma-amedas.yaml
+  s_7db6cfa1a4eea3::t_387ce22c57b234 1-18
+README.md
+  s_7db6cfa1a4eea3::t_626a871af987a5 13-14,24
+  s_7db6cfa1a4eea3::t_b326998b063b38 25
+distributions/extra/jma.yaml
+  s_7db6cfa1a4eea3::t_4805ab423b9339 3-20
+  s_7db6cfa1a4eea3::t_387ce22c57b234 1-2
+examples/weather.yaml
+  s_7db6cfa1a4eea3::t_4805ab423b9339 1-28
+examples/weather-README.md
+  s_7db6cfa1a4eea3::t_626a871af987a5 1-25,32-68,70-154
+  s_7db6cfa1a4eea3::t_387ce22c57b234 26-31,69
+receiver/openmeteoreceiver/testdata/README.md
+  s_7db6cfa1a4eea3::t_626a871af987a5 1-5
+distributions/extra/openmeteo.yaml
+  s_7db6cfa1a4eea3::t_4805ab423b9339 1-20
+receiver/jmareceiver/testdata/README.md
+  s_7db6cfa1a4eea3::t_626a871af987a5 1-5
+  s_7db6cfa1a4eea3::t_387ce22c57b234 6-15
+receiver/openmeteoreceiver/README.md
+  s_7db6cfa1a4eea3::t_626a871af987a5 1-80
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "425f6c97ede79b3be9df5f166767257489a0669c",
+  "prompts": {},
+  "sessions": {
+    "s_7db6cfa1a4eea3": {
+      "agent_id": {
+        "tool": "codex",
+        "id": "01a17068-3c52-75e0-9d32-18b0a03669ed",
+        "model": "gpt-6-astra"
+      },
+      "human_author": "Yoshi Yamaguchi <ymotongpoo@gmail.com>"
+    }
+  }
+}
