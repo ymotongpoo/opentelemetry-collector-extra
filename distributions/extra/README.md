@@ -99,9 +99,9 @@ make build validate
 make test vet
 python3 scripts/test-credentials.py
 python3 scripts/test-collector-integration.py
-make deb VERSION=0.3.0 ARCH=amd64
-./scripts/test-deb.sh dist/otelcol-extra_0.3.0_amd64.deb
-make deb VERSION=0.3.0 ARCH=arm64
+make deb VERSION=0.3.1 ARCH=amd64
+./scripts/test-deb.sh dist/otelcol-extra_0.3.1_amd64.deb
+make deb VERSION=0.3.1 ARCH=arm64
 ```
 
 `test-deb.sh` uses a disposable Docker container and pinned published 0.1.0/0.1.1 packages.

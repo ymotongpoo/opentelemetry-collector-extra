@@ -1,7 +1,7 @@
 #!/bin/sh
 set -eu
 cd "$(dirname "$0")/.."
-version="${1:-0.3.0}"
+version="${1:-0.3.1}"
 arch="${2:-$(dpkg --print-architecture)}"
 ./scripts/build-collector.sh "$version" "$arch"
 root="$(mktemp -d "$PWD/build/deb.XXXXXX")"

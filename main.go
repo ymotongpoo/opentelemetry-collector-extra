@@ -20,7 +20,7 @@ func main() {
 	info := component.BuildInfo{
 		Command:     "otelcol-extra",
 		Description: "Extra OpenTelemetry Collector components",
-		Version:     "0.3.0",
+		Version:     "0.3.1",
 	}
 
 	set := otelcol.CollectorSettings{
