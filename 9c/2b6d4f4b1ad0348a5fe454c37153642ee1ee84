@@ -1,0 +1,105 @@
+receiver/jmareceiver/testdata/uenohara-hourly.html
+  s_7db6cfa1a4eea3::t_9877fc907e4082 1-44
+receiver/jmareceiver/config.go
+  s_7db6cfa1a4eea3::t_955a2f4c445b98 36,39-52,57,60-61
+  s_7db6cfa1a4eea3::t_00649322c22a70 15,18-27,31,54-56,58-59,62-71
+  s_7db6cfa1a4eea3::t_2bc7c2d258dba1 1-14,16-17,28-30,32-35,37-38,53,72-74
+receiver/jmareceiver/metadata.yaml
+  s_7db6cfa1a4eea3::t_2bc7c2d258dba1 1-9
+  s_7db6cfa1a4eea3::t_d7af3fd0df6490 10-13
+receiver/jmareceiver/generated_package_test.go
+  s_7db6cfa1a4eea3::t_00649322c22a70 1-13
+receiver/jmareceiver/testdata/katsunuma-hourly.html
+  s_7db6cfa1a4eea3::t_9877fc907e4082 1-44
+receiver/jmareceiver/source_test.go
+  s_7db6cfa1a4eea3::t_f140094515bb59 18-35,38-69,71-72,76-91,95-100,105-166,170-190,194-206
+  s_7db6cfa1a4eea3::t_719c80c7329275 70
+  s_7db6cfa1a4eea3::t_f596c5267bf8db 1-17,36-37,73-75,92-94,101-104,167-169,191-193,207
+receiver/openmeteoreceiver/generated_package_test.go
+  s_7db6cfa1a4eea3::t_00649322c22a70 1-13
+receiver/jmareceiver/internal/metadata/generated_logs.go
+  s_7db6cfa1a4eea3::t_00649322c22a70 1-92
+receiver/openmeteoreceiver/testdata/forecast.json
+  s_7db6cfa1a4eea3::t_4ead6e0ddce3e3 1-79
+receiver/jmareceiver/testdata/kofu-hourly.html
+  s_7db6cfa1a4eea3::t_4ead6e0ddce3e3 1-28
+receiver/jmareceiver/go.mod
+  s_7db6cfa1a4eea3::t_2bc7c2d258dba1 1-5,7-8,11,14,18,20-22
+  s_7db6cfa1a4eea3::t_f140094515bb59 6,9-10,12-13,15-17,19
+  s_7db6cfa1a4eea3::t_527a4045e9bb91 23-62
+receiver/openmeteoreceiver/source_test.go
+  s_7db6cfa1a4eea3::t_f140094515bb59 17-23,25-32,35-54,56-61,66-94,112-146,150-161
+  s_7db6cfa1a4eea3::t_f596c5267bf8db 1-16,24,33-34,55,62-65,109-111,147-149,162-163
+  s_7db6cfa1a4eea3::t_cfd1f9ae0a3538 95-108
+receiver/openmeteoreceiver/config.go
+  s_7db6cfa1a4eea3::t_00649322c22a70 19-26,30,34-45,47-54
+  s_7db6cfa1a4eea3::t_97905c2e11f749 1-18,27-29,31-33,55-56
+  s_7db6cfa1a4eea3::t_cfd1f9ae0a3538 46
+receiver/openmeteoreceiver/metadata.yaml
+  s_7db6cfa1a4eea3::t_d7af3fd0df6490 10-14
+  s_7db6cfa1a4eea3::t_97905c2e11f749 1-9
+receiver/jmareceiver/testdata/katsunuma-2020-hourly.html
+  s_7db6cfa1a4eea3::t_9877fc907e4082 1-44
+receiver/jmareceiver/generated_component_test.go
+  s_7db6cfa1a4eea3::t_00649322c22a70 1-60
+receiver/jmareceiver/parser.go
+  s_7db6cfa1a4eea3::t_00649322c22a70 19-26,28-33,35-37,39-44,46,123-149,151-158,162,164-165,167,169-170,174-176,178-180,182-193,206,210,212-220,223-234,237-244,246-262
+  s_7db6cfa1a4eea3::t_2bc7c2d258dba1 1-9,11-18,27,34,38,45,47,92,150,166,168,221-222,235-236,245,263
+  s_7db6cfa1a4eea3::t_955a2f4c445b98 10,48-61,63,65-72,74,76-91,93-122,159-161,163,171-173,177,181,194-205,207-209,211
+  s_7db6cfa1a4eea3::t_9877fc907e4082 62,64,73,75
+receiver/jmareceiver/internal/metadata/generated_logs_test.go
+  s_7db6cfa1a4eea3::t_00649322c22a70 1-64
+receiver/jmareceiver/amedas_test.go
+  s_7db6cfa1a4eea3::t_499db7b43f96ce 1-146,153-204
+  s_7db6cfa1a4eea3::t_ea9b9601140261 147-152
+receiver/jmareceiver/source.go
+  s_7db6cfa1a4eea3::t_00649322c22a70 18-19,23-24,27-35,38-56,58,61-63,67-74,76-84,86-103
+  s_7db6cfa1a4eea3::t_2bc7c2d258dba1 1-17,20-22,25,36-37,57,59-60,64-66,75,85,104-107
+  s_7db6cfa1a4eea3::t_955a2f4c445b98 26
+receiver/jmareceiver/internal/metadata/generated_status.go
+  s_7db6cfa1a4eea3::t_00649322c22a70 1-18
+receiver/jmareceiver/factory.go
+  s_7db6cfa1a4eea3::t_2bc7c2d258dba1 1-16,27
+  s_7db6cfa1a4eea3::t_955a2f4c445b98 26
+  s_7db6cfa1a4eea3::t_00649322c22a70 17-25
+receiver/openmeteoreceiver/generated_component_test.go
+  s_7db6cfa1a4eea3::t_00649322c22a70 1-60
+receiver/openmeteoreceiver/factory.go
+  s_7db6cfa1a4eea3::t_cfd1f9ae0a3538 27
+  s_7db6cfa1a4eea3::t_97905c2e11f749 1-16,20,29
+  s_7db6cfa1a4eea3::t_00649322c22a70 17-19,21-26,28
+receiver/openmeteoreceiver/go.mod
+  s_7db6cfa1a4eea3::t_f140094515bb59 6,9-10,12-13,15-19
+  s_7db6cfa1a4eea3::t_97905c2e11f749 1-5,7-8,11,14,20-22
+  s_7db6cfa1a4eea3::t_9e0f9e55ae9811 23-62
+receiver/openmeteoreceiver/internal/metadata/generated_logs.go
+  s_7db6cfa1a4eea3::t_00649322c22a70 1-92
+receiver/openmeteoreceiver/source.go
+  s_7db6cfa1a4eea3::t_cfd1f9ae0a3538 39-40,100,103-105,110
+  s_7db6cfa1a4eea3::t_00649322c22a70 21-29,31-35,41-51,54,57-76,79-89,92,94-99,101-102,106-109,112-118,120-124,126,128-133,135-142,144-157,161
+  s_7db6cfa1a4eea3::t_97905c2e11f749 1-20,30,36-38,52-53,55-56,77-78,90-91,93,111,119,125,127,134,143,158-160,162
+receiver/openmeteoreceiver/internal/metadata/generated_status.go
+  s_7db6cfa1a4eea3::t_00649322c22a70 1-18
+receiver/openmeteoreceiver/internal/metadata/generated_logs_test.go
+  s_7db6cfa1a4eea3::t_00649322c22a70 1-64
+receiver/jmareceiver/go.sum
+  s_7db6cfa1a4eea3::t_6c827f1725bdb3 1-127
+receiver/openmeteoreceiver/go.sum
+  s_7db6cfa1a4eea3::t_d89f6347c8fff0 1-127
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "9c2b6d4f4b1ad0348a5fe454c37153642ee1ee84",
+  "prompts": {},
+  "sessions": {
+    "s_7db6cfa1a4eea3": {
+      "agent_id": {
+        "tool": "codex",
+        "id": "01a17068-3c52-75e0-9d32-18b0a03669ed",
+        "model": "gpt-6-astra"
+      },
+      "human_author": "Yoshi Yamaguchi <ymotongpoo@gmail.com>"
+    }
+  }
+}
