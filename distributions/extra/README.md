@@ -56,6 +56,7 @@ The receiver discovers the unit on the LAN and polls every 30 seconds.
 Set `device_id` to the unit's device number if multiple units share the network.
 For containers or larger subnets, set `discovery.networks` to the device's private IPv4 `/24` network.
 An explicit `endpoint` disables discovery.
+The service allows `AF_NETLINK` for automatic LAN interface enumeration without network-administration capabilities.
 
 ## Upgrade from discord-otelcol
 
@@ -107,6 +108,7 @@ make deb VERSION=0.3.0 ARCH=arm64
 It checks fresh installs, encryption, failed rotation, legacy data migrations, failed migration recovery, service state, APT removal of the last archived transitional package, remove, and purge.
 `test-systemd.sh` installs a package on its host and requires `OTELCOL_EXTRA_SYSTEMD_TEST=1`; run it only on a disposable systemd CI runner.
 The Collector integration test uses local fake services and verifies that cloud authentication and Matter connection failures leave an unrelated metrics pipeline running.
+The systemd test inherits the packaged service's full sandbox and checks the route-query socket required by Smart Heim discovery.
 
 Release CI uses tags `otelcol-extra/vVERSION` and produces only `otelcol-extra_VERSION_amd64.deb`, `otelcol-extra_VERSION_arm64.deb`, and `SHA256SUMS`. An explicit file list prevents old artifacts from entering uploads or releases.
 The shared APT importer accepts only `otelcol-extra` packages, verifies checksums and Debian metadata, and ignores retired artifacts listed in historical manifests. It also removes old package files from a reused import pool before indexing.

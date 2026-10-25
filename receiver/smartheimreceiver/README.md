@@ -69,6 +69,9 @@ By default, discovery uses private IPv4 networks from active interfaces and excl
 Automatic discovery supports interface prefixes from `/24` through `/30` and deduplicates networks shared by Ethernet and Wi-Fi.
 Specify `discovery.networks` when your interface uses a larger subnet or the Collector runs in a container.
 The Collector must have HTTP access to the device. Discovery needs no root access or external network tools.
+On Linux, automatic interface enumeration requires `AF_NETLINK` for route queries.
+Collector Extra packages from 0.3.1 allow this socket family in the systemd sandbox.
+For a custom sandbox that blocks it, set `discovery.networks` explicitly; IP discovery still works within those networks.
 
 After discovery, normal collection contacts only the selected address.
 Three consecutive summary failures clear that address and allow another discovery attempt after `discovery.interval`.
