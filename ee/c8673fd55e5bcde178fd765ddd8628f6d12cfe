@@ -1,0 +1,29 @@
+Makefile
+  s_7db6cfa1a4eea3::t_0511fa972e8c40 2
+otelcol-builder.yaml
+  s_7db6cfa1a4eea3::t_0511fa972e8c40 20
+.github/workflows/extra-packages.yaml
+  s_7db6cfa1a4eea3::t_0511fa972e8c40 60
+scripts/build-deb.sh
+  s_7db6cfa1a4eea3::t_0511fa972e8c40 4
+scripts/build-collector.sh
+  s_7db6cfa1a4eea3::t_0511fa972e8c40 5
+main.go
+  s_7db6cfa1a4eea3::t_6b04cc4a282874 23
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "eec8673fd55e5bcde178fd765ddd8628f6d12cfe",
+  "prompts": {},
+  "sessions": {
+    "s_7db6cfa1a4eea3": {
+      "agent_id": {
+        "tool": "codex",
+        "id": "01a17068-3c52-75e0-9d32-18b0a03669ed",
+        "model": "gpt-6.1-sol"
+      },
+      "human_author": "Yoshi Yamaguchi <ymotongpoo@gmail.com>"
+    }
+  }
+}
