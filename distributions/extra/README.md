@@ -1,6 +1,6 @@
 # otelcol-extra distribution
 
-`otelcol-extra` includes all custom components in this repository: Discord, Slack, and SwitchBot receivers; Discord, Slack, and S3 Tables exporters.
+`otelcol-extra` includes all custom components in this repository: Discord, Slack, SwitchBot, and Smart Heim Navi receivers; Discord, Slack, and S3 Tables exporters.
 It also includes OTLP and Prometheus receivers, batch processing, and debug and OTLP HTTP exporters.
 Only configured components run. The S3 Tables exporter remains experimental.
 
@@ -48,6 +48,15 @@ Use `--with-key=host` if the default systemd key selection is unsuitable for the
 For rotation, rerun the helper, then reload and restart the service. Remove a component's snippet and credential drop-in before disabling its credentials.
 See the [receiver documentation](../../receiver/switchbotreceiver/README.md) for polling intervals, supported measurements, cloud quotas, and Matter bindings.
 
+## Smart Heim Navi
+
+The local [Smart Heim Navi receiver](../../receiver/smartheimreceiver) needs no cloud credentials.
+Copy `/usr/share/otelcol-extra/examples/smartheim.yaml` into `/etc/otelcol-extra/conf.d/` and restart `otelcol-extra.service`.
+The receiver discovers the unit on the LAN and polls every 30 seconds.
+Set `device_id` to the unit's device number if multiple units share the network.
+For containers or larger subnets, set `discovery.networks` to the device's private IPv4 `/24` network.
+An explicit `endpoint` disables discovery.
+
 ## Upgrade from discord-otelcol
 
 `otelcol-extra` is the only Collector package published to APT. The temporary `discord-otelcol` packages from releases 0.2.0 and 0.2.1 are retired; current builds do not generate them, and the APT index excludes the old package name. Historical GitHub release assets remain available for recovery.
@@ -89,9 +98,9 @@ make build validate
 make test vet
 python3 scripts/test-credentials.py
 python3 scripts/test-collector-integration.py
-make deb VERSION=0.2.1 ARCH=amd64
-./scripts/test-deb.sh dist/otelcol-extra_0.2.1_amd64.deb
-make deb VERSION=0.2.1 ARCH=arm64
+make deb VERSION=0.3.0 ARCH=amd64
+./scripts/test-deb.sh dist/otelcol-extra_0.3.0_amd64.deb
+make deb VERSION=0.3.0 ARCH=arm64
 ```
 
 `test-deb.sh` uses a disposable Docker container and pinned published 0.1.0/0.1.1 packages.

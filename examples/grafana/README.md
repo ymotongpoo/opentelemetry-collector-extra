@@ -1,5 +1,7 @@
 # SwitchBot Grafana dashboard
 
+For home energy measurements, see the [Smart Heim Navi dashboard](smartheim-README.md).
+
 [switchbot-dashboard.json](switchbot-dashboard.json) is an importable Grafana dashboard for the [SwitchBot receiver](../../receiver/switchbotreceiver). It has 14 panels with Japanese labels: collection summaries, temperature, humidity, CO₂, Hub brightness, battery levels and history, device measurement status, and observation ages.
 
 ## Import

@@ -9,6 +9,7 @@ Experimental OpenTelemetry Collector components for community projects and perso
 - [Discord exporter](exporter/discordexporter): posts OTLP metrics JSON to a Discord channel.
 - [Slack exporter](exporter/slackexporter): posts OTLP metrics JSON to a Slack channel.
 - [SwitchBot receiver](receiver/switchbotreceiver): environmental measurements and battery levels through the cloud API and optional Matter Server.
+- [Smart Heim Navi receiver](receiver/smartheimreceiver): local solar generation, household consumption, grid flow, and circuit power, with LAN discovery.
 - [S3 Tables exporter](exporter/s3tablesexporter): an unfinished experiment, included in the custom distribution.
 
 The Discord and Slack components support **metrics**. Receivers observe new messages while running; they do not fetch message history.
@@ -38,7 +39,7 @@ To build the checked-in generated sources without regenerating them:
 GOTOOLCHAIN=go1.27.3 go build -o otelcol-extra .
 ```
 
-`make generate` regenerates the chat and SwitchBot components' metadata with the pinned generator.
+`make generate` regenerates the custom components' metadata with the pinned generator.
 
 
 ## Receive message statistics
