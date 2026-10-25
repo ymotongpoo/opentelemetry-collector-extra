@@ -1,0 +1,25 @@
+scripts/test-systemd.sh
+  s_7db6cfa1a4eea3::t_e50ff3e8d988e3 16-25,29-30
+.github/workflows/extra-packages.yaml
+  s_7db6cfa1a4eea3::t_6d9c9ea0b4efc4 72
+packaging/debian/otelcol-extra.service
+  s_7db6cfa1a4eea3::t_e50ff3e8d988e3 24-25
+receiver/smartheimreceiver/discovery.go
+  s_7db6cfa1a4eea3::t_e50ff3e8d988e3 18-19
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "f127fe6b1627870cfbd03d6e2f6613bf58054140",
+  "prompts": {},
+  "sessions": {
+    "s_7db6cfa1a4eea3": {
+      "agent_id": {
+        "tool": "codex",
+        "id": "01a17068-3c52-75e0-9d32-18b0a03669ed",
+        "model": "gpt-6.1-sol"
+      },
+      "human_author": "Yoshi Yamaguchi <ymotongpoo@gmail.com>"
+    }
+  }
+}
