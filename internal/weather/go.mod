@@ -4,9 +4,9 @@ go 1.27.3
 
 require (
 	github.com/gofrs/flock v0.13.0
-	go.opentelemetry.io/collector/component v1.69.0
+	go.opentelemetry.io/collector/component v1.70.0
 	go.opentelemetry.io/collector/consumer v1.69.0
-	go.opentelemetry.io/collector/pdata v1.69.0
+	go.opentelemetry.io/collector/pdata v1.70.0
 	go.opentelemetry.io/collector/receiver v1.69.0
 	go.opentelemetry.io/collector/receiver/receiverhelper v0.163.0
 	go.opentelemetry.io/collector/receiver/receivertest v0.163.0
@@ -27,7 +27,7 @@ require (
 	go.opentelemetry.io/collector/component/componenttest v0.163.0 // indirect
 	go.opentelemetry.io/collector/consumer/consumererror v0.163.0 // indirect
 	go.opentelemetry.io/collector/consumer/xconsumer v0.163.0 // indirect
-	go.opentelemetry.io/collector/featuregate v1.69.0 // indirect
+	go.opentelemetry.io/collector/featuregate v1.70.0 // indirect
 	go.opentelemetry.io/collector/internal/componentalias v0.163.0 // indirect
 	go.opentelemetry.io/collector/pdata/pprofile v0.163.0 // indirect
 	go.opentelemetry.io/collector/pipeline v1.69.0 // indirect

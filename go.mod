@@ -15,7 +15,7 @@ require (
 	github.com/ymotongpoo/opentelemetry-collector-extra/receiver/slackreceiver v0.0.0
 	github.com/ymotongpoo/opentelemetry-collector-extra/receiver/smartheimreceiver v0.0.0
 	github.com/ymotongpoo/opentelemetry-collector-extra/receiver/switchbotreceiver v0.0.0
-	go.opentelemetry.io/collector/component v1.69.0
+	go.opentelemetry.io/collector/component v1.70.0
 	go.opentelemetry.io/collector/confmap v1.69.0
 	go.opentelemetry.io/collector/confmap/provider/envprovider v1.69.0
 	go.opentelemetry.io/collector/confmap/provider/fileprovider v1.69.0
@@ -282,14 +282,14 @@ require (
 	go.opentelemetry.io/collector/extension/extensionmiddleware v0.163.0 // indirect
 	go.opentelemetry.io/collector/extension/extensiontest v0.163.0 // indirect
 	go.opentelemetry.io/collector/extension/xextension v0.163.0 // indirect
-	go.opentelemetry.io/collector/featuregate v1.69.0 // indirect
+	go.opentelemetry.io/collector/featuregate v1.70.0 // indirect
 	go.opentelemetry.io/collector/filter v0.163.0 // indirect
 	go.opentelemetry.io/collector/internal/componentalias v0.163.0 // indirect
 	go.opentelemetry.io/collector/internal/fanoutconsumer v0.163.0 // indirect
 	go.opentelemetry.io/collector/internal/sharedcomponent v0.163.0 // indirect
 	go.opentelemetry.io/collector/internal/statusutil v0.163.0 // indirect
 	go.opentelemetry.io/collector/internal/telemetry v0.163.0 // indirect
-	go.opentelemetry.io/collector/pdata v1.69.0 // indirect
+	go.opentelemetry.io/collector/pdata v1.70.0 // indirect
 	go.opentelemetry.io/collector/pdata/pprofile v0.163.0 // indirect
 	go.opentelemetry.io/collector/pdata/testdata v0.163.0 // indirect
 	go.opentelemetry.io/collector/pdata/xpdata v0.163.0 // indirect

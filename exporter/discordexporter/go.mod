@@ -4,7 +4,7 @@ go 1.27.3
 
 require (
 	github.com/stretchr/testify v1.12.1
-	go.opentelemetry.io/collector/component v1.69.0
+	go.opentelemetry.io/collector/component v1.70.0
 	go.opentelemetry.io/collector/component/componenttest v0.163.0
 	go.opentelemetry.io/collector/config/configopaque v1.69.0
 	go.opentelemetry.io/collector/config/configoptional v1.69.0
@@ -15,7 +15,7 @@ require (
 	go.opentelemetry.io/collector/exporter v1.69.0
 	go.opentelemetry.io/collector/exporter/exporterhelper v0.163.0
 	go.opentelemetry.io/collector/exporter/exportertest v0.163.0
-	go.opentelemetry.io/collector/pdata v1.69.0
+	go.opentelemetry.io/collector/pdata v1.70.0
 	go.uber.org/goleak v1.3.0
 )
 
@@ -44,7 +44,7 @@ require (
 	go.opentelemetry.io/collector/exporter/xexporter v0.163.0 // indirect
 	go.opentelemetry.io/collector/extension v1.69.0 // indirect
 	go.opentelemetry.io/collector/extension/xextension v0.163.0 // indirect
-	go.opentelemetry.io/collector/featuregate v1.69.0 // indirect
+	go.opentelemetry.io/collector/featuregate v1.70.0 // indirect
 	go.opentelemetry.io/collector/internal/componentalias v0.163.0 // indirect
 	go.opentelemetry.io/collector/pdata/pprofile v0.163.0 // indirect
 	go.opentelemetry.io/collector/pdata/xpdata v0.163.0 // indirect
