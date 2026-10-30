@@ -5,7 +5,7 @@ go 1.27.3
 require (
 	github.com/google/go-cmp v0.7.0
 	github.com/gorilla/websocket v1.5.3
-	github.com/slack-go/slack v0.30.1
+	github.com/slack-go/slack v0.33.0
 	github.com/stretchr/testify v1.12.1
 	go.opentelemetry.io/collector/component v1.69.0
 	go.opentelemetry.io/collector/component/componentstatus v0.163.0
