@@ -9,12 +9,12 @@ require (
 	github.com/aws/aws-sdk-go-v2/service/s3tables v1.13.1
 	github.com/google/uuid v1.6.0
 	github.com/parquet-go/parquet-go v0.26.2
-	go.opentelemetry.io/collector/component v1.69.0
+	go.opentelemetry.io/collector/component v1.71.0
 	go.opentelemetry.io/collector/component/componenttest v0.163.0
 	go.opentelemetry.io/collector/exporter v1.69.0
 	go.opentelemetry.io/collector/exporter/exporterhelper v0.163.0
 	go.opentelemetry.io/collector/exporter/exportertest v0.163.0
-	go.opentelemetry.io/collector/pdata v1.69.0
+	go.opentelemetry.io/collector/pdata v1.71.0
 )
 
 require (
@@ -68,7 +68,7 @@ require (
 	go.opentelemetry.io/collector/exporter/xexporter v0.163.0 // indirect
 	go.opentelemetry.io/collector/extension v1.69.0 // indirect
 	go.opentelemetry.io/collector/extension/xextension v0.163.0 // indirect
-	go.opentelemetry.io/collector/featuregate v1.69.0 // indirect
+	go.opentelemetry.io/collector/featuregate v1.71.0 // indirect
 	go.opentelemetry.io/collector/internal/componentalias v0.163.0 // indirect
 	go.opentelemetry.io/collector/pdata/pprofile v0.163.0 // indirect
 	go.opentelemetry.io/collector/pdata/xpdata v0.163.0 // indirect
@@ -87,7 +87,7 @@ require (
 	go.uber.org/zap v1.28.0 // indirect
 	go.yaml.in/yaml/v3 v3.0.5 // indirect
 	golang.org/x/sys v0.48.0 // indirect
-	google.golang.org/genproto/googleapis/rpc v0.0.0-20260706201446-f0a921348800 // indirect
-	google.golang.org/grpc v1.84.0 // indirect
+	google.golang.org/genproto/googleapis/rpc v0.0.0-20260817212433-ac3dfec99bb1 // indirect
+	google.golang.org/grpc v1.85.0 // indirect
 	google.golang.org/protobuf v1.36.12 // indirect
 )
