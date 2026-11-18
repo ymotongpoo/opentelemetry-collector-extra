@@ -8,7 +8,7 @@ require (
 	github.com/aws/aws-sdk-go-v2/service/s3 v1.94.0
 	github.com/aws/aws-sdk-go-v2/service/s3tables v1.13.1
 	github.com/google/uuid v1.6.0
-	github.com/parquet-go/parquet-go v0.26.2
+	github.com/parquet-go/parquet-go v0.32.1
 	go.opentelemetry.io/collector/component v1.69.0
 	go.opentelemetry.io/collector/component/componenttest v0.163.0
 	go.opentelemetry.io/collector/exporter v1.69.0
@@ -18,7 +18,7 @@ require (
 )
 
 require (
-	github.com/andybalholm/brotli v1.2.0 // indirect
+	github.com/andybalholm/brotli v1.3.0 // indirect
 	github.com/aws/aws-sdk-go-v2/aws/protocol/eventstream v1.7.4 // indirect
 	github.com/aws/aws-sdk-go-v2/credentials v1.19.6 // indirect
 	github.com/aws/aws-sdk-go-v2/feature/ec2/imds v1.18.16 // indirect
@@ -44,7 +44,7 @@ require (
 	github.com/hashicorp/go-version v1.9.0 // indirect
 	github.com/hashicorp/golang-lru/v2 v2.0.7 // indirect
 	github.com/json-iterator/go v1.1.12 // indirect
-	github.com/klauspost/compress v1.18.0 // indirect
+	github.com/klauspost/compress v1.20.4 // indirect
 	github.com/knadh/koanf/maps v0.1.3 // indirect
 	github.com/knadh/koanf/providers/confmap v1.0.1 // indirect
 	github.com/knadh/koanf/v2 v2.3.8 // indirect
@@ -52,10 +52,11 @@ require (
 	github.com/mitchellh/reflectwalk v1.0.2 // indirect
 	github.com/modern-go/concurrent v0.0.0-20180306012644-bacd9c7ef1dd // indirect
 	github.com/modern-go/reflect2 v1.0.3-0.20250322232337-35a7c28c31ee // indirect
-	github.com/parquet-go/bitpack v1.0.0 // indirect
-	github.com/parquet-go/jsonlite v1.0.0 // indirect
-	github.com/pierrec/lz4/v4 v4.1.22 // indirect
+	github.com/parquet-go/bitpack v1.0.3 // indirect
+	github.com/parquet-go/jsonlite v1.5.5 // indirect
+	github.com/pierrec/lz4/v4 v4.1.33 // indirect
 	github.com/stretchr/testify v1.12.1 // indirect
+	github.com/twpayne/go-geom v1.6.1 // indirect
 	go.opentelemetry.io/auto/sdk v1.2.1 // indirect
 	go.opentelemetry.io/collector/client v1.69.0 // indirect
 	go.opentelemetry.io/collector/config/configoptional v1.69.0 // indirect
